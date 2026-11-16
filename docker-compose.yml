@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:17
+    container_name: devpay-db
+    environment:
+      POSTGRES_DB: devpay
+      POSTGRES_USER: devpay
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-devpay1234}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - devpay-data:/var/lib/postgresql/data
+
+volumes:
+  devpay-data:
