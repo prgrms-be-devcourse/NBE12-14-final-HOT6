@@ -84,11 +84,11 @@ public class GlobalExceptionHandler {
     return response(CommonErrorCode.INVALID_REQUEST);
   }
 
-  // 지원하지 않는 HTTP 메서드. 명세에 별도 코드가 없어 COM-001 로 처리한다.
+  // 지원하지 않는 HTTP 메서드 (405)
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
       HttpRequestMethodNotSupportedException e) {
-    return response(CommonErrorCode.INVALID_REQUEST);
+    return response(CommonErrorCode.METHOD_NOT_ALLOWED);
   }
 
   // 존재하지 않는 URL

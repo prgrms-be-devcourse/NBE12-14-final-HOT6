@@ -26,7 +26,10 @@ public enum CommonErrorCode implements ErrorCode {
   // 리소스·서버·외부 연동
   RESOURCE_NOT_FOUND("COM-009", HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다"),
   INTERNAL_SERVER_ERROR("COM-010", HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다"),
-  EXTERNAL_SERVICE_FAILURE("COM-011", HttpStatus.SERVICE_UNAVAILABLE, "외부 서비스 연동에 실패했습니다");
+  EXTERNAL_SERVICE_FAILURE("COM-011", HttpStatus.SERVICE_UNAVAILABLE, "외부 서비스 연동에 실패했습니다"),
+
+  // HTTP 메서드
+  METHOD_NOT_ALLOWED("COM-012", HttpStatus.METHOD_NOT_ALLOWED, "지원하지 않는 HTTP 메서드입니다");
 
   private final String code;
   private final HttpStatus status;
