@@ -7,11 +7,14 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -50,6 +53,27 @@ public class GlobalExceptionHandler {
   // 요청 본문을 DTO 로 변환할 수 없는 경우
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ApiResponse<Void>> handleNotReadable(HttpMessageNotReadableException e) {
+    return response(CommonErrorCode.INVALID_REQUEST);
+  }
+
+  // 필수 쿼리 파라미터 누락
+  @ExceptionHandler(MissingServletRequestParameterException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMissingParameter(
+      MissingServletRequestParameterException e) {
+    return response(CommonErrorCode.INVALID_REQUEST);
+  }
+
+  // @RequestParam, @PathVariable 등 메서드 파라미터 검증 실패
+  @ExceptionHandler(HandlerMethodValidationException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMethodValidation(
+      HandlerMethodValidationException e) {
+    return response(CommonErrorCode.INVALID_REQUEST);
+  }
+
+  // 지원하지 않는 Content-Type
+  @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMediaTypeNotSupported(
+      HttpMediaTypeNotSupportedException e) {
     return response(CommonErrorCode.INVALID_REQUEST);
   }
 
