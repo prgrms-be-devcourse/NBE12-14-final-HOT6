@@ -1,4 +1,4 @@
-package com.back.nbe1214finalhot6.domain.cashback.support;
+package com.back.nbe1214finalhot6.support;
 
 import java.sql.Connection;
 import java.sql.DriverManager;

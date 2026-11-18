@@ -1,4 +1,4 @@
-package com.back.nbe1214finalhot6.domain.cashback.support;
+package com.back.nbe1214finalhot6.support;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -9,9 +9,11 @@ import java.time.ZoneId;
 public class MutableClock extends Clock {
 
   private final ZoneId zone;
+  private final Instant initial;
   private volatile Instant instant;
 
   public MutableClock(Instant instant, ZoneId zone) {
+    this.initial = instant;
     this.instant = instant;
     this.zone = zone;
   }
@@ -22,6 +24,11 @@ public class MutableClock extends Clock {
 
   public void advance(Duration duration) {
     this.instant = this.instant.plus(duration);
+  }
+
+  /** 만들 때의 시각으로 되돌린다. 테스트 사이에 시간 변경이 새지 않게 하려고 쓴다. */
+  public void reset() {
+    this.instant = initial;
   }
 
   @Override
