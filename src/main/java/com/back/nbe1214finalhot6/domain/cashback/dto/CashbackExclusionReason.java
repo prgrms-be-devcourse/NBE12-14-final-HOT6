@@ -1,7 +1,7 @@
 package com.back.nbe1214finalhot6.domain.cashback.dto;
 
 /** 적립이 0원이 된 이유. 영수증과 적립 내역에 그대로 보여 준다. */
-public enum ExclusionReason {
+public enum CashbackExclusionReason {
   /** 적립됐다(제외 아님). */
   NONE,
   /** 적립 대상 가맹점이 아니다. */

@@ -1,8 +1,8 @@
 package com.back.nbe1214finalhot6.domain.cashback.service;
 
-import com.back.nbe1214finalhot6.domain.cashback.dto.ExclusionReason;
-import com.back.nbe1214finalhot6.domain.cashback.dto.ReserveCommand;
-import com.back.nbe1214finalhot6.domain.cashback.dto.ReserveResult;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackExclusionReason;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveResponse;
 import org.springframework.stereotype.Service;
 
 /**
@@ -19,8 +19,8 @@ public class CashbackService {
    *
    * <p>적립은 전액 또는 0원이다. 예산이 부족하거나 한도를 넘으면 예외 없이 0원과 사유를 돌려주며, 결제는 그대로 진행한다.
    */
-  public ReserveResult reserve(ReserveCommand command) {
-    return ReserveResult.excluded(ExclusionReason.NOT_ELIGIBLE);
+  public CashbackReserveResponse reserve(CashbackReserveRequest command) {
+    return CashbackReserveResponse.excluded(CashbackExclusionReason.NOT_ELIGIBLE);
   }
 
   /**
