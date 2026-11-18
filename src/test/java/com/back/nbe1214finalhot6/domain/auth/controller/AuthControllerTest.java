@@ -89,7 +89,7 @@ class AuthControllerTest {
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("AUTH-002"))
-        .andExpect(jsonPath("$.message").value("이미 사용 중인 핸드폰 번호입니다"));
+        .andExpect(jsonPath("$.message").value("이미 사용 중인 전화번호입니다"));
   }
 
   // 입력 검증 실패 케이스. 모두 400 과 COM-001 로 거절되고 서비스 호출 없음

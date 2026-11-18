@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "인증·회원", description = "회원가입, 로그인 관련 API") // Swagger 그룹 이름
+@Tag(name = "인증·회원", description = "회원가입 관련 API") // Swagger 그룹 이름
 @RestController
 @RequestMapping("/api") // 공통 경로
 @RequiredArgsConstructor
