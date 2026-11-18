@@ -20,58 +20,57 @@ import org.hibernate.annotations.CreationTimestamp;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(nullable = false, length = 100)
-    private String name;
+  @Column(nullable = false, length = 100)
+  private String name;
 
-    @Column(nullable = false, unique = true, length = 255)
-    private String email;
+  @Column(nullable = false, unique = true, length = 255)
+  private String email;
 
-    @Column(nullable = false, length = 255)
-    private String passwordHash;
+  @Column(nullable = false, length = 255)
+  private String passwordHash;
 
-    @Column(nullable = false, unique = true, length = 11)
-    private String phone;
+  @Column(nullable = false, unique = true, length = 11)
+  private String phone;
 
-    @Column(nullable = false, length = 255)
-    private String pinHash;
+  @Column(nullable = false, length = 255)
+  private String pinHash;
 
-    @Column(nullable = false)
-    private int pinFailCount;
+  @Column(nullable = false)
+  private int pinFailCount;
 
-    private LocalDateTime pinLockedAt;
+  private LocalDateTime pinLockedAt;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private UserRole role;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private UserRole role;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    private UserStatus status;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 20)
+  private UserStatus status;
 
-    private LocalDateTime withdrawnAt;
+  private LocalDateTime withdrawnAt;
 
-    @Column(nullable = false, updatable = false)
-    @CreationTimestamp
-    private LocalDateTime createdAt;
+  @Column(nullable = false, updatable = false)
+  @CreationTimestamp
+  private LocalDateTime createdAt;
 
+  private User(
+      String name, String email, String phone, String passwordHash, String pinHash, UserRole role) {
+    this.name = name;
+    this.email = email;
+    this.phone = phone;
+    this.passwordHash = passwordHash;
+    this.pinHash = pinHash;
+    this.role = role;
+    this.status = UserStatus.ACTIVE;
+  }
 
-    private User(String name, String email, String phone, String passwordHash, String pinHash,
-        UserRole role) {
-        this.name = name;
-        this.email = email;
-        this.phone = phone;
-        this.passwordHash = passwordHash;
-        this.pinHash = pinHash;
-        this.role = role;
-        this.status = UserStatus.ACTIVE;
-    }
-
-    public static User create(String name, String email, String phone, String passwordHash,
-        String pinHash, UserRole role) {
-        return new User(name, email, phone, passwordHash, pinHash, role);
-    }
+  public static User create(
+      String name, String email, String phone, String passwordHash, String pinHash, UserRole role) {
+    return new User(name, email, phone, passwordHash, pinHash, role);
+  }
 }

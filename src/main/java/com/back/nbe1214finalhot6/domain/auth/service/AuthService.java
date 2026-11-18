@@ -16,37 +16,32 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+  private final UserRepository userRepository;
+  private final PasswordEncoder passwordEncoder;
 
-    @Transactional
-    public SignupResponse signup(SignupRequest request) {
-        // 1. 이메일 중복이면 예외
-        if (userRepository.existsByEmail(request.email())) {
-            throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
-        }
-        // 2. 전화번호 중복이면 예외
-        if (userRepository.existsByPhone(request.phone())) {
-            throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE);
-        }
-        // 3. 암호화
-        String passwordHash = passwordEncoder.encode(request.password());
-        String pinHash = passwordEncoder.encode(request.pin());
-
-        // 4. 엔티티 생성
-        User user = User.create(
-            request.name(),
-            request.email(),
-            request.phone(),
-            passwordHash,
-            pinHash,
-            UserRole.USER);
-
-        // 5. 저장
-        User saved = userRepository.save(user);
-
-        // 6. 응답으로 변환
-        return SignupResponse.from(saved);
+  @Transactional
+  public SignupResponse signup(SignupRequest request) {
+    // 1. 이메일 중복이면 예외
+    if (userRepository.existsByEmail(request.email())) {
+      throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
     }
+    // 2. 전화번호 중복이면 예외
+    if (userRepository.existsByPhone(request.phone())) {
+      throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE);
+    }
+    // 3. 암호화
+    String passwordHash = passwordEncoder.encode(request.password());
+    String pinHash = passwordEncoder.encode(request.pin());
 
+    // 4. 엔티티 생성
+    User user =
+        User.create(
+            request.name(), request.email(), request.phone(), passwordHash, pinHash, UserRole.USER);
+
+    // 5. 저장
+    User saved = userRepository.save(user);
+
+    // 6. 응답으로 변환
+    return SignupResponse.from(saved);
+  }
 }
