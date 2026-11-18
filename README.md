@@ -85,7 +85,7 @@ IntelliJ에서는 `Nbe1214FinalHot6Application`을 실행해도 됩니다.
 docker compose ps          # DB 상태 확인
 docker compose down        # DB 중지 (데이터 유지)
 docker compose down -v     # DB 중지 및 데이터 초기화
-./gradlew test             # 테스트 실행
+./gradlew test             # 테스트 실행 (DB가 떠 있어야 함. cashback 통합 테스트는 devpay_test DB를 자동 생성)
 ```
 
 ## 프로젝트 구조
