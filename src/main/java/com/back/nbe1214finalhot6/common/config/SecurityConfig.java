@@ -4,10 +4,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * 임시 보안 설정
+ *
  * <p>TODO: 인증·권한(COM-03) 작업이 머지되면 이 파일을 그쪽 설정으로 교체한다. 그 전까지는 가맹점 API 만 열어 둔다.
  */
 @Configuration
@@ -16,8 +19,16 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.csrf(AbstractHttpConfigurer::disable)
-        .authorizeHttpRequests(
-            auth -> auth.requestMatchers("/api/merchants/**").permitAll().anyRequest().authenticated());
+        .authorizeHttpRequests(auth ->
+            auth.requestMatchers("/api/merchants/**", "/api/users/signup")
+                .permitAll()
+                .anyRequest()
+                .authenticated());
     return http.build();
+  }
+
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
   }
 }
