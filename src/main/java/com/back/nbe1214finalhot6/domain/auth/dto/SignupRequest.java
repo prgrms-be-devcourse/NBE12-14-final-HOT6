@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.Locale;
 
 @Schema(description = "회원가입 요청")
 public record SignupRequest(
@@ -26,4 +27,10 @@ public record SignupRequest(
     @Schema(description = "로그인/결제에 사용되는 핀 비밀번호 6자리", example = "123456")
         @NotBlank
         @Pattern(regexp = "\\d{6}") // 6자리 숫자
-        String pin) {}
+        String pin) {
+
+  // 이메일 앞뒤 공백 제거, 소문자변환
+  public SignupRequest {
+    email = email == null ? null : email.strip().toLowerCase(Locale.ROOT);
+  }
+}

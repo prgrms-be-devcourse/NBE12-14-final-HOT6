@@ -1,5 +1,6 @@
 package com.back.nbe1214finalhot6.domain.auth.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -11,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.domain.auth.dto.SignupRequest;
 import com.back.nbe1214finalhot6.domain.auth.dto.SignupResponse;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -90,6 +93,29 @@ class AuthControllerTest {
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("AUTH-002"))
         .andExpect(jsonPath("$.message").value("이미 사용 중인 전화번호입니다"));
+  }
+
+  // 이메일의 앞뒤 공백과 대문자는 JSON 변환 시점에 정리되어 @Email 검증을 통과하고, 서비스에는 정규화된 값 전달
+  @Test
+  @DisplayName("이메일에 공백과 대문자가 있어도 정규화되어 서비스에 전달된다")
+  void signup_normalizesEmail() throws Exception {
+    given(authService.signup(any()))
+        .willReturn(new SignupResponse(1L, "홍길동", "user@example.com", UserRole.USER));
+
+    mockMvc
+        .perform(
+            post("/api/users/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"name": "홍길동", "email": " User@Example.COM ", "password": "Password1!",
+                     "phone": "01012345678", "pin": "123456"}
+                    """))
+        .andExpect(status().isCreated());
+
+    ArgumentCaptor<SignupRequest> captor = ArgumentCaptor.forClass(SignupRequest.class);
+    verify(authService).signup(captor.capture());
+    assertThat(captor.getValue().email()).isEqualTo("user@example.com");
   }
 
   // 입력 검증 실패 케이스. 모두 400 과 COM-001 로 거절되고 서비스 호출 없음
