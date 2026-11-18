@@ -44,7 +44,8 @@ public class MerchantService {
             .findById(merchantId)
             .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
 
-    merchant.update(request.name(), request.address(), request.cashbackEligible());
+    // TODO: 인증(COM-03) 머지 후 로그인한 사장님의 ID 와 merchant.getOwnerId() 를 비교해 본인 가맹점만 수정하도록 검사한다.
+    merchant.update(request.name(), request.address());
 
     return MerchantResponse.from(merchant);
   }

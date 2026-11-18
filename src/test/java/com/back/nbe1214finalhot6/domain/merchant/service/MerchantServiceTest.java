@@ -9,20 +9,23 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
+import com.back.nbe1214finalhot6.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
-// 실제 DB(docker compose 의 PostgreSQL)가 켜져 있어야 한다.
-@SpringBootTest
+// docker compose 의 PostgreSQL 이 켜져 있어야 한다. 테스트 전용 DB(devpay_test)를 사용한다.
+@IntegrationTest
 @Transactional
 class MerchantServiceTest {
 
@@ -48,33 +51,38 @@ class MerchantServiceTest {
   }
 
   @Test
-  @DisplayName("적립 대상 여부를 보내지 않으면 기본값은 true")
-  void 적립대상여부생략시기본값true() {
+  @DisplayName("증빙 서류를 첨부하면 적립 대상으로 저장된다")
+  void 증빙서류첨부시적립대상() {
     MerchantRegisterRequest request =
-        new MerchantRegisterRequest(1L, "기본값 가맹점", "인천광역시 서구 어딘가 2", null);
+        new MerchantRegisterRequest(1L, "서류 가맹점", "인천광역시 서구 어딘가 2", "revenue.pdf");
 
     MerchantRegisterResponse response = merchantService.register(request);
 
     assertThat(response.cashbackEligible()).isTrue();
+    assertThat(merchantRepository.findById(response.merchantId()).orElseThrow().isCashbackEligible())
+        .isTrue();
   }
 
-  @Test
-  @DisplayName("적립 대상 여부를 false 로 보내면 false 로 저장된다")
-  void 적립대상여부false저장() {
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {"   "})
+  @DisplayName("증빙 서류가 없거나 비어 있으면 적립 대상에서 제외된다")
+  void 증빙서류없으면적립제외(String proof) {
     MerchantRegisterRequest request =
-        new MerchantRegisterRequest(1L, "비적립 가맹점", "인천광역시 부평구 어딘가 3", false);
+        new MerchantRegisterRequest(1L, "서류없는 가맹점", "인천광역시 부평구 어딘가 3", proof);
 
     MerchantRegisterResponse response = merchantService.register(request);
 
     assertThat(response.cashbackEligible()).isFalse();
   }
 
+
   @Test
   @DisplayName("일부 필드만 수정하면 나머지는 기존 값을 유지한다")
   void 일부필드만수정() {
     Long id = register("원래 이름", "원래 주소", true);
 
-    merchantService.update(id, new MerchantUpdateRequest("새 이름", null, null));
+    merchantService.update(id, new MerchantUpdateRequest("새 이름", null));
     Merchant updated = reload(id);
 
     assertThat(updated.getName()).isEqualTo("새 이름");
@@ -84,37 +92,23 @@ class MerchantServiceTest {
   }
 
   @Test
-  @DisplayName("적립 대상 여부를 false 로 수정할 수 있다")
-  void 적립대상여부수정() {
-    Long id = register("적립 가맹점", "인천광역시 남동구 1", true);
-
-    MerchantResponse response =
-        merchantService.update(id, new MerchantUpdateRequest(null, null, false));
-    Merchant updated = reload(id);
-
-    assertThat(response.cashbackEligible()).isFalse();
-    assertThat(updated.isCashbackEligible()).isFalse();
-    assertThat(updated.getName()).isEqualTo("적립 가맹점");
-  }
-
-  @Test
   @DisplayName("모든 필드를 수정할 수 있다")
   void 모든필드수정() {
     Long id = register("원래 이름", "원래 주소", true);
 
-    merchantService.update(id, new MerchantUpdateRequest("새 이름", "새 주소", false));
+    merchantService.update(id, new MerchantUpdateRequest("새 이름", "새 주소"));
     Merchant updated = reload(id);
 
     assertThat(updated.getName()).isEqualTo("새 이름");
     assertThat(updated.getAddress()).isEqualTo("새 주소");
-    assertThat(updated.isCashbackEligible()).isFalse();
+    assertThat(updated.isCashbackEligible()).isTrue();
   }
 
   @Test
   @DisplayName("존재하지 않는 가맹점을 수정하면 예외가 발생한다")
   void 없는가맹점수정시예외() {
     assertThatThrownBy(
-            () -> merchantService.update(Long.MAX_VALUE, new MerchantUpdateRequest("이름", null, null)))
+            () -> merchantService.update(Long.MAX_VALUE, new MerchantUpdateRequest("이름", null)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_NOT_FOUND));
@@ -227,9 +221,9 @@ class MerchantServiceTest {
     assertThat(result.content().get(1).merchantId()).isEqualTo(secondSameName);
   }
 
-  private Long register(String name, String address, Boolean cashbackEligible) {
+  private Long register(String name, String address, boolean cashbackEligible) {
     return merchantService
-        .register(new MerchantRegisterRequest(1L, name, address, cashbackEligible))
+        .register(new MerchantRegisterRequest(1L, name, address, cashbackEligible ? "revenue.pdf" : null))
         .merchantId();
   }
 

@@ -34,7 +34,7 @@ public class MerchantController {
 
   @Operation(
       summary = "가맹점 등록",
-      description = "가맹점을 등록한다. 적립 대상 여부(cashbackEligible)를 생략하면 true 로 등록된다")
+      description = "가맹점을 등록한다. 연매출 30억 미만 증빙 서류(revenueProof)를 첨부하면 적립 대상으로 자동 승인되고, 첨부하지 않으면 적립 대상에서 제외된다")
   @PostMapping
   public ResponseEntity<ApiResponse<MerchantRegisterResponse>> register(
       @Valid @RequestBody MerchantRegisterRequest request) {

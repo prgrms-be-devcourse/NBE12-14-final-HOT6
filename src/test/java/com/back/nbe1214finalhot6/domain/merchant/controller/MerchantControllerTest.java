@@ -65,10 +65,10 @@ class MerchantControllerTest {
   }
 
   @Test
-  @DisplayName("cashbackEligible 을 false 로 보내면 서비스에 false 로 전달된다")
-  void 적립대상여부false바인딩() throws Exception {
+  @DisplayName("증빙 서류를 보내면 서비스에 전달되고 적립 대상으로 판정된다")
+  void 증빙서류바인딩() throws Exception {
     given(merchantService.register(any()))
-        .willReturn(new MerchantRegisterResponse(1L, "비적립 가맹점", "인천광역시 남동구 1", false));
+        .willReturn(new MerchantRegisterResponse(1L, "서류 가맹점", "인천광역시 남동구 1", true));
 
     mockMvc
         .perform(
@@ -76,17 +76,17 @@ class MerchantControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"ownerId": 1, "name": "비적립 가맹점", "address": "인천광역시 남동구 1",
-                     "cashbackEligible": false}
+                    {"ownerId": 1, "name": "서류 가맹점", "address": "인천광역시 남동구 1",
+                     "revenueProof": "revenue.pdf"}
                     """))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.data.cashbackEligible").value(false));
+        .andExpect(jsonPath("$.data.cashbackEligible").value(true));
 
     ArgumentCaptor<MerchantRegisterRequest> captor =
         ArgumentCaptor.forClass(MerchantRegisterRequest.class);
     verify(merchantService).register(captor.capture());
-    assertThat(captor.getValue().cashbackEligible()).isFalse();
-    assertThat(captor.getValue().resolveCashbackEligible()).isFalse();
+    assertThat(captor.getValue().revenueProof()).isEqualTo("revenue.pdf");
+    assertThat(captor.getValue().resolveCashbackEligible()).isTrue();
   }
 
   @ParameterizedTest
@@ -157,7 +157,7 @@ class MerchantControllerTest {
   @DisplayName("일부 필드만 보내면 나머지는 null 로 전달된다")
   void 일부필드만수정시나머지는null() throws Exception {
     given(merchantService.update(eq(1L), any()))
-        .willReturn(new MerchantResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", false));
+        .willReturn(new MerchantResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true));
 
     mockMvc
         .perform(
@@ -165,17 +165,16 @@ class MerchantControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"cashbackEligible": false}
+                    {"address": "새 주소"}
                     """))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.cashbackEligible").value(false));
+        .andExpect(jsonPath("$.data.merchantId").value(1));
 
     ArgumentCaptor<MerchantUpdateRequest> captor =
         ArgumentCaptor.forClass(MerchantUpdateRequest.class);
     verify(merchantService).update(eq(1L), captor.capture());
     assertThat(captor.getValue().name()).isNull();
-    assertThat(captor.getValue().address()).isNull();
-    assertThat(captor.getValue().cashbackEligible()).isFalse();
+    assertThat(captor.getValue().address()).isEqualTo("새 주소");
   }
 
   @Test
