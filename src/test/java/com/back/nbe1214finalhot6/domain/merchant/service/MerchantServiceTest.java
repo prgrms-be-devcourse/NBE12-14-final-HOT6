@@ -1,29 +1,44 @@
 package com.back.nbe1214finalhot6.domain.merchant.service;
 
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.response.PageResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
+import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
+import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
+import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
+import com.back.nbe1214finalhot6.support.IntegrationTest;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
-// 실제 DB(docker compose 의 PostgreSQL)가 켜져 있어야 한다.
-@SpringBootTest
+// docker compose 의 PostgreSQL 이 켜져 있어야 한다. 테스트 전용 DB(devpay_test)를 사용한다.
+@IntegrationTest
 @Transactional
 class MerchantServiceTest {
 
+  // 이미 저장된 데이터와 섞이지 않도록 검색 테스트에서만 쓰는 고유한 키워드
+  private static final String KEYWORD = "zq9k";
+
   @Autowired private MerchantService merchantService;
   @Autowired private MerchantRepository merchantRepository;
+  @PersistenceContext private EntityManager entityManager;
 
-  // 목적: 등록한 값이 DB에 저장되고 다시 조회했을 때 요청값과 같은지 확인한다.
   @Test
   @DisplayName("가맹점을 등록하면 요청한 값으로 저장된다")
-  void register_savesMerchant() {
+  void 가맹점등록시요청값으로저장() {
     MerchantRegisterRequest request =
         new MerchantRegisterRequest(1L, "테스트 가맹점", "인천광역시 남동구 어딘가 1", null);
 
@@ -35,27 +50,187 @@ class MerchantServiceTest {
     assertThat(saved.getAddress()).isEqualTo("인천광역시 남동구 어딘가 1");
   }
 
-  // 목적: cashbackEligible 을 생략(null)했을 때 기본값 true 가 적용되는지 확인한다.
   @Test
-  @DisplayName("적립 대상 여부를 보내지 않으면 기본값은 true")
-  void register_defaultCashbackEligible() {
+  @DisplayName("증빙 서류를 첨부하면 적립 대상으로 저장된다")
+  void 증빙서류첨부시적립대상() {
     MerchantRegisterRequest request =
-        new MerchantRegisterRequest(1L, "기본값 가맹점", "인천광역시 서구 어딘가 2", null);
+        new MerchantRegisterRequest(1L, "서류 가맹점", "인천광역시 서구 어딘가 2", "revenue.pdf");
 
     MerchantRegisterResponse response = merchantService.register(request);
 
     assertThat(response.cashbackEligible()).isTrue();
+    assertThat(merchantRepository.findById(response.merchantId()).orElseThrow().isCashbackEligible())
+        .isTrue();
   }
 
-  // 목적: cashbackEligible 을 false 로 명시하면 기본값에 덮이지 않고 false 로 저장되는지 확인한다.
-  @Test
-  @DisplayName("적립 대상 여부를 false 로 보내면 false 로 저장된다")
-  void register_cashbackEligibleFalse() {
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {"   "})
+  @DisplayName("증빙 서류가 없거나 비어 있으면 적립 대상에서 제외된다")
+  void 증빙서류없으면적립제외(String proof) {
     MerchantRegisterRequest request =
-        new MerchantRegisterRequest(1L, "비적립 가맹점", "인천광역시 부평구 어딘가 3", false);
+        new MerchantRegisterRequest(1L, "서류없는 가맹점", "인천광역시 부평구 어딘가 3", proof);
 
     MerchantRegisterResponse response = merchantService.register(request);
 
     assertThat(response.cashbackEligible()).isFalse();
+  }
+
+
+  @Test
+  @DisplayName("일부 필드만 수정하면 나머지는 기존 값을 유지한다")
+  void 일부필드만수정() {
+    Long id = register("원래 이름", "원래 주소", true);
+
+    merchantService.update(id, new MerchantUpdateRequest("새 이름", null));
+    Merchant updated = reload(id);
+
+    assertThat(updated.getName()).isEqualTo("새 이름");
+    assertThat(updated.getAddress()).isEqualTo("원래 주소");
+    assertThat(updated.isCashbackEligible()).isTrue();
+    assertThat(updated.getOwnerId()).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("모든 필드를 수정할 수 있다")
+  void 모든필드수정() {
+    Long id = register("원래 이름", "원래 주소", true);
+
+    merchantService.update(id, new MerchantUpdateRequest("새 이름", "새 주소"));
+    Merchant updated = reload(id);
+
+    assertThat(updated.getName()).isEqualTo("새 이름");
+    assertThat(updated.getAddress()).isEqualTo("새 주소");
+    assertThat(updated.isCashbackEligible()).isTrue();
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 가맹점을 수정하면 예외가 발생한다")
+  void 없는가맹점수정시예외() {
+    assertThatThrownBy(
+            () -> merchantService.update(Long.MAX_VALUE, new MerchantUpdateRequest("이름", null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("이름에 키워드가 포함된 가맹점을 대소문자 구분 없이 검색한다")
+  void 이름부분일치검색() {
+    register("ZQ9K 카페", "인천광역시 남동구 1", true);
+    register("행복 zq9k", "인천광역시 남동구 2", true);
+    register("무관한 가게", "인천광역시 남동구 3", true);
+
+    PageResponse<MerchantResponse> result = merchantService.search(KEYWORD, 0, 20);
+
+    assertThat(result.content())
+        .extracting(MerchantResponse::name)
+        .containsExactlyInAnyOrder("ZQ9K 카페", "행복 zq9k");
+    assertThat(result.totalElements()).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName("검색 결과에 적립 대상 여부가 포함된다")
+  void 검색결과에적립대상여부포함() {
+    register(KEYWORD + " 적립", "인천광역시 남동구 1", true);
+    register(KEYWORD + " 비적립", "인천광역시 남동구 2", false);
+
+    PageResponse<MerchantResponse> result = merchantService.search(KEYWORD, 0, 20);
+
+    assertThat(result.content())
+        .extracting(MerchantResponse::name, MerchantResponse::cashbackEligible)
+        .containsExactlyInAnyOrder(
+            tuple(KEYWORD + " 적립", true), tuple(KEYWORD + " 비적립", false));
+  }
+
+  @Test
+  @DisplayName("검색어 앞뒤 공백은 무시한다")
+  void 검색어앞뒤공백무시() {
+    register(KEYWORD + " 가게", "인천광역시 남동구 1", true);
+
+    PageResponse<MerchantResponse> result = merchantService.search("  " + KEYWORD + "  ", 0, 20);
+
+    assertThat(result.totalElements()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("검색어의 % 와 _ 는 와일드카드로 해석하지 않는다")
+  void 검색어와일드카드는문자그대로비교() {
+    register(KEYWORD + " 가게", "인천광역시 남동구 1", true);
+
+    assertThat(merchantService.search(KEYWORD + "%", 0, 20).totalElements()).isZero();
+    assertThat(merchantService.search("zq9_", 0, 20).totalElements()).isZero();
+  }
+
+  @Test
+  @DisplayName("일치하는 가맹점이 없으면 빈 결과를 반환한다")
+  void 검색결과없음() {
+    PageResponse<MerchantResponse> result = merchantService.search(KEYWORD + "-nomatch", 0, 20);
+
+    assertThat(result.content()).isEmpty();
+    assertThat(result.totalElements()).isZero();
+    assertThat(result.totalPages()).isZero();
+  }
+
+  @Test
+  @DisplayName("size 만큼 잘라서 페이지별로 반환한다")
+  void 검색페이징() {
+    register(KEYWORD + "-가", "인천광역시 남동구 1", true);
+    register(KEYWORD + "-나", "인천광역시 남동구 2", true);
+    register(KEYWORD + "-다", "인천광역시 남동구 3", true);
+
+    PageResponse<MerchantResponse> first = merchantService.search(KEYWORD, 0, 2);
+    PageResponse<MerchantResponse> second = merchantService.search(KEYWORD, 1, 2);
+
+    assertThat(first.content()).extracting(MerchantResponse::name)
+        .containsExactly(KEYWORD + "-가", KEYWORD + "-나");
+    assertThat(second.content()).extracting(MerchantResponse::name)
+        .containsExactly(KEYWORD + "-다");
+    assertThat(first.totalElements()).isEqualTo(3);
+    assertThat(first.totalPages()).isEqualTo(2);
+    assertThat(first.page()).isZero();
+    assertThat(second.page()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("size 가 50을 넘으면 50으로 제한한다")
+  void size상한50제한() {
+    register(KEYWORD + " 가게", "인천광역시 남동구 1", true);
+
+    PageResponse<MerchantResponse> result = merchantService.search(KEYWORD, 0, 1000);
+
+    assertThat(result.size()).isEqualTo(50);
+  }
+
+  @Test
+  @DisplayName("이름 오름차순, 같은 이름이면 ID 오름차순으로 정렬한다")
+  void 이름순ID순정렬() {
+    register(KEYWORD + "-나", "인천광역시 남동구 1", true);
+    Long firstSameName = register(KEYWORD + "-가", "인천광역시 남동구 2", true);
+    Long secondSameName = register(KEYWORD + "-가", "인천광역시 남동구 3", true);
+
+    PageResponse<MerchantResponse> result = merchantService.search(KEYWORD, 0, 20);
+
+    assertThat(result.content())
+        .extracting(MerchantResponse::merchantId)
+        .contains(firstSameName, secondSameName);
+    assertThat(result.content())
+        .extracting(MerchantResponse::name)
+        .containsExactly(KEYWORD + "-가", KEYWORD + "-가", KEYWORD + "-나");
+    assertThat(result.content().get(0).merchantId()).isEqualTo(firstSameName);
+    assertThat(result.content().get(1).merchantId()).isEqualTo(secondSameName);
+  }
+
+  private Long register(String name, String address, boolean cashbackEligible) {
+    return merchantService
+        .register(new MerchantRegisterRequest(1L, name, address, cashbackEligible ? "revenue.pdf" : null))
+        .merchantId();
+  }
+
+  // 변경 내용이 실제로 DB에 반영됐는지 보려고, 영속성 컨텍스트를 비우고 다시 조회한다.
+  private Merchant reload(Long id) {
+    entityManager.flush();
+    entityManager.clear();
+    return merchantRepository.findById(id).orElseThrow();
   }
 }
