@@ -1,4 +1,4 @@
-package com.back.nbe1214finalhot6.domain.merchant;
+package com.back.nbe1214finalhot6.domain.merchant.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
-import com.back.nbe1214finalhot6.domain.merchant.controller.MerchantController;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;

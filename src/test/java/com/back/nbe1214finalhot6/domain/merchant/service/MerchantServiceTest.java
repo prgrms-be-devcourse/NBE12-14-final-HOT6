@@ -1,10 +1,9 @@
-package com.back.nbe1214finalhot6.domain.merchant;
+package com.back.nbe1214finalhot6.domain.merchant.service;
 
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
-import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
