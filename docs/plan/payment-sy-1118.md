@@ -79,7 +79,7 @@ Controller → PaymentFacade (트랜잭션 없음)
 ### 2-6. 결제 응답(영수증 기본 필드)
 결제금액, 데브머니 사용분, 캐시백 사용분, 적립 캐시백, 적용 요율, **지급 예정 시각, 적립 제외 사유**를 응답에 담습니다.
 - 지급 예정 시각과 제외 사유는 `CashbackService.reserve`의 반환값이며, 재조회해도 같은 영수증이 나오도록 `payment`에 저장합니다 (`cashback_payable_at`, `cashback_exclusion_reason`).
-- **월 한도 상태(남은 한도)는 아직 없습니다.** `reserve` 반환값에 없으므로 합의 #13에서 정합니다.
+- **월 한도 상태(남은 한도)는 아직 없습니다.** 머지된 `ReserveResult`에 월 한도 필드가 없으므로(제외 사유 `MONTHLY_LIMIT_EXCEEDED`만 있음) 합의 #13에서 정합니다.
 
 ## 3. 진행 현황
 
@@ -89,7 +89,7 @@ Controller → PaymentFacade (트랜잭션 없음)
 | 멱등키 헤더 검증 (#2) | 완료 (PR #13, dev 머지. 이전 PR이 `feat/#4`로 머지되어 dev에 없던 것을 바로잡음) |
 | 결제 요청 접수(멱등 선점) API (#12) | 완료 (PR #15, dev 머지): 엔티티, 리포지토리, DTO, claim/기존 요청 판정, 컨트롤러, 통합 테스트 (FAILED 재시도 1개는 `@Disabled`) |
 | 결제 본처리 T2 (#16) | 구현 완료, PR 준비 중: `PaymentTxService`(락·차감·QR·적립 예약·완료), 가맹점 적립 대상 조회, 영수증 필드. 지갑·QR·캐시백은 인터페이스 없이 `*MockService` 클래스로 연결 (실제 서비스 머지 후 타입 교체) |
-| 캐시백 연동 서비스 (B, PR #23) | 리뷰 중. 머지되면 `CashbackMockService`를 삭제하고 `CashbackService`로 교체 |
+| 캐시백 연동 서비스 (B, PR #23) | 머지 완료. #16에서 `CashbackMockService`를 삭제하고 실제 `CashbackService`로 교체 예정 |
 | 실패 처리 T3, 재조회, 취소 | 미착수 |
 | 사장님 결제 내역 | 11/23 마감 범위 제외 (11/25~26) |
 
@@ -126,7 +126,7 @@ Controller → PaymentFacade (트랜잭션 없음)
 
 | # | 내용 | 대상 |
 | --- | --- | --- |
-| 1 | 지갑·QR·캐시백 호출 시그니처(파라미터·반환·예외). 금액 인자는 `long`. **캐시백은 B의 PR #23으로 확정**: `reserve(ReserveCommand) → ReserveResult(적립액, 요율, 정책ID, 지급 예정 시각, 제외 사유)`, `cancel(paymentId)`. 지갑·QR은 결제 쪽 초안: `debit(walletId, amount) → (walletUsed, cashbackUsed)`, `markUsed(qrId)`(이미 사용됐거나 만료면 `BusinessException`). 합의 전까지 `*MockService` 클래스로 진행 | C, D |
+| 1 | 지갑·QR·캐시백 호출 시그니처(파라미터·반환·예외). 금액 인자는 `long`. **캐시백은 B의 PR #23(머지 완료)로 확정**: `reserve(ReserveCommand) → ReserveResult(적립액, 요율, 정책ID, 지급 예정 시각, 제외 사유)`, `cancel(paymentId)`. 지갑·QR은 결제 쪽 초안: `debit(walletId, amount) → (walletUsed, cashbackUsed)`, `markUsed(qrId)`(이미 사용됐거나 만료면 `BusinessException`). 합의 전까지 `*MockService` 클래스로 진행 | C, D |
 | 2 | ~~적립액이 0원인 경우의 `reserve` 처리~~ → **해결**: 예외 없이 0원과 제외 사유를 반환 (PR #23) | B |
 | 3 | 락 순서 통일: **결제 행 → 지갑 → QR → 예산**. 결제·취소·환불·지급 배치·탈퇴가 같은 순서를 지킴. 또한 `debit` 등은 호출한 쪽 트랜잭션에 참여(`REQUIRED`)해야 T2 롤백 시 함께 롤백됨 | 전원 |
 | 4 | 리질리언스 적용 경계(지갑 호출 지점만 vs 트랜잭션 전체) | C |
@@ -138,7 +138,7 @@ Controller → PaymentFacade (트랜잭션 없음)
 | 10 | 월 예산 ID 위치: B 제안대로 `cashback_earning` 쪽에 두고 `payment`에는 추가하지 않는 방향 (A 스키마가 B에 의존하지 않도록). 이견 없으면 확정 | B |
 | 11 | 기획서·역할분담 문서와 현재 설정 불일치 정리 (DB: PostgreSQL 확정, 일정 4주/3주, 소수점 누적 정책 문구) | 전원 |
 | 12 | 금액 컬럼 타입: 캐시백 기획서는 `NUMERIC(15,4)` 유지, 결제는 `BIGINT`/`Long`(정수 원). `reserve` 계약이 `long`이므로 컬럼 타입을 맞출지 | B |
-| 13 | 영수증의 월 한도 상태: `reserve` 반환값에 포함 vs `GET /api/cashback/monthly-limit`로 별도 조회 | B, C |
+| 13 | 영수증의 월 한도 상태: B 기획서 3-4절은 `reserve` 반환값에 포함한다고 되어 있으나 머지된 `ReserveResult`에는 없음. 반환값에 필드를 추가(B가 후속 PR)할지, `GET /api/cashback/monthly-limit`로 별도 조회할지 | B, C |
 
 ## 6. 테스트 계획
 
