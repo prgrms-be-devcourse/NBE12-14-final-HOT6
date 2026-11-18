@@ -8,7 +8,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 /**
  * 임시 보안 설정
- * <p>TODO: 인증·권한(COM-03) 작업이 머지되면 이 파일을 그쪽 설정으로 교체한다. 그 전까지는 가맹점 API 만 열어 둔다.
+ * <p>TODO: 인증·권한(COM-03) 작업이 머지되면 이 파일을 그쪽 설정으로 교체한다. 그 전까지는 가맹점 API 와 캐시백 운영자 API 만 열어 둔다.
  */
 @Configuration
 public class SecurityConfig {
@@ -17,7 +17,11 @@ public class SecurityConfig {
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.csrf(AbstractHttpConfigurer::disable)
         .authorizeHttpRequests(
-            auth -> auth.requestMatchers("/api/merchants/**").permitAll().anyRequest().authenticated());
+            auth ->
+                auth.requestMatchers("/api/merchants/**", "/api/admin/cashback/**")
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated());
     return http.build();
   }
 }
