@@ -56,4 +56,13 @@ public class Merchant {
       boolean cashbackEligible) {
     return new Merchant(ownerId, name, address, cashbackEligible);
   }
+
+  public void update(String name, String address) {
+    if (name != null) {
+      this.name = name;
+    }
+    if (address != null) {
+      this.address = address;
+    }
+  }
 }
