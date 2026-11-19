@@ -18,7 +18,10 @@ public class SecurityConfig {
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.csrf(AbstractHttpConfigurer::disable)
         .authorizeHttpRequests(auth ->
-            auth.requestMatchers("/api/merchants/**", "/api/users/signup")
+            auth.requestMatchers(
+                    // 경로는 한 줄에 하나씩, 알파벳순으로 추가한다.
+                    "/api/merchants/**",
+                    "/api/users/signup")
                 .permitAll()
                 .anyRequest()
                 .authenticated());
