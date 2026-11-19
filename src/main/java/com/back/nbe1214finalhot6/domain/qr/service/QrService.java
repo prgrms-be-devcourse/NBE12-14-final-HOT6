@@ -5,7 +5,9 @@ import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateRequest;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateResponse;
+import com.back.nbe1214finalhot6.domain.qr.dto.QrStatusResponse;
 import com.back.nbe1214finalhot6.domain.qr.entity.QrCode;
+import com.back.nbe1214finalhot6.domain.qr.exception.QrErrorCode;
 import com.back.nbe1214finalhot6.domain.qr.repository.QrCodeRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -33,5 +35,15 @@ public class QrService {
             QrCode.createDynamic(merchantId, request.amount(), LocalDateTime.now(clock)));
 
     return QrCreateResponse.from(qrCode);
+  }
+
+  @Transactional(readOnly = true)
+  public QrStatusResponse getStatus(String token) {
+    QrCode qrCode =
+        qrCodeRepository
+            .findByToken(token)
+            .orElseThrow(() -> new BusinessException(QrErrorCode.QR_NOT_FOUND));
+
+    return QrStatusResponse.of(qrCode, LocalDateTime.now(clock));
   }
 }

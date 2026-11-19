@@ -9,8 +9,10 @@ import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateRequest;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateResponse;
+import com.back.nbe1214finalhot6.domain.qr.dto.QrStatusResponse;
 import com.back.nbe1214finalhot6.domain.qr.entity.QrCode;
 import com.back.nbe1214finalhot6.domain.qr.entity.QrStatus;
+import com.back.nbe1214finalhot6.domain.qr.exception.QrErrorCode;
 import com.back.nbe1214finalhot6.domain.qr.repository.QrCodeRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
@@ -19,6 +21,7 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 // docker compose 의 PostgreSQL 이 켜져 있어야 한다. 테스트 전용 DB(devpay_test)를 사용한다.
@@ -85,6 +88,47 @@ class QrServiceTest {
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_NOT_FOUND));
     assertThat(qrCodeRepository.count()).isEqualTo(before);
+  }
+
+  @Test
+  @DisplayName("생성 직후에는 대기, 만료 시각이 지나면 만료로 조회된다")
+  void 시간에따라상태가바뀐다() {
+    Long merchantId = saveMerchant();
+    QrCreateResponse created = qrService.createDynamic(merchantId, new QrCreateRequest(1000L));
+
+    assertThat(qrService.getStatus(created.token()).status()).isEqualTo(QrStatus.WAITING);
+
+    clock.advance(Duration.ofMinutes(2).plusSeconds(59));
+    assertThat(qrService.getStatus(created.token()).status()).isEqualTo(QrStatus.WAITING);
+
+    clock.advance(Duration.ofSeconds(1));
+    QrStatusResponse expired = qrService.getStatus(created.token());
+    assertThat(expired.status()).isEqualTo(QrStatus.EXPIRED);
+    assertThat(expired.expiresAt()).isEqualTo(created.expiresAt());
+  }
+
+  @Test
+  @DisplayName("사용된 QR 은 만료 시각이 지나도 사용됨으로 조회된다")
+  void 사용된QR은만료되어도사용됨() {
+    Long merchantId = saveMerchant();
+    QrCreateResponse created = qrService.createDynamic(merchantId, new QrCreateRequest(1000L));
+    QrCode qrCode = qrCodeRepository.findByToken(created.token()).orElseThrow();
+    ReflectionTestUtils.setField(qrCode, "status", QrStatus.USED);
+    qrCodeRepository.flush();
+
+    assertThat(qrService.getStatus(created.token()).status()).isEqualTo(QrStatus.USED);
+
+    clock.advance(Duration.ofMinutes(10));
+    assertThat(qrService.getStatus(created.token()).status()).isEqualTo(QrStatus.USED);
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 토큰이면 QR_NOT_FOUND 예외가 발생한다")
+  void 없는토큰이면예외() {
+    assertThatThrownBy(() -> qrService.getStatus("unknown-token"))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_NOT_FOUND));
   }
 
   private Long saveMerchant() {
