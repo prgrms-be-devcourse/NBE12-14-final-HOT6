@@ -7,7 +7,7 @@
 | 기준 문서 | 커밋된 [기획서](../project-spec.md), [역할 분담](../team-roles.md) |
 | 상태 | 도메인 판단으로 진행 중. 기획서와 달라지는 부분은 [1절](#1-기획서-대비-변경-요약)에 모았다 |
 
-**운영 방식**: 각자 자기 도메인은 본인 판단으로 진행하고, 진행 중 바뀐 기획은 `docs/plan/도메인-이니셜-MMDD.md`로 남겨 공유한다. 이 문서는 cashback 도메인의 첫 기획 문서이며, 이후 변경은 새 날짜의 파일로 추가한다.
+**운영 방식**: 각자 자기 도메인은 본인 판단으로 진행하고, 진행 중 바뀐 기획은 `docs/plan/도메인-이니셜-MMDD.md`로 남겨 공유한다. 이 문서는 cashback 도메인의 개인 기획서이며, 수정할 때마다 파일명의 날짜(MMDD)를 수정일로 바꾼다(`git mv`).
 
 **도메인 방향(초안, 팀 합의 전)**: 캐시백이 얼마나 갈지 미리 보여 주고, 약속한 캐시백은 끝까지 지킨다. 예산은 1원도 초과하지 않고 결제는 멈추지 않는다. 정합성(예산 초과 0원)은 처음부터 지키고, 판단 근거를 먼저 보여 주는 정보(결제 전 미리보기, 확정 영수증, 소진 예측)가 우리 도메인의 특징이다.
 
@@ -21,8 +21,8 @@
 | 변경 | 중단 공지 | 대비금이 소모되기 시작하면 3일 후 00:00에 적립 중단을 공지 | 남은 예산이 대비금에 닿으면 **즉시 공지하고 공지일 + 3일 00:00(KST)에 중단**. 공지에는 날짜만 쓰고 시각은 쓰지 않음 | A(결제 응답), C·D 화면 |
 | 변경 | 긴급 중단 기준 | 공지 후 대비금의 10%만 남으면 | **대비금의 절반**에 닿으면 즉시 중단 | 중단 판정 |
 | 변경 | 예산 부족 시 적립 | 적립만 0원(또는 남은 만큼) | **전액 또는 0원**. 부분 지급과 안분 없음 | A, C |
-| 변경 | 소수점 | 적립·보유·회수는 소수점 유지 | **적립액은 1원 단위 버림**(`floor(데브머니 사용분 × 요율)`). 금액 컬럼은 `NUMERIC(15,4)`를 유지해 이후 확장 가능 | A, C(보유 캐시백) |
-| 변경 | 적립 지급 배치 | B가 건별 트랜잭션으로 지급 | **B가 지급 내역을 만들어 C에 전달 → C가 건별 트랜잭션으로 지갑에 반영 → B가 상태·예산 갱신** | B, C |
+| 변경 | 소수점 | 적립·보유·회수는 소수점 유지 | **적립액은 1원 단위 버림**(`floor(데브머니 사용분 × 요율)`). 금액은 원 단위 `long`(BIGINT)으로 저장한다. 소수 유지 지급은 [8절](#8-제외후순위)의 도전 과제로 두고, 필요해지면 컬럼 타입을 바꾼다 | A, C(보유 캐시백) |
+| 변경 | 적립 지급 배치 | B가 건별 트랜잭션으로 지급 | **B 배치가 건별 트랜잭션을 열어 C의 입금 API를 호출하고, 같은 트랜잭션에서 상태·예산을 갱신**. 지갑 API는 도메인 중립(`credit`/`debit`)이며 호출자의 트랜잭션에 참여한다([3-3](#3-3-적립-지급-배치와-지갑-연동)) | B, C |
 | 유지 | 정책 변경 이력 | 변경자·시각·변경 전후 값 기록 | 그대로 B 범위에 포함(역할 분담 논의에서 제외로 거론됐으나 B 도메인 판단으로 포함) | |
 | 추가 | 데이터 투명성 | 없음 | 결제 전 캐시백·한도 미리보기, 확정 영수증 필드, 적립 제외 사유, 정책 변경 예고, 알림·공지 목록 | A, C, D 화면 |
 | 추가 | 수요 예측 | 없음 | 소진 예측(예상 소진일 범위, 최소 보장 인원), 정책 저장 전 예측 미리보기, 가정·버전 표시 | D(대시보드 그래프) |
@@ -38,14 +38,14 @@
 
 | 번호 | 기능 | 기획서 | API·형태 | 단계 | 메모 |
 |---|---|---|---|---|---|
-| C1 | 정책 관리 (요율·기간, 같은 타입끼리 기간 겹침 금지) | CB-03 | `POST·GET /api/admin/cashback/policies` | 1 | `type`(BASE/EXTRA) 구분 |
+| C1 | 정책 관리 (요율·기간, 기간 겹침 금지) | CB-03 | `POST·GET /api/admin/cashback/policies` | 1 | 정책은 한 종류(기본 요율)다. 추가 요율(EXTRA)은 [8절](#8-제외후순위)의 MVP 이후 항목. 요율은 소수 비율(3% = 0.03), 기간은 `[시작, 종료)` 반개구간이고 종료가 없으면 무기한 |
 | C2 | 정책 변경 이력 (변경자·시각·변경 전후 값) | CB-03 | 이력 조회 (제안) | 1 | 조회만 가능. 입력값·근거까지 남길지는 [9절](#9-개발하면서-판단할-것) |
 | C3 | 적립 계산 (정수 버림, 월 한도 차감) | PAY-01 | `CashbackService.reserve` (A가 결제 트랜잭션에서 호출) | 1 | 적립 = `floor(데브머니 사용분 × 접수 시각 요율)`. 적립 대상 가맹점에서만 |
 | C4 | 예산 확보(예약) | PAY-01 | `CashbackService.reserve` | 1 | 조건부 UPDATE, 음수 불가. 연 예산과 월 예산을 함께 차감. 중단 판정과 같은 흐름 |
 | C5 | 적립 취소·회수 | PAY-03 | `CashbackService.cancel` (A가 취소 트랜잭션에서 호출) | 1 | 지급 전 취소는 확보 예산 반환, 지급 후는 회수(음수 가능, 예산 복구 안 함), 월 한도는 결제한 달에 한 번만 복구 |
 | C6 | 이용자 월 적립 한도 조회 | CB-02 | `GET /api/cashback/monthly-limit` | 1 | 결제한 달(최초 접수 시각 기준 한국 시간 월), 적립 예정 포함. 컨트롤러는 B, 화면은 C |
 | C7 | 이용자 적립 내역 조회 | CB-05 | `GET /api/cashback/earnings` | 1 | 상태: 예정 / 지급 완료 / 취소 / 회수 / 제외, 음수 상계 표시 |
-| C8 | 적립 지급 배치 | CB-01 | 배치, `POST /api/admin/cashback/payouts/run` | 1 | 결제 다음날 00:00 + 3일, 매시간(데모 10초), 건별 트랜잭션, 음수 상계. [3-3](#3-3-적립-지급-배치와-c-전달)절 |
+| C8 | 적립 지급 배치 | CB-01 | 배치, `POST /api/admin/cashback/payouts/run` | 1 | 결제 다음날 00:00 + 3일, 매시간(데모 10초), 건별 트랜잭션(B가 경계를 소유하고 C의 `credit`이 참여). [3-3](#3-3-적립-지급-배치와-지갑-연동)절 |
 | C9 | 연/월 예산 관리 (배정, 집행, 예약·차감·복원) | CB-04 | `POST·GET /api/admin/cashback/budget` | 1 | 월 배정 합계 ≤ 연 예산 |
 
 ### 2-2. 운영·중단
@@ -124,21 +124,24 @@
 - 예산 확보는 한 번의 조건부 UPDATE로 해서 초과를 설계상 막는다.
 - 받지 못한 경우 영수증과 적립 내역에 사유와 접수 시각을 남긴다.
 
-### 3-3. 적립 지급 배치와 C 전달
+### 3-3. 적립 지급 배치와 지갑 연동
 
-**방식은 확정**이다.
+B가 지급 대상을 고르고, 지갑 반영은 C의 API에 요청한다. 지갑 API는 캐시백을 알지 못하는 **도메인 중립 API**(`credit`/`debit`)로 두고, 캐시백은 거래 type으로만 구분한다.
 
 | 단계 | 담당 |
 |---|---|
-| 지급일이 된 `PENDING` 적립 선정, 지급액 확정(요율 스냅샷, 버림 후 금액) | B |
-| 지갑 캐시백 반영, 지갑 원장 기록 (건별 트랜잭션) | C |
-| 적립 상태 `PENDING → PAID`, 예산 예약 → 차감 | B (C의 성공 결과를 받은 뒤) |
+| 지급일이 된 `PENDING` 적립 선정(스케줄러, 트랜잭션 없음). 지급액은 적립 시점에 확정된 값 | B |
+| 건별 트랜잭션 시작 | B (경계를 소유) |
+| 지갑 입금과 원장 기록: `credit(walletId, amount, CASHBACK_EARN, earningId)` | C (호출자의 트랜잭션에 참여) |
+| 적립 상태 `PENDING → PAID`, 예산 예약 → 차감 | B (같은 트랜잭션) |
+| 커밋 | B |
 
-아래 세부는 **제안**이며 구현하면서 C와 맞춘다.
-- 호출은 같은 프로젝트이므로 C의 서비스 메서드를 직접 호출하고, 건마다 별도 트랜잭션으로 처리한다.
-- 적립 건 ID를 멱등 키로 써서 재실행해도 한 번만 반영한다.
-- 실패 건은 `PENDING`으로 남겨 다음 실행에서 재시도하고, 나머지 건은 정상 지급한다.
-- 음수 상계는 C가 지갑 캐시백 잔액에 합산해서 처리하고, B는 상계가 필요한 건(지급 후 취소)을 표시해서 넘긴다.
+- 같은 DB를 쓰므로 C 반영과 B 상태 변경이 한 번에 커밋되거나 한 번에 롤백된다. C가 예외를 던지면 그 건만 롤백되어 `PENDING`으로 남고 다음 주기에 재시도하며, 나머지 건은 계속 처리한다.
+- 건별 처리 메서드는 스케줄러와 다른 빈에 둔다(같은 클래스 안에서 부르면 트랜잭션이 적용되지 않는다).
+- 멱등: C 원장에 `(type, refKey)` 유니크 제약을 두어 같은 입금이 두 번 와도 한 번만 반영하고 정상 응답한다. B는 `PENDING`인 건만 조건부로 전환한다.
+- 원장에는 type, refKey, 금액, 거래 후 잔액만 남기고 설명(memo)은 없다. 요율 등 적립 상세는 B의 `cashback_earning`이 원본이며 refKey(적립 건 ID)로 연결한다.
+- **회수(지급 후 결제 취소)**: A의 취소 트랜잭션 안에서 `CashbackService.cancel`이 `debit(walletId, amount, CASHBACK_CLAWBACK, earningId, allowNegative=true)`를 호출한다. 데브머니와 캐시백은 한 잔액으로 합산하고 회수에서만 음수를 허용하며, 음수는 다음 입금이 더해지면서 상계된다(별도 상계 로직 없음). 지급 전 취소는 B 안에서 끝난다.
+- 메서드 이름·시그니처·type 이름은 C가 정하며, C에게 이슈로 요청했다.
 
 ### 3-4. 확정 영수증
 
@@ -165,25 +168,176 @@
 | 상대 | 연동 |
 |---|---|
 | A (결제) | `CashbackService.reserve / cancel` 호출(C3~C5). 영수증 필드를 결제 응답에 포함(T2). 월 예산 ID를 `payment`에 둘지 `cashback_earning`에 둘지 협의(A의 스키마가 B에 의존하지 않도록 `cashback_earning` 쪽을 제안) |
-| C (회원·지갑) | 지급 배치에서 지갑 캐시백 반영(C8). `CashbackQueryService`로 이용자 월 한도·적립 내역 제공(C6, C7). 계산과 상태 판단은 B, C는 응답 조립. 탈퇴 시 남은 캐시백·적립 예정 처리는 B와 합동 |
+| C (회원·지갑) | B가 C의 지갑 API(`credit`/`debit`)를 호출한다: 지급 배치(C8)와 지급 후 취소의 회수(C5), [3-3](#3-3-적립-지급-배치와-지갑-연동). 이용자 월 한도·적립 내역 조회(C6, C7)는 B가 `CashbackQueryService`와 컨트롤러까지 제공하고, 지갑 화면 합성은 프런트가 한다. C는 B를 호출하지 않는다(의존 한 방향). 탈퇴 시 남은 캐시백·적립 예정 처리는 B와 합동 |
 | D (가맹점·QR·정산·대사) | QR 스캔 조회에 요율·남은 한도(T1). 예산·적립 시계열 API(T6). 대사의 캐시백 잔액 대조에서 B의 적립 합계와 지갑 원장 비교. 수요 예측 차트의 분담 |
 
-## 5. 데이터 모델 변경
+## 5. 데이터 모델
 
-DB는 PostgreSQL 기준(11/16 결정, 기획서에는 아직 MySQL 표기)이다. 금액은 원 단위, 캐시백 금액은 `NUMERIC(15,4)`에 1원 단위 버림 값만 저장한다.
+DB는 PostgreSQL 기준(11/16 결정, 기획서에는 아직 MySQL 표기)이고, 스키마는 Hibernate `ddl-auto: update`로 만든다. 개발하면서 바뀌는 부분은 이 절을 고치고 [5-4](#5-4-구조-변경-기록)에 남긴다.
 
-| 테이블 | 용도 | 변경 |
+**공통 규칙**
+- 금액은 원 단위 `long`(BIGINT)이다. 캐시백 금액은 1원 단위 버림 값만 저장한다.
+- 요율은 소수 비율(3% = 0.03)이며 `NUMERIC(5,4)`다.
+- 시각은 `LocalDateTime`(한국 시간)이다. 기간은 `[시작, 종료)` 반개구간이다.
+- 다른 도메인은 ID 값으로만 참조하고(`payment_id`, `wallet_id`) 외래키 제약을 걸지 않는다. 같은 도메인 안에서도 연관관계 매핑 대신 ID 컬럼을 기본으로 한다(제안. 조건부 UPDATE 중심이라 객체 그래프가 필요 없다).
+- 이력과 이월 테이블은 INSERT only다.
+
+### 5-1. 테이블 요약
+
+| 테이블 | 용도 | 단계 | 상태 | 기획서 대비 변경 |
+|---|---|---|---|---|
+| `cashback_policy` | 정책(요율·기간) | 1 | 구현(#28) | 단일 종류(기본 요율), 기간 겹침 금지. 추가 요율(EXTRA)은 MVP 이후 |
+| `cashback_policy_history` | 정책 변경 이력 | 1 | 예정 | 신규 |
+| `cashback_annual_budget` | 연 예산 | 1 | 예정 | `cashback_budget` 이름 변경(기획서 8절), 예약·지급 합계 추가 |
+| `cashback_monthly_budget` | 월 예산 | 1~2 | 예정 | 배정·이월 유입·예약·지급 분리, 상태, **대비금**, 중단 예약 시각 |
+| `cashback_budget_transfer` | 이월 이력 | 2 | 예정 | 신규 |
+| `cashback_monthly_limit` | 이용자 월 적립 한도 사용량 | 1 | 예정 | 신규 |
+| `cashback_earning` | 적립 건 | 1 | 예정 | 상태에 제외(`EXCLUDED`)·회수 추가, 제외 사유 코드. 적립 정보의 기준 테이블 |
+| `cashback_budget_state_log` | 중단 상태 전이 이력 | 2 | 예정 | 신규 |
+| `cashback_notice` | 변경 예고·소진 예고·중단 공지 | 3 | 예정 | 신규 |
+| `cashback_seasonal_index`, `cashback_special_day` | 계절 지수·특일 시드 | 4 | 예정(확장) | 신규 |
+
+### 5-2. 관계
+
+```mermaid
+erDiagram
+  CASHBACK_POLICY ||--o{ CASHBACK_POLICY_HISTORY : "변경 이력"
+  CASHBACK_POLICY ||--o{ CASHBACK_EARNING : "적용 정책"
+  CASHBACK_ANNUAL_BUDGET ||--|{ CASHBACK_MONTHLY_BUDGET : "월 배정"
+  CASHBACK_MONTHLY_BUDGET ||--o{ CASHBACK_EARNING : "예산 확보"
+  CASHBACK_MONTHLY_BUDGET ||--o{ CASHBACK_BUDGET_TRANSFER : "이월"
+  CASHBACK_MONTHLY_BUDGET ||--o{ CASHBACK_BUDGET_STATE_LOG : "상태 전이"
+  CASHBACK_MONTHLY_BUDGET ||--o{ CASHBACK_NOTICE : "공지"
+```
+
+외부 참조(값으로만 보관): 적립 건의 `payment_id`(A), `wallet_id`(C). `cashback_monthly_limit`의 이용자는 `wallet_id`로 식별한다(`ReserveCommand`에 이용자 ID가 없고 이용자당 지갑 1개를 전제).
+
+### 5-3. 엔티티별 구조
+
+**`cashback_policy`** — 정책 (구현)
+
+| 컬럼 | 타입 | 설명 |
 |---|---|---|
-| `cashback_policy` | 정책 | `type`(BASE/EXTRA), 같은 타입끼리 기간 겹침 금지 |
-| `cashback_policy_history` | 정책 변경 이력 | 신규. 변경자, 시각, 변경 전후 값 |
-| `cashback_annual_budget` | 연 예산 | `cashback_budget` 이름 변경(기획서 8절) |
-| `cashback_monthly_budget` | 월 예산 | 배정·이월 유입·예약(reserved)·지급(paid) 분리, 상태(`ACTIVE/NOTICED/STOPPED/CLOSED`), 중단 예약 시각, **대비금 금액**(월 시작 시 확정. 예약과 혼동되지 않게 `reserve_amount` 대신 `contingency_amount` 같은 이름) |
-| `cashback_budget_transfer` | 이월 이력 | 신규, INSERT only |
-| `cashback_monthly_limit` | 이용자 월 적립 한도 | 이용자·월별 사용량 |
-| `cashback_earning` | 적립 건 | 상태에 제외(`EXCLUDED`) 추가 제안, 제외 사유 코드. 적립 정보의 기준 테이블로 두는 것을 제안 |
-| 상태 전이 이력 | 중단 상태 변경 기록 | 신규. 전이 시각, 사유(자동·수동), 당시 남은 예산 % |
-| 알림·공지 | 변경 예고, 소진 예고, 중단 공지 | 신규 |
-| 계절 지수 | 월별 지수 시드 | 신규(확장) |
+| `id` | BIGINT PK | |
+| `rate` | NUMERIC(5,4) | 요율. 0 초과 1 이하, 소수 넷째 자리까지 |
+| `starts_at` | TIMESTAMP | 적용 시작(포함) |
+| `ends_at` | TIMESTAMP, null | 적용 종료(미포함). null이면 무기한 |
+| `created_at` | TIMESTAMP | |
+
+기간이 겹치는 정책은 등록하지 않는다(서비스에서 검사, DB 제약 없음. 운영자 단독 작업 전제).
+
+**`cashback_policy_history`** — 정책 변경 이력
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `policy_id` | BIGINT | 대상 정책 |
+| `action` | VARCHAR | `CREATE` / `UPDATE` |
+| `changed_by` | BIGINT | 변경한 운영자 ID(인증 머지 후) |
+| `changed_at` | TIMESTAMP | |
+| `before_rate`, `before_starts_at`, `before_ends_at` | | 변경 전 값. `CREATE`면 null |
+| `after_rate`, `after_starts_at`, `after_ends_at` | | 변경 후 값 |
+
+입력값·근거까지 남길지는 [9절](#9-개발하면서-판단할-것) 7번에서 정한다(남기면 JSON 컬럼 추가).
+
+**`cashback_annual_budget`** — 연 예산
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `budget_year` | INT, unique | |
+| `total_amount` | BIGINT | 연 예산 |
+| `reserved_amount` | BIGINT | 확보(예약)한 금액. 지급 전 |
+| `paid_amount` | BIGINT | 지급 완료 금액 |
+
+불변식: `reserved_amount + paid_amount ≤ total_amount`. 월 배정 합계 ≤ `total_amount`.
+
+**`cashback_monthly_budget`** — 월 예산
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `annual_budget_id` | BIGINT | |
+| `budget_month` | 연월, unique | |
+| `allocated_amount` | BIGINT | 월 배정 |
+| `carried_in_amount` | BIGINT | 이월 유입 |
+| `reserved_amount` | BIGINT | 확보(예약). 지급 전 |
+| `paid_amount` | BIGINT | 지급 완료 |
+| `contingency_amount` | BIGINT | 대비금. 월 시작 시 확정(월 배정의 10%). 예약과 혼동되지 않게 `reserve`가 아닌 이름 |
+| `status` | VARCHAR | `ACTIVE` / `NOTICED` / `STOPPED` / `CLOSED` |
+| `stop_scheduled_at` | TIMESTAMP, null | 공지 후 중단 예약 시각(`NOTICED`일 때) |
+
+남은 예산 = `allocated_amount + carried_in_amount − reserved_amount − paid_amount`. 확보는 한 번의 조건부 UPDATE로 하며 음수가 되지 않는다. 지급되면 `reserved_amount`가 줄고 `paid_amount`가 같은 만큼 늘어 남은 예산은 변하지 않는다.
+
+**`cashback_budget_transfer`** — 이월 이력 (INSERT only)
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `from_monthly_budget_id`, `to_monthly_budget_id` | BIGINT | 다음 달로만 이월 |
+| `amount` | BIGINT | |
+| `type` | VARCHAR | `AUTO` / `MANUAL` |
+| `created_by`, `created_at` | | 자동이면 `created_by`는 null |
+
+**`cashback_monthly_limit`** — 이용자 월 적립 한도 사용량
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT PK | |
+| `wallet_id` | BIGINT | 이용자 식별 |
+| `limit_month` | 연월 | 결제한 달(최초 접수 시각 기준 한국 시간 월) |
+| `used_amount` | BIGINT | 적립 예정 포함 사용량 |
+
+`(wallet_id, limit_month)` 유니크. 한도 금액은 행에 저장하지 않고 설정값으로 둔다(값은 P6에서 확정).
+
+**`cashback_earning`** — 적립 건 (적립 정보의 기준 테이블)
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| `id` | BIGINT PK | 지갑 원장의 `refKey`로 쓰는 적립 건 ID |
+| `payment_id` | BIGINT, unique | A의 결제. `reserve` 멱등 키 |
+| `wallet_id` | BIGINT | C의 지갑 |
+| `wallet_used_amount` | BIGINT | 데브머니 사용분(적립 기준) |
+| `applied_rate` | NUMERIC(5,4) | 접수 시각 요율(스냅샷) |
+| `applied_policy_id` | BIGINT, null | 적용 정책. 제외 건은 null |
+| `amount` | BIGINT | 적립액. `floor(사용분 × 요율)`, 제외 건은 0 |
+| `status` | VARCHAR | `PENDING`(적립 예정) / `PAID` / `CANCELED` / `CLAWED_BACK`(지급 후 회수) / `EXCLUDED` |
+| `exclusion_reason` | VARCHAR, null | `ExclusionReason`. 제외 건에만 |
+| `requested_at` | TIMESTAMP | A가 넘긴 최초 접수 시각 |
+| `payable_at` | TIMESTAMP, null | 지급 예정 시각. 제외 건은 null |
+| `paid_at`, `canceled_at` | TIMESTAMP, null | 지급·취소(회수 포함) 시각 |
+| `monthly_budget_id` | BIGINT, null | 확보한 월 예산. 제외 건은 null |
+| `limit_month` | 연월 | 월 한도를 차감한 달. 취소 시 이 달에서 복구 |
+| `created_at` | TIMESTAMP | |
+
+인덱스: 지급 대상 조회용 `(status, payable_at)`, 이용자 조회용 `(wallet_id, requested_at)`. 제외 건에도 행을 만들어 적립 내역에 "제외"와 사유를 보여 준다([9절](#9-개발하면서-판단할-것) 8번). A의 `payment`에도 적용 요율·적립액이 복사되어 있지만 원본은 이 테이블이다.
+
+**`cashback_budget_state_log`** — 중단 상태 전이 이력 (2단계, INSERT only)
+
+| 컬럼 | 설명 |
+|---|---|
+| `monthly_budget_id`, `from_status`, `to_status` | 전이 내용 |
+| `reason` | 자동 판정(공지선·긴급선), 예약 시각 도달, 운영자 공지 후 중단, 긴급 중단, 새 월 복귀 |
+| `remaining_rate` | 당시 남은 예산 % |
+| `operator_id`, `occurred_at` | 자동이면 `operator_id`는 null |
+
+**`cashback_notice`** — 공지 (3단계, 세부는 그때 확정)
+
+| 컬럼 | 설명 |
+|---|---|
+| `type` | 정책 변경 예고 / 소진 예고 / 긴급 중단 / 중단 예정 취소 |
+| `content`, `effective_from`, `stop_at`(null) | 문구는 날짜만 쓰고 시각은 쓰지 않는다 |
+| `created_at` | |
+
+**`cashback_seasonal_index`, `cashback_special_day`** — 시드 데이터 (4단계, 확장). 월별 지수 12개와 한 해치 특일.
+
+### 5-4. 구조 변경 기록
+
+| 날짜 | 변경 | 이유 |
+|---|---|---|
+| 11-18 | `cashback_policy`에서 `type`(BASE/EXTRA) 삭제 | 추가 요율은 MVP 이후로 미룸. 도입하면 기본 요율에 합산 |
+| 11-18 | 금액 컬럼 `NUMERIC(15,4)` → `BIGINT` | 결제·지갑이 `Long`을 쓰고, 소수 유지 지급은 도전 과제 |
+| 11-18 | 월 한도의 이용자 식별을 `wallet_id`로, 적립 상태명을 `PENDING` 기준으로 정리 | `ReserveCommand`에 이용자 ID가 없음 |
 
 ## 6. 구현 순서 (제안)
 
@@ -210,11 +364,11 @@ DB는 PostgreSQL 기준(11/16 결정, 기획서에는 아직 MySQL 표기)이다
 | 항목 | 구분 | 이유 |
 |---|---|---|
 | 일일 예산 페이싱 | **기획에서 제외** | |
-| 추가 캐시백 운영, 탄력 요율 | MVP 이후 | 기획서 3절의 추가 캐시백 운영(이월 예산으로 추가 요율) |
+| 추가 캐시백 운영, 탄력 요율 | MVP 이후 | 기획서 3절의 추가 캐시백 운영(이월 예산으로 추가 요율). 도입하면 기본 요율에 **합산**하는 방식으로 한다 |
 | 예측 오차 공개, 요율 제안 | MVP 이후 | 예측값 저장이 먼저 필요 |
 | 요율별 예상 잔액 비교, 적립 제외 건수 추이, 월한도 도달 분포, 지급 배치 추이 그래프 | MVP 이후 | 그래프는 3개만 우선 |
 | 푸시 알림, 가맹점 쪽 소진 예고, 선결제 억제(건당·가맹점당 상한) | MVP 이후 | |
-| 소수점 유지 지급 | 도전 과제 | 금액 컬럼만 확장 가능하게 둠 |
+| 소수점 유지 지급 | 도전 과제 | 금액은 `long`이라 필요해지면 컬럼 타입 변경과 함께 도입 |
 | AI 예측 | 제외 | 응집성과 일정 부담 |
 
 ## 9. 개발하면서 판단할 것
