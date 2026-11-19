@@ -51,7 +51,7 @@ class PaymentFacadeTest {
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest request = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     //when
     PaymentResponse response = paymentFacade.pay(key,request);
@@ -71,7 +71,7 @@ class PaymentFacadeTest {
     clock.set(Instant.parse("2026-11-18T01:30:00Z"));
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
-    PaymentRequest request = new PaymentRequest(1L, merchantId, 1L, 10_000L);
+    PaymentRequest request = new PaymentRequest(1L, merchantId, "qr-token-1", 10_000L);
     //when
     PaymentResponse response = paymentFacade.pay(key, request);
     //then
@@ -88,10 +88,10 @@ class PaymentFacadeTest {
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest pastrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentRequest currentrequest = new PaymentRequest(
-            1L, merchantId + 1, 2L, 20_000L //walletId 는 같아야 함 ((walletId, 멱등키)가 유니크라서 지갑이 다르면 새 요청이 됨)
+            1L, merchantId + 1, "qr-token-2", 20_000L //walletId 는 같아야 함 ((walletId, 멱등키)가 유니크라서 지갑이 다르면 새 요청이 됨)
     );
     paymentFacade.pay(key, pastrequest); //먼저 최초 요청으로 기존 행을 만들어 둠
 
@@ -109,10 +109,10 @@ class PaymentFacadeTest {
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest pastrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentRequest currentrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentResponse response = paymentFacade.pay(key, pastrequest); //먼저 최초 요청으로 기존 행을 만들어 둠
     assertThat(response.status()).isEqualTo(PaymentStatus.COMPLETED);
@@ -131,10 +131,10 @@ class PaymentFacadeTest {
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest pastrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentRequest currentrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     //when & then
     PaymentResponse pastresponse = paymentFacade.pay(key, pastrequest); //기존요청
@@ -152,10 +152,10 @@ class PaymentFacadeTest {
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest pastrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentRequest currentrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentResponse pastresponse = paymentFacade.pay(key, pastrequest); //기존요청
     //기존요청 완료처리

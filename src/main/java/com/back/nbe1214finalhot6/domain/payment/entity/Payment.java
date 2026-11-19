@@ -40,8 +40,9 @@ public class Payment {
   @Column(name = "merchant_id", nullable = false)
   private Long merchantId;
 
-  @Column(name = "qr_id")
-  private Long qrId;
+  // 이용자가 스캔한 QR 토큰(UUID). T1 에서 저장해 두고 요청 내용 비교와 QR 사용 처리에 쓴다
+  @Column(name = "qr_token", length = 64)
+  private String qrToken;
 
   @Column(name = "idempotency_key", nullable = false, length = 100)
   private String idempotencyKey;

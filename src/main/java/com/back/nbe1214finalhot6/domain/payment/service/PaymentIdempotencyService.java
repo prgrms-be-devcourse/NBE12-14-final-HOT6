@@ -11,6 +11,7 @@ import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.repository.PaymentRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +30,7 @@ public class PaymentIdempotencyService {
         Payment.builder()
             .walletId(request.walletId())
             .merchantId(request.merchantId())
-            .qrId(request.qrId())
+            .qrToken(request.qrToken())
             .idempotencyKey(key)
             .amount(request.amount())
             .walletUsedAmount(0L)
@@ -67,8 +68,8 @@ public class PaymentIdempotencyService {
   }
 
   private boolean isSameRequest(Payment p, PaymentRequest r) {
-    return p.getMerchantId().equals(r.merchantId()) //가맹점주id ,금액, qr id
+    return p.getMerchantId().equals(r.merchantId()) // 가맹점 id, 금액, QR 토큰
         && p.getAmount().equals(r.amount())
-        && p.getQrId().equals(r.qrId());
+        && Objects.equals(p.getQrToken(), r.qrToken());
   }
 }
