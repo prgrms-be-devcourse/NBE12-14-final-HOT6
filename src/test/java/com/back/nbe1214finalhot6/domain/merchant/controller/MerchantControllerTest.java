@@ -3,17 +3,26 @@ package com.back.nbe1214finalhot6.domain.merchant.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.response.PageResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
+import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
+import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
+import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -25,6 +34,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.RequestBuilder;
 
 // 인증 없이(로그인·CSRF 토큰 없이) 호출해서 임시 보안 설정도 함께 확인한다.
 @WebMvcTest(MerchantController.class)
@@ -34,10 +44,9 @@ class MerchantControllerTest {
   @Autowired private MockMvc mockMvc;
   @MockitoBean private MerchantService merchantService;
 
-  // 목적: 정상 요청이 201 과 공통 응답 형식(success, data)으로 내려가는지 확인한다.
   @Test
   @DisplayName("정상 요청이면 201 과 등록 결과를 반환한다")
-  void register_created() throws Exception {
+  void 가맹점등록성공() throws Exception {
     given(merchantService.register(any()))
         .willReturn(new MerchantRegisterResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true));
 
@@ -55,12 +64,11 @@ class MerchantControllerTest {
         .andExpect(jsonPath("$.data.cashbackEligible").value(true));
   }
 
-  // 목적: JSON 의 cashbackEligible: false 가 Boolean 으로 바인딩되어 서비스까지 전달되는지 확인한다.
   @Test
-  @DisplayName("cashbackEligible 을 false 로 보내면 서비스에 false 로 전달된다")
-  void register_cashbackEligibleFalseBinding() throws Exception {
+  @DisplayName("증빙 서류를 보내면 서비스에 전달되고 적립 대상으로 판정된다")
+  void 증빙서류바인딩() throws Exception {
     given(merchantService.register(any()))
-        .willReturn(new MerchantRegisterResponse(1L, "비적립 가맹점", "인천광역시 남동구 1", false));
+        .willReturn(new MerchantRegisterResponse(1L, "서류 가맹점", "인천광역시 남동구 1", true));
 
     mockMvc
         .perform(
@@ -68,39 +76,36 @@ class MerchantControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"ownerId": 1, "name": "비적립 가맹점", "address": "인천광역시 남동구 1",
-                     "cashbackEligible": false}
+                    {"ownerId": 1, "name": "서류 가맹점", "address": "인천광역시 남동구 1",
+                     "revenueProof": "revenue.pdf"}
                     """))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.data.cashbackEligible").value(false));
+        .andExpect(jsonPath("$.data.cashbackEligible").value(true));
 
     ArgumentCaptor<MerchantRegisterRequest> captor =
         ArgumentCaptor.forClass(MerchantRegisterRequest.class);
     verify(merchantService).register(captor.capture());
-    assertThat(captor.getValue().cashbackEligible()).isFalse();
-    assertThat(captor.getValue().resolveCashbackEligible()).isFalse();
+    assertThat(captor.getValue().revenueProof()).isEqualTo("revenue.pdf");
+    assertThat(captor.getValue().resolveCashbackEligible()).isTrue();
   }
 
-  // 목적: 이름이 비어 있거나 공백뿐이면 @NotBlank 로 걸러져 400 이 되는지 확인한다.
   @ParameterizedTest
   @ValueSource(strings = {"", "   "})
   @DisplayName("이름이 비어 있으면 400")
-  void register_blankName(String name) throws Exception {
+  void 이름이공백이면400(String name) throws Exception {
     expectBadRequest(requestBody(name, "인천광역시 남동구 1"), "name");
   }
 
-  // 목적: 주소가 비어 있거나 공백뿐이면 @NotBlank 로 걸러져 400 이 되는지 확인한다.
   @ParameterizedTest
   @ValueSource(strings = {"", "   "})
   @DisplayName("주소가 비어 있으면 400")
-  void register_blankAddress(String address) throws Exception {
+  void 주소가공백이면400(String address) throws Exception {
     expectBadRequest(requestBody("테스트 가맹점", address), "address");
   }
 
-  // 목적: ownerId 가 빠지면 @NotNull 로 걸러져 400 이 되는지 확인한다.
   @Test
   @DisplayName("ownerId 가 없으면 400")
-  void register_missingOwnerId() throws Exception {
+  void 사장님ID누락시400() throws Exception {
     expectBadRequest(
         """
         {"name": "테스트 가맹점", "address": "인천광역시 남동구 1"}
@@ -108,10 +113,9 @@ class MerchantControllerTest {
         "ownerId");
   }
 
-  // 목적: 이름 길이 제한(100자)의 경계값을 확인한다. 100자는 통과하고 101자는 400 이어야 한다.
   @Test
   @DisplayName("이름이 100자면 201, 101자면 400")
-  void register_nameSizeBoundary() throws Exception {
+  void 이름길이경계값() throws Exception {
     given(merchantService.register(any()))
         .willReturn(new MerchantRegisterResponse(1L, "가".repeat(100), "인천광역시 남동구 1", true));
 
@@ -119,15 +123,175 @@ class MerchantControllerTest {
     expectBadRequest(requestBody("가".repeat(101), "인천광역시 남동구 1"), "name");
   }
 
-  // 목적: 주소 길이 제한(200자)의 경계값을 확인한다. 200자는 통과하고 201자는 400 이어야 한다.
   @Test
   @DisplayName("주소가 200자면 201, 201자면 400")
-  void register_addressSizeBoundary() throws Exception {
+  void 주소길이경계값() throws Exception {
     given(merchantService.register(any()))
         .willReturn(new MerchantRegisterResponse(1L, "테스트 가맹점", "가".repeat(200), true));
 
     expectCreated(requestBody("테스트 가맹점", "가".repeat(200)));
     expectBadRequest(requestBody("테스트 가맹점", "가".repeat(201)), "address");
+  }
+
+  @Test
+  @DisplayName("가맹점을 수정하면 200 과 수정 결과를 반환한다")
+  void 가맹점수정성공() throws Exception {
+    given(merchantService.update(eq(1L), any()))
+        .willReturn(new MerchantResponse(1L, "새 이름", "인천광역시 남동구 1", true));
+
+    mockMvc
+        .perform(
+            patch("/api/merchants/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"name": "새 이름"}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.merchantId").value(1))
+        .andExpect(jsonPath("$.data.name").value("새 이름"));
+  }
+
+  @Test
+  @DisplayName("일부 필드만 보내면 나머지는 null 로 전달된다")
+  void 일부필드만수정시나머지는null() throws Exception {
+    given(merchantService.update(eq(1L), any()))
+        .willReturn(new MerchantResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true));
+
+    mockMvc
+        .perform(
+            patch("/api/merchants/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"address": "새 주소"}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.merchantId").value(1));
+
+    ArgumentCaptor<MerchantUpdateRequest> captor =
+        ArgumentCaptor.forClass(MerchantUpdateRequest.class);
+    verify(merchantService).update(eq(1L), captor.capture());
+    assertThat(captor.getValue().name()).isNull();
+    assertThat(captor.getValue().address()).isEqualTo("새 주소");
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 가맹점을 수정하면 404")
+  void 없는가맹점수정시404() throws Exception {
+    given(merchantService.update(eq(999L), any()))
+        .willThrow(new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+
+    mockMvc
+        .perform(
+            patch("/api/merchants/999")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"name": "새 이름"}
+                    """))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("MER-001"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "   "})
+  @DisplayName("수정할 이름이 비어 있으면 400")
+  void 수정할이름이공백이면400(String name) throws Exception {
+    expectInvalidRequest(patchRequest("{\"name\": \"%s\"}".formatted(name)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "   "})
+  @DisplayName("수정할 주소가 비어 있으면 400")
+  void 수정할주소가공백이면400(String address) throws Exception {
+    expectInvalidRequest(patchRequest("{\"address\": \"%s\"}".formatted(address)));
+  }
+
+  @Test
+  @DisplayName("수정할 이름은 100자, 주소는 200자까지 허용한다")
+  void 수정길이경계값() throws Exception {
+    given(merchantService.update(eq(1L), any()))
+        .willReturn(new MerchantResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true));
+
+    mockMvc.perform(patchRequest("{\"name\": \"%s\"}".formatted("가".repeat(100))))
+        .andExpect(status().isOk());
+    mockMvc.perform(patchRequest("{\"address\": \"%s\"}".formatted("가".repeat(200))))
+        .andExpect(status().isOk());
+    expectInvalidRequest(patchRequest("{\"name\": \"%s\"}".formatted("가".repeat(101))));
+    expectInvalidRequest(patchRequest("{\"address\": \"%s\"}".formatted("가".repeat(201))));
+  }
+
+  @Test
+  @DisplayName("이름으로 검색하면 200 과 목록·페이지 정보를 반환한다")
+  void 이름검색성공() throws Exception {
+    given(merchantService.search("분식", 0, 20))
+        .willReturn(
+            new PageResponse<>(
+                List.of(
+                    new MerchantResponse(1L, "행복분식", "인천광역시 남동구 1", true),
+                    new MerchantResponse(2L, "해피분식", "인천광역시 서구 2", false)),
+                0,
+                20,
+                2,
+                1));
+
+    mockMvc
+        .perform(get("/api/merchants").param("name", "분식"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.content[0].name").value("행복분식"))
+        .andExpect(jsonPath("$.data.content[0].cashbackEligible").value(true))
+        .andExpect(jsonPath("$.data.content[1].cashbackEligible").value(false))
+        .andExpect(jsonPath("$.data.page").value(0))
+        .andExpect(jsonPath("$.data.size").value(20))
+        .andExpect(jsonPath("$.data.totalElements").value(2))
+        .andExpect(jsonPath("$.data.totalPages").value(1));
+  }
+
+  @Test
+  @DisplayName("page 와 size 는 기본값 0, 20 이고 값을 보내면 그대로 전달된다")
+  void 검색페이징파라미터전달() throws Exception {
+    given(merchantService.search(any(), eq(0), eq(20)))
+        .willReturn(new PageResponse<>(List.of(), 0, 20, 0, 0));
+    given(merchantService.search(any(), eq(2), eq(10)))
+        .willReturn(new PageResponse<>(List.of(), 2, 10, 0, 0));
+
+    mockMvc.perform(get("/api/merchants").param("name", "분식")).andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/merchants").param("name", "분식").param("page", "2").param("size", "10"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.page").value(2))
+        .andExpect(jsonPath("$.data.size").value(10));
+
+    verify(merchantService).search("분식", 0, 20);
+    verify(merchantService).search("분식", 2, 10);
+  }
+
+  @Test
+  @DisplayName("잘못된 검색 요청이면 400")
+  void 잘못된검색요청이면400() throws Exception {
+    expectInvalidRequest(get("/api/merchants"));
+    expectInvalidRequest(get("/api/merchants").param("name", "   "));
+    expectInvalidRequest(get("/api/merchants").param("name", "분식").param("page", "-1"));
+    expectInvalidRequest(get("/api/merchants").param("name", "분식").param("size", "0"));
+  }
+
+  private RequestBuilder patchRequest(String body) {
+    return patch("/api/merchants/1").contentType(MediaType.APPLICATION_JSON).content(body);
+  }
+
+  // 요청이 400(COM-001)으로 거절되고, 서비스가 새로 호출되지 않았는지 확인한다.
+  private void expectInvalidRequest(RequestBuilder request) throws Exception {
+    int callsBefore = mockingDetails(merchantService).getInvocations().size();
+    mockMvc
+        .perform(request)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("COM-001"));
+    assertThat(mockingDetails(merchantService).getInvocations()).hasSize(callsBefore);
   }
 
   private String requestBody(String name, String address) {
