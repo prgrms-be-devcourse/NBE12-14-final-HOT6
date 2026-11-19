@@ -7,6 +7,7 @@ import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateRequest;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateResponse;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrStatusResponse;
 import com.back.nbe1214finalhot6.domain.qr.entity.QrCode;
+import com.back.nbe1214finalhot6.domain.qr.entity.QrStatus;
 import com.back.nbe1214finalhot6.domain.qr.exception.QrErrorCode;
 import com.back.nbe1214finalhot6.domain.qr.repository.QrCodeRepository;
 import java.time.Clock;
@@ -45,5 +46,21 @@ public class QrService {
             .orElseThrow(() -> new BusinessException(QrErrorCode.QR_NOT_FOUND));
 
     return QrStatusResponse.of(qrCode, LocalDateTime.now(clock));
+  }
+
+  @Transactional
+  public void markUsed(Long qrId) {
+    LocalDateTime now = LocalDateTime.now(clock);
+    if (qrCodeRepository.markUsedIfAvailable(qrId, now) == 1) {
+      return;
+    }
+
+    // 호출한 트랜잭션의 영속성 컨텍스트에 남은 이전 값을 읽지 않도록 엔티티 대신 상태 값만 조회한다.
+    QrStatus status =
+        qrCodeRepository
+            .findStatusById(qrId)
+            .orElseThrow(() -> new BusinessException(QrErrorCode.QR_NOT_FOUND));
+    throw new BusinessException(
+        status == QrStatus.USED ? QrErrorCode.QR_ALREADY_USED : QrErrorCode.QR_EXPIRED);
   }
 }
