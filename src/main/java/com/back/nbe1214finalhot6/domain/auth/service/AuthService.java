@@ -7,7 +7,10 @@ import com.back.nbe1214finalhot6.domain.auth.entity.User;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,27 +24,51 @@ public class AuthService {
 
   @Transactional
   public SignupResponse signup(SignupRequest request) {
-    // 1. 이메일 중복이면 예외
+    // 이메일 중복이면 예외
     if (userRepository.existsByEmail(request.email())) {
       throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
     }
-    // 2. 전화번호 중복이면 예외
+    // 전화번호 중복이면 예외
     if (userRepository.existsByPhone(request.phone())) {
       throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE);
     }
-    // 3. 암호화
+    // 암호화
     String passwordHash = passwordEncoder.encode(request.password());
     String pinHash = passwordEncoder.encode(request.pin());
 
-    // 4. 엔티티 생성
     User user =
         User.create(
             request.name(), request.email(), request.phone(), passwordHash, pinHash, UserRole.USER);
 
-    // 5. 저장
-    User saved = userRepository.save(user);
+    User saved = saveOrThrowDuplicate(user);
 
-    // 6. 응답으로 변환
     return SignupResponse.from(saved);
+  }
+
+  // 동시 가입으로 위의 중복 확인을 함께 통과한 요청은 DB unique 제약이 막는다. 이를 중복 에러로 바꾼다.
+  // 예외가 나면 이 트랜잭션은 롤백되므로 여기서 다시 조회하지 않고 제약 이름으로 구분한다.
+  private User saveOrThrowDuplicate(User user) {
+    try {
+      // 저장 즉시 flush 해서 unique 위반이 이 try 안에서 나도록 한다(ID 생성 방식에 기대지 않음)
+      return userRepository.saveAndFlush(user);
+    } catch (DataIntegrityViolationException e) {
+      String constraint = constraintName(e);
+      // 위의 사전 확인과 같은 에러를 던지는 것은 의도한 중복이다. 사전 확인은 순차 요청을, 여기는 동시 요청을 거른다.
+      if (constraint.contains("email")) {
+        throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
+      }
+      if (constraint.contains("phone")) {
+        throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE);
+      }
+      throw e; // 이메일·전화번호 제약이 아니면 중복이라고 단정하지 않고 그대로
+    }
+  }
+
+  private String constraintName(DataIntegrityViolationException e) {
+    if (e.getCause() instanceof ConstraintViolationException cause
+        && cause.getConstraintName() != null) {
+      return cause.getConstraintName().toLowerCase(Locale.ROOT);
+    }
+    return "";
   }
 }

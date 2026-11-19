@@ -16,6 +16,8 @@ import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserStatus;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
+import java.sql.SQLException;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,12 +44,12 @@ class AuthServiceTest {
   void signup_success() {
     given(passwordEncoder.encode("Password1!")).willReturn("hashed-pw");
     given(passwordEncoder.encode("123456")).willReturn("hashed-pin");
-    given(userRepository.save(any(User.class))).willAnswer(inv -> inv.getArgument(0));
+    given(userRepository.saveAndFlush(any(User.class))).willAnswer(inv -> inv.getArgument(0));
 
     SignupResponse response = authService.signup(request);
 
     ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
-    verify(userRepository).save(captor.capture());
+    verify(userRepository).saveAndFlush(captor.capture());
     User saved = captor.getValue();
 
     assertThat(saved.getPasswordHash()).isEqualTo("hashed-pw").isNotEqualTo("Password1!");
@@ -75,7 +78,7 @@ class AuthServiceTest {
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(AuthErrorCode.DUPLICATE_EMAIL));
 
-    verify(userRepository, never()).save(any());
+    verify(userRepository, never()).saveAndFlush(any());
     verifyNoInteractions(passwordEncoder);
   }
 
@@ -90,7 +93,47 @@ class AuthServiceTest {
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(AuthErrorCode.DUPLICATE_PHONE));
 
-    verify(userRepository, never()).save(any());
+    verify(userRepository, never()).saveAndFlush(any());
     verifyNoInteractions(passwordEncoder);
+  }
+
+  // 사전 확인을 통과한 뒤 DB unique 제약에 걸리면(동시 가입) 제약 이름으로 중복 에러를 구분하는지 확인
+  @Test
+  @DisplayName("저장 시 이메일 unique 제약에 걸리면 DUPLICATE_EMAIL 예외가 난다")
+  void signup_uniqueViolationOnEmail() {
+    given(userRepository.saveAndFlush(any(User.class))).willThrow(uniqueViolation("users_email_key"));
+
+    assertThatThrownBy(() -> authService.signup(request))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(AuthErrorCode.DUPLICATE_EMAIL));
+  }
+
+  @Test
+  @DisplayName("저장 시 전화번호 unique 제약에 걸리면 DUPLICATE_PHONE 예외가 난다")
+  void signup_uniqueViolationOnPhone() {
+    given(userRepository.saveAndFlush(any(User.class))).willThrow(uniqueViolation("users_phone_key"));
+
+    assertThatThrownBy(() -> authService.signup(request))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(AuthErrorCode.DUPLICATE_PHONE));
+  }
+
+  // 이메일·전화번호 제약이 아니면 중복으로 단정하지 않고 원래 예외를 그대로 던지는지 확인
+  @Test
+  @DisplayName("알 수 없는 제약 위반은 중복으로 바꾸지 않고 그대로 던진다")
+  void signup_unknownViolationIsRethrown() {
+    DataIntegrityViolationException unknown = uniqueViolation("users_other_key");
+    given(userRepository.saveAndFlush(any(User.class))).willThrow(unknown);
+
+    assertThatThrownBy(() -> authService.signup(request)).isSameAs(unknown);
+  }
+
+  private DataIntegrityViolationException uniqueViolation(String constraintName) {
+    return new DataIntegrityViolationException(
+        "could not execute statement",
+        new ConstraintViolationException(
+            "duplicate key", new SQLException("duplicate key"), constraintName));
   }
 }
