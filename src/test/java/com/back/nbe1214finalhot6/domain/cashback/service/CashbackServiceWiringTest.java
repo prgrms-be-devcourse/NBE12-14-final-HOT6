@@ -2,8 +2,8 @@ package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.back.nbe1214finalhot6.domain.cashback.dto.ReserveCommand;
-import com.back.nbe1214finalhot6.domain.cashback.dto.ReserveResult;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveResponse;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
@@ -23,9 +23,10 @@ class CashbackServiceWiringTest {
   void 서비스주입() {
     assertThat(context.getBeansOfType(CashbackService.class)).hasSize(1);
 
-    ReserveResult result =
+    CashbackReserveResponse result =
         cashbackService.reserve(
-            new ReserveCommand(1L, 1L, true, 12_000L, LocalDateTime.of(2026, 11, 18, 9, 0)));
+            new CashbackReserveRequest(
+                1L, 1L, true, 12_000L, LocalDateTime.of(2026, 11, 18, 9, 0)));
 
     assertThat(result.earnedAmount()).isZero();
   }
