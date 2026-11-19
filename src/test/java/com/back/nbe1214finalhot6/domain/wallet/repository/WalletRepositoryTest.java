@@ -8,6 +8,7 @@ import com.back.nbe1214finalhot6.domain.wallet.entity.Wallet;
 import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransaction;
 import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 /** 엔티티가 테이블로 만들어지고 DB 유니크 제약이 동작하는지 확인함. */
 @IntegrationTest
 class WalletRepositoryTest {
+
+  private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 19, 10, 0);
 
   @Autowired WalletRepository walletRepository;
   @Autowired AccountRepository accountRepository;
@@ -85,6 +88,7 @@ class WalletRepositoryTest {
         .amount(1_000L)
         .balanceAfter(1_000L)
         .refKey(refKey)
+        .createdAt(NOW)
         .build();
   }
 }

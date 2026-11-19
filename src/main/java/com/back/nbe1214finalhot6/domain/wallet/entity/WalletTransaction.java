@@ -15,7 +15,6 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
 /** 지갑 원장. INSERT만 하고 수정하지 않음. 취소는 반대 방향의 새 행으로 남김. */
 @Entity
@@ -72,8 +71,8 @@ public class WalletTransaction {
   @Column(name = "ref_key", updatable = false)
   private Long refKey;
 
+  // 생성 시각. 엔티티가 만들지 않고 서비스가 Clock으로 만든 시각을 받음
   @Column(name = "created_at", nullable = false, updatable = false)
-  @CreationTimestamp
   private LocalDateTime createdAt;
 
   @Builder
@@ -86,7 +85,9 @@ public class WalletTransaction {
       WalletTransactionType type,
       long amount,
       long balanceAfter,
-      Long refKey) {
+      Long refKey,
+      LocalDateTime createdAt) {
+    this.createdAt = createdAt;
     this.walletId = walletId;
     this.chargeId = chargeId;
     this.refundId = refundId;
