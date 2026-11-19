@@ -11,8 +11,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetResponse;
+import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackBudgetService;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -116,5 +119,102 @@ class CashbackBudgetAdminControllerTest {
         .perform(get("/api/admin/cashback/budget/annual/2030"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("CSH-004"));
+  }
+
+  private MonthlyBudgetResponse monthly(int month) {
+    return new MonthlyBudgetResponse(
+        2026, month, 1_000_000L, 0L, 0L, 0L, 100_000L, 1_000_000L, BudgetStatus.ACTIVE);
+  }
+
+  // 목적: 월 배정 PUT 이 200 과 대비금·상태를 포함한 응답으로 내려가는지 확인한다.
+  @Test
+  @DisplayName("월 예산 PUT 은 200 과 결과를 반환한다")
+  void putMonthly_ok() throws Exception {
+    given(budgetService.putMonthly(eq(2026), eq(12), any())).willReturn(monthly(12));
+
+    mockMvc
+        .perform(
+            put("/api/admin/cashback/budget/monthly/2026/12")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"allocatedAmount": 1000000}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.budgetMonth").value(12))
+        .andExpect(jsonPath("$.data.allocatedAmount").value(1_000_000))
+        .andExpect(jsonPath("$.data.contingencyAmount").value(100_000))
+        .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+  }
+
+  // 목적: 배정 금액이 빠지면 400 으로 걸러지는지 확인한다.
+  @Test
+  @DisplayName("배정 금액이 없으면 400")
+  void putMonthly_missingAmount() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/admin/cashback/budget/monthly/2026/12")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  // 목적: 합계 초과는 409 와 CSH-005, 사용 중인 달은 409 와 CSH-008 로 변환되는지 확인한다.
+  @Test
+  @DisplayName("합계 초과는 CSH-005, 사용 중인 달 수정은 CSH-008 (모두 409)")
+  void putMonthly_conflicts() throws Exception {
+    given(budgetService.putMonthly(eq(2026), eq(11), any()))
+        .willThrow(new BusinessException(CashbackErrorCode.BUDGET_ALLOCATION_EXCEEDED));
+    given(budgetService.putMonthly(eq(2026), eq(12), any()))
+        .willThrow(new BusinessException(CashbackErrorCode.BUDGET_IN_USE));
+    String body = "{\"allocatedAmount\": 1000000}";
+
+    mockMvc
+        .perform(
+            put("/api/admin/cashback/budget/monthly/2026/11")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CSH-005"));
+    mockMvc
+        .perform(
+            put("/api/admin/cashback/budget/monthly/2026/12")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CSH-008"));
+  }
+
+  // 목적: 월 조회는 200, 배정하지 않은 달은 404 와 CSH-004 인지 확인한다.
+  @Test
+  @DisplayName("월 조회는 200, 없는 달은 404 와 CSH-004")
+  void getMonthly_okAndNotFound() throws Exception {
+    given(budgetService.getMonthly(2026, 12)).willReturn(monthly(12));
+    given(budgetService.getMonthly(2026, 1))
+        .willThrow(new BusinessException(CashbackErrorCode.BUDGET_NOT_FOUND));
+
+    mockMvc
+        .perform(get("/api/admin/cashback/budget/monthly/2026/12"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.budgetMonth").value(12));
+    mockMvc
+        .perform(get("/api/admin/cashback/budget/monthly/2026/1"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("CSH-004"));
+  }
+
+  // 목적: 연도별 목록이 배열로 내려가고, year 파라미터가 없으면 400 인지 확인한다.
+  @Test
+  @DisplayName("월 예산 목록은 배열로 반환하고 year 가 없으면 400")
+  void listMonthly() throws Exception {
+    given(budgetService.listMonthly(2026)).willReturn(List.of(monthly(11), monthly(12)));
+
+    mockMvc
+        .perform(get("/api/admin/cashback/budget/monthly").param("year", "2026"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(2))
+        .andExpect(jsonPath("$.data[0].budgetMonth").value(11));
+    mockMvc
+        .perform(get("/api/admin/cashback/budget/monthly"))
+        .andExpect(status().isBadRequest());
   }
 }
