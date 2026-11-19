@@ -15,7 +15,7 @@ export default function MerchantRegisterPage() {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
-  const [eligible, setEligible] = useState(true);
+  const [proof, setProof] = useState<string>("");
   const [category, setCategory] = useState("식당");
   const [pos, setPos] = useState<LatLng | null>(null);
   const [error, setError] = useState("");
@@ -27,7 +27,7 @@ export default function MerchantRegisterPage() {
     setError("");
     setBusy(true);
     try {
-      const res = await registerMerchant({ ownerId, name: name.trim(), address: address.trim(), cashbackEligible: eligible });
+      const res = await registerMerchant({ ownerId, name: name.trim(), address: address.trim(), ...(proof ? { revenueProof: proof } : {}) });
       saveCtx({ merchantId: res.merchantId, merchantName: res.name, category, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
       router.push("/merchant/edit");
     } catch (err) {
@@ -46,10 +46,16 @@ export default function MerchantRegisterPage() {
         <label className="block"><span className="label">업종 (지도 마크에 표시 · API 미지원 · 이 브라우저에만 저장)</span><select className="field" value={category} onChange={(e) => setCategory(e.target.value)}>{CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.icon} {c.value}</option>)}</select></label>
         <label className="block"><span className="label">연락처 (API 미지원 · 전송 안 함)</span><input className="field" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
         <label className="block"><span className="label">ownerId (개발용 · 인증 연동 전 임시)</span><input className="field" inputMode="numeric" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value.replace(/\D/g, "")) || 0)} /></label>
-        <label className="card flex cursor-pointer items-start gap-3 !p-3.5">
-          <input type="checkbox" className="mt-1 h-4 w-4 accent-blue-600" checked={eligible} onChange={(e) => setEligible(e.target.checked)} />
-          <span><span className="block text-sm font-semibold">캐시백 적립 대상 가맹점</span><span className="note">끄면 이 가맹점에서는 적립이 제외돼요. 캐시백 잔액 사용은 가능합니다.</span></span>
-        </label>
+        <div className="card space-y-2 !p-3.5">
+          <div>
+            <span className="block text-sm font-semibold">캐시백 적립 대상 증빙</span>
+            <span className="note">연매출 30억 미만 증빙 서류를 첨부하면 적립 대상 가맹점으로 자동 승인돼요. 서류 내용은 검증하지 않고, 첨부 여부로만 결정합니다.</span>
+          </div>
+          <input type="file" aria-label="증빙 서류 첨부" onChange={(e) => setProof(e.target.files?.[0]?.name ?? "")} className="block w-full text-[13px] file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-[13px] file:font-semibold file:text-blue-700" />
+          <p role="status" className={`rounded-lg px-3 py-2 text-[13px] font-medium ${proof ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+            {proof ? `증빙 첨부됨 (${proof}) → 적립 대상 가맹점으로 등록돼요` : "증빙이 없으면 적립 제외 가맹점으로 등록돼요"}
+          </p>
+        </div>
         <div>
           <span className="label">지도 (위치 선택)</span>
           <MapPicker value={pos} onChange={setPos} />
@@ -57,7 +63,7 @@ export default function MerchantRegisterPage() {
         </div>
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">{error}</p>}
         <button type="submit" disabled={busy || !name.trim() || !address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "등록 중…" : "등록"}</button>
-        <div className="card-dash"><ul className="space-y-0.5"><li>• POST /api/merchants 로 등록됩니다</li><li>• cashbackEligible 값이 함께 전송됩니다</li><li>• 등록 후 merchantId 가 개발용 식별자에 저장됩니다</li></ul></div>
+        <div className="card-dash"><ul className="space-y-0.5"><li>• POST /api/merchants 로 등록됩니다</li><li>• 증빙 서류를 첨부하면 revenueProof 가 함께 전송됩니다</li><li>• 등록 후 merchantId 가 개발용 식별자에 저장됩니다</li></ul></div>
       </form>
     </>
   );

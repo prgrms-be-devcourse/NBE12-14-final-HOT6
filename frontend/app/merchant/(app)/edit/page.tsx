@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import MapPicker, { type LatLng } from "@/components/MapPicker";
+import { ApiError } from "@/lib/api";
 import { loadCtx, saveCtx } from "@/lib/devContext";
+import { updateMerchant } from "@/lib/endpoints";
 import { merchant } from "@/lib/mock";
 
 export default function MerchantEditPage() {
@@ -14,18 +16,35 @@ export default function MerchantEditPage() {
   const [eligible, setEligible] = useState(true);
   const [pos, setPos] = useState<LatLng | null>(null);
   const [ready, setReady] = useState(false);
+  const [merchantId, setMerchantId] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     const c = loadCtx();
     setF((x) => ({ ...x, name: c.merchantName ?? x.name, address: c.merchantAddress ?? x.address }));
     setEligible(c.eligible ?? true);
+    setMerchantId(c.merchantId);
     if (c.lat !== undefined && c.lng !== undefined) setPos({ lat: c.lat, lng: c.lng });
     setReady(true);
   }, []);
 
-  const save = () => {
-    saveCtx({ merchantName: f.name, merchantAddress: f.address, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
-    setEditing(false);
+  // PATCH /api/merchants/{id} : 이름·주소만 서버에 반영. 연락처·위치·업종은 API 미지원이라 이 브라우저에만 저장
+  const save = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await updateMerchant(merchantId, { name: f.name.trim(), address: f.address.trim() });
+      saveCtx({ merchantName: res.name, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
+      setF((x) => ({ ...x, name: res.name, address: res.address }));
+      setEligible(res.cashbackEligible);
+      setEditing(false);
+      setMsg({ ok: true, text: "가맹점 정보가 수정되었어요" });
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof ApiError ? err.message : "알 수 없는 오류가 발생했습니다" });
+    } finally {
+      setBusy(false);
+    }
   };
   const ro = !editing;
   const input = (k: keyof typeof f, label: string) => (
@@ -49,8 +68,9 @@ export default function MerchantEditPage() {
           {ready && <MapPicker value={pos} onChange={editing ? setPos : undefined} />}
           <p className="note mt-1">{editing ? "지도를 눌러 위치를 바꿀 수 있어요" : pos ? "등록된 위치" : "위치가 등록되지 않았어요 (수정에서 선택)"}</p>
         </div>
+        {msg && <p role={msg.ok ? "status" : "alert"} className={`rounded-lg px-3 py-2 text-[13px] font-medium ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-600"}`}>{msg.text}</p>}
         {editing
-          ? <div className="flex gap-2.5"><button type="button" onClick={() => setEditing(false)} className="btn btn-outline">취소</button><button type="button" onClick={save} className="btn btn-primary">저장</button></div>
+          ? <div className="flex gap-2.5"><button type="button" onClick={() => setEditing(false)} className="btn btn-outline">취소</button><button type="button" onClick={save} disabled={busy || !f.name.trim() || !f.address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "저장 중…" : "저장"}</button></div>
           : <button type="button" onClick={() => setEditing(true)} className="btn btn-outline">수정</button>}
 
         <div>
@@ -63,7 +83,7 @@ export default function MerchantEditPage() {
           <p className={`mt-2 text-[13px] ${open ? "text-slate-500" : "font-medium text-red-600"}`} role="status">중지 상태에서는 QR 결제가 거절됩니다</p>
         </div>
         <Link href="/merchant/qr" className="btn btn-primary">QR 생성하러 가기</Link>
-        <p className="note">※ 상태관리 범위 확인 필요 · 수정/상태 변경 API 연동 전 (화면에서만 반영)</p>
+        <p className="note">※ 이름·주소 수정은 PATCH /api/merchants/{"{"}id{"}"} 로 저장돼요. 연락처·위치·운영 상태 변경은 API 연동 전이라 화면에서만 반영됩니다.</p>
       </div>
     </>
   );

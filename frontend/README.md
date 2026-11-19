@@ -25,7 +25,9 @@ BACKEND_URL=http://localhost:8080 npm run dev
 
 ## 백엔드 연동
 
-- 연동된 API: `POST /api/merchants`(가맹점 등록), `POST /api/payments`(QR 결제)
+- 연동된 API: `POST /api/merchants`(가맹점 등록), `PATCH /api/merchants/{id}`(이름·주소 수정), `POST /api/payments`(QR 결제)
+- `GET /api/merchants?name=`(이름 검색)은 `lib/endpoints.ts` 에 함수만 있고 아직 화면에는 연결하지 않았다. (응답에 위치·업종이 없어 지도에 못 찍음)
+- 가맹점의 적립 대상 여부는 서버가 결정한다: 등록 시 증빙 서류(`revenueProof`)를 첨부하면 적립 대상
 - 나머지는 `lib/mock.ts` 의 목 데이터. API 가 생기면 `lib/endpoints.ts` 에 함수를 추가하고 화면에서 호출을 바꾼다.
 - 요청·응답 타입은 `lib/types.ts` (백엔드 DTO 와 1:1)
 - 서비스 한도는 `lib/limits.ts` 한 곳에서 관리한다.
