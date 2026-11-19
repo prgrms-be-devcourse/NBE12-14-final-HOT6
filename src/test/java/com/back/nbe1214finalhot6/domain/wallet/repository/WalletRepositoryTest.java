@@ -65,6 +65,8 @@ class WalletRepositoryTest {
   @Test
   @DisplayName("같은 (type, refKey)의 원장은 두 번 저장할 수 없고, type이 다르면 저장할 수 있다")
   void walletTransaction_uniqueTypeRefKey() {
+    long before = walletTransactionRepository.count();
+
     walletTransactionRepository.saveAndFlush(ledger(WalletTransactionType.CASHBACK_EARN, 100L));
 
     // 같은 type, 같은 refKey: 중복 반영이므로 실패
@@ -77,7 +79,8 @@ class WalletRepositoryTest {
     // 같은 refKey, 다른 type: 같은 적립 건의 지급과 회수는 허용
     walletTransactionRepository.saveAndFlush(ledger(WalletTransactionType.CASHBACK_CLAWBACK, 100L));
 
-    assertThat(walletTransactionRepository.count()).isEqualTo(2);
+    // 기존 행 수와 상관없이, 이 테스트가 성공시킨 2건만 늘었는지 확인
+    assertThat(walletTransactionRepository.count()).isEqualTo(before + 2);
   }
 
   // 테스트용 원장 행. 유니크 검증에 필요한 type, refKey만 바꿔가며 사용
