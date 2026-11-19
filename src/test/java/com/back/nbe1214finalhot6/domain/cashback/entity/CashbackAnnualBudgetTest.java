@@ -52,7 +52,7 @@ class CashbackAnnualBudgetTest {
   void changeTotal_valid() {
     CashbackAnnualBudget budget = CashbackAnnualBudget.create(2026, 1_000_000L);
 
-    budget.changeTotal(2_000_000L);
+    budget.changeTotal(2_000_000L, 0L);
 
     assertThat(budget.getTotalAmount()).isEqualTo(2_000_000L);
   }
@@ -63,7 +63,7 @@ class CashbackAnnualBudgetTest {
   void changeTotal_invalid() {
     CashbackAnnualBudget budget = CashbackAnnualBudget.create(2026, 1_000_000L);
 
-    assertThatThrownBy(() -> budget.changeTotal(0L))
+    assertThatThrownBy(() -> budget.changeTotal(0L, 0L))
         .isInstanceOf(BusinessException.class)
         .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_BUDGET);
     assertThat(budget.getTotalAmount()).isEqualTo(1_000_000L);
@@ -77,12 +77,27 @@ class CashbackAnnualBudgetTest {
     ReflectionTestUtils.setField(budget, "reservedAmount", 300_000L);
     ReflectionTestUtils.setField(budget, "paidAmount", 200_000L);
 
-    assertThatThrownBy(() -> budget.changeTotal(499_999L))
+    assertThatThrownBy(() -> budget.changeTotal(499_999L, 0L))
         .isInstanceOf(BusinessException.class)
         .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_BUDGET);
 
-    budget.changeTotal(500_000L);
+    budget.changeTotal(500_000L, 0L);
     assertThat(budget.getTotalAmount()).isEqualTo(500_000L);
     assertThat(budget.remainingAmount()).isZero();
+  }
+
+  // 목적: 월 배정 합계보다 작게 줄이면 CSH-005 로 막고 값은 그대로이며, 합계와 같으면 허용되는지 확인한다.
+  @Test
+  @DisplayName("월 배정 합계보다 작게 줄일 수 없다")
+  void changeTotal_belowAllocated() {
+    CashbackAnnualBudget budget = CashbackAnnualBudget.create(2026, 1_000_000L);
+
+    assertThatThrownBy(() -> budget.changeTotal(699_999L, 700_000L))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.BUDGET_ALLOCATION_EXCEEDED);
+    assertThat(budget.getTotalAmount()).isEqualTo(1_000_000L);
+
+    budget.changeTotal(700_000L, 700_000L);
+    assertThat(budget.getTotalAmount()).isEqualTo(700_000L);
   }
 }
