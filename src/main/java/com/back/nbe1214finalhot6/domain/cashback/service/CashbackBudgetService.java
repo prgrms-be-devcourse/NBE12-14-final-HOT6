@@ -20,11 +20,13 @@ public class CashbackBudgetService {
   /**
    * 연 예산을 등록하거나 총액을 바꾼다. 같은 연도는 한 건만 존재한다.
    *
-   * <p>같은 연도를 동시에 처음 등록하면 한쪽은 유니크 제약으로 실패한다. 운영자 단독 작업을 전제로 따로 처리하지 않는다.
+   * <p>같은 연도를 동시에 처음 등록하면 한쪽은 유니크 제약으로 실패한다. 운영자 단독 작업을 전제로 따로 처리하지 않는다. 이미 있는 연도는 행을
+   * 잠그고 읽어서, 총액을 바꾸는 사이 커밋된 예약·지급 금액을 낡은 값으로 덮어쓰지 않게 한다.
    */
   @Transactional
   public AnnualBudgetResponse putAnnual(int year, AnnualBudgetRequest request) {
-    CashbackAnnualBudget budget = annualBudgetRepository.findByBudgetYear(year).orElse(null);
+    CashbackAnnualBudget budget =
+        annualBudgetRepository.findWithLockByBudgetYear(year).orElse(null);
     if (budget == null) {
       budget = annualBudgetRepository.save(CashbackAnnualBudget.create(year, request.totalAmount()));
     } else {
