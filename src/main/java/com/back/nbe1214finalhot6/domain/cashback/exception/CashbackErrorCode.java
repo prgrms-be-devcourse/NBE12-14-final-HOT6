@@ -22,7 +22,8 @@ public enum CashbackErrorCode implements ErrorCode {
   EARNING_NOT_FOUND("CSH-006", HttpStatus.NOT_FOUND, "적립 내역을 찾을 수 없습니다"),
 
   // 예산 금액
-  INVALID_BUDGET("CSH-007", HttpStatus.BAD_REQUEST, "예산 금액이 올바르지 않습니다");
+  INVALID_BUDGET("CSH-007", HttpStatus.BAD_REQUEST, "예산 금액이 올바르지 않습니다"),
+  BUDGET_IN_USE("CSH-008", HttpStatus.CONFLICT, "예약 또는 지급이 시작된 월 예산은 수정할 수 없습니다");
 
   private final String code;
   private final HttpStatus status;
