@@ -85,7 +85,7 @@ class WalletRepositoryTest {
     return WalletTransaction.builder()
         .walletId(1L)
         .type(type)
-        .amount(1_000L)
+        .amount(-1_000L) // 부호형: 차감은 음수
         .balanceAfter(1_000L)
         .refKey(refKey)
         .createdAt(NOW)

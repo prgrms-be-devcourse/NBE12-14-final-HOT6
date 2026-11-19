@@ -11,6 +11,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -58,7 +59,9 @@ public class WalletTransaction {
   @Column(nullable = false, length = 30, updatable = false)
   private WalletTransactionType type;
 
-  // 이 거래로 움직인 금액
+  // 부호 있는 금액. 입금(credit)은 +, 차감(debit)은 -.
+  // 호출자(A, B)는 항상 양수로 요청하고, 부호는 WalletService가 credit/debit 중 어느 쪽인지에 따라 정함.
+  // 같은 지갑·같은 잔액 종류(type.affectsCashback())의 amount 합계가 잔액 변화와 같으므로 대사에서 SUM(amount)로 비교 가능
   @Column(nullable = false, updatable = false)
   private long amount;
 
@@ -87,13 +90,18 @@ public class WalletTransaction {
       long balanceAfter,
       Long refKey,
       LocalDateTime createdAt) {
-    this.createdAt = createdAt;
-    this.walletId = walletId;
+    // 필수 값을 빠뜨리면 DB까지 가기 전에 여기서 막음
+    this.walletId = Objects.requireNonNull(walletId, "walletId는 필수");
+    this.type = Objects.requireNonNull(type, "type은 필수");
+    this.createdAt = Objects.requireNonNull(createdAt, "createdAt은 필수");
+    // 0원 거래는 원장에 남길 의미가 없고 호출 실수일 가능성이 높음
+    if (amount == 0) {
+      throw new IllegalArgumentException("amount는 0일 수 없음");
+    }
     this.chargeId = chargeId;
     this.refundId = refundId;
     this.settlementId = settlementId;
     this.paymentId = paymentId;
-    this.type = type;
     this.amount = amount;
     this.balanceAfter = balanceAfter;
     this.refKey = refKey;
