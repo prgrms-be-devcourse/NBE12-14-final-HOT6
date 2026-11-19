@@ -36,13 +36,12 @@ class QrTokenControllerTest {
     given(qrService.scan("token-1"))
         .willReturn(
             new QrScanResponse(
-                7L, 3L, "테스트 가맹점", 5000L, true, LocalDateTime.of(2026, 11, 18, 9, 3)));
+                3L, "테스트 가맹점", 5000L, true, LocalDateTime.of(2026, 11, 18, 9, 3)));
 
     mockMvc
         .perform(get("/api/qr/{token}", "token-1"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.qrId").value(7))
         .andExpect(jsonPath("$.data.merchantId").value(3))
         .andExpect(jsonPath("$.data.merchantName").value("테스트 가맹점"))
         .andExpect(jsonPath("$.data.amount").value(5000))

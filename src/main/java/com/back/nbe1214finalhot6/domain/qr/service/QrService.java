@@ -1,6 +1,7 @@
 package com.back.nbe1214finalhot6.domain.qr.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
@@ -12,6 +13,7 @@ import com.back.nbe1214finalhot6.domain.qr.entity.QrCode;
 import com.back.nbe1214finalhot6.domain.qr.entity.QrStatus;
 import com.back.nbe1214finalhot6.domain.qr.exception.QrErrorCode;
 import com.back.nbe1214finalhot6.domain.qr.repository.QrCodeRepository;
+import com.back.nbe1214finalhot6.domain.qr.repository.QrSnapshot;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -71,21 +73,30 @@ public class QrService {
   }
 
   @Transactional
-  public void markUsed(Long qrId) {
-    LocalDateTime now = LocalDateTime.now(clock);
-    if (qrCodeRepository.markUsedIfAvailable(qrId, now) == 1) {
+  public void markUsed(String qrToken, Long merchantId, long amount, LocalDateTime requestedAt) {
+    if (requestedAt == null) {
+      throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
+    }
+
+    int updated =
+        qrCodeRepository.markUsedIfMatches(
+            qrToken, merchantId, amount, requestedAt, LocalDateTime.now(clock));
+    if (updated == 1) {
       return;
     }
 
-    // 호출한 트랜잭션의 영속성 컨텍스트에 남은 이전 값을 읽지 않도록 엔티티 대신 상태 값만 조회한다.
-    QrStatus status =
+    // 호출한 트랜잭션의 영속성 컨텍스트에 남은 이전 값을 읽지 않도록 엔티티 대신 값만 조회한다.
+    QrSnapshot snapshot =
         qrCodeRepository
-            .findStatusById(qrId)
+            .findSnapshotByToken(qrToken)
             .orElseThrow(() -> new BusinessException(QrErrorCode.QR_NOT_FOUND));
-    throw unusable(status);
+    if (!snapshot.merchantId().equals(merchantId) || !snapshot.amount().equals(amount)) {
+      throw new BusinessException(QrErrorCode.QR_MISMATCH);
+    }
+    throw unusable(snapshot.status());
   }
 
-  // 사용할 수 없는 QR 의 사유. 사용됨이 아니면 만료로 본다. (DB 의 WAITING 은 만료 시각이 지난 경우만 여기 도달한다)
+  // 사용할 수 없는 QR 의 사유. 사용됨이 아니면 만료로 본다. (DB 의 WAITING 이 여기 도달했다면 접수 시각 기준으로 만료된 경우다)
   private BusinessException unusable(QrStatus status) {
     return new BusinessException(
         status == QrStatus.USED ? QrErrorCode.QR_ALREADY_USED : QrErrorCode.QR_EXPIRED);
