@@ -20,10 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class CashbackPolicyServiceTest {
 
-  private static final LocalDateTime NOV_1 = LocalDateTime.of(2026, 11, 1, 0, 0);
-  private static final LocalDateTime DEC_1 = LocalDateTime.of(2026, 12, 1, 0, 0);
-  private static final LocalDateTime JAN_1 = LocalDateTime.of(2027, 1, 1, 0, 0);
-  private static final LocalDateTime OCT_1 = LocalDateTime.of(2026, 10, 1, 0, 0);
+  private static final LocalDateTime NOV_1 = LocalDateTime.of(2027, 11, 1, 0, 0);
+  private static final LocalDateTime DEC_1 = LocalDateTime.of(2027, 12, 1, 0, 0);
+  private static final LocalDateTime JAN_1 = LocalDateTime.of(2028, 1, 1, 0, 0);
+  private static final LocalDateTime OCT_1 = LocalDateTime.of(2027, 10, 1, 0, 0);
 
   @Autowired private CashbackPolicyService policyService;
   @Autowired private CashbackPolicyRepository policyRepository;
@@ -36,6 +36,17 @@ class CashbackPolicyServiceTest {
     assertThatThrownBy(() -> register("0.05", startsAt, endsAt))
         .isInstanceOf(BusinessException.class)
         .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.POLICY_PERIOD_OVERLAP);
+  }
+
+  // 목적: 시작이 과거인 정책은 등록되지 않고 저장도 되지 않는지 확인한다(테스트 시계는 2026-11-18 09:00 KST).
+  @Test
+  @DisplayName("시작 시각이 과거면 거부하고 저장하지 않는다")
+  void create_pastStartRejected() {
+    assertThatThrownBy(() -> register("0.03", LocalDateTime.of(2026, 11, 17, 0, 0), null))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_POLICY);
+
+    assertThat(policyService.findAll()).isEmpty();
   }
 
   // 목적: 등록한 값이 DB에 저장되고, 요율이 소수 넷째 자리로 정규화되는지 확인한다.
@@ -56,8 +67,8 @@ class CashbackPolicyServiceTest {
   void create_partialOverlapRejected() {
     register("0.03", NOV_1, DEC_1);
 
-    assertOverlap(LocalDateTime.of(2026, 11, 15, 0, 0), JAN_1);
-    assertOverlap(OCT_1, LocalDateTime.of(2026, 11, 15, 0, 0));
+    assertOverlap(LocalDateTime.of(2027, 11, 15, 0, 0), JAN_1);
+    assertOverlap(OCT_1, LocalDateTime.of(2027, 11, 15, 0, 0));
   }
 
   // 목적: 기존 정책을 감싸거나 기존 정책 안에 포함되는 기간이 거부되는지 확인한다.
@@ -67,7 +78,7 @@ class CashbackPolicyServiceTest {
     register("0.03", NOV_1, DEC_1);
 
     assertOverlap(OCT_1, JAN_1);
-    assertOverlap(LocalDateTime.of(2026, 11, 10, 0, 0), LocalDateTime.of(2026, 11, 20, 0, 0));
+    assertOverlap(LocalDateTime.of(2027, 11, 10, 0, 0), LocalDateTime.of(2027, 11, 20, 0, 0));
   }
 
   // 목적: 반개구간이라 종료 = 다음 시작이면 겹치지 않는 것으로 처리되는지 확인한다.

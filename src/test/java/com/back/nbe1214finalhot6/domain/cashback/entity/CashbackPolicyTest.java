@@ -72,6 +72,26 @@ class CashbackPolicyTest {
         .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_POLICY);
   }
 
+  // 목적: 시작이 현재보다 과거면 거부되고, 현재 분(分)이나 미래는 허용되는지 확인한다.
+  // 이미 지난 기간을 나중에 채우면 이력이 실제 적용 결과와 달라지기 때문이다.
+  @Test
+  @DisplayName("시작 시각이 현재 분보다 과거면 거부한다")
+  void create_pastStartRejected() {
+    LocalDateTime now = LocalDateTime.of(2026, 11, 18, 9, 30, 45);
+
+    assertThatThrownBy(
+            () ->
+                CashbackPolicy.create(
+                    new BigDecimal("0.03"), LocalDateTime.of(2026, 11, 18, 9, 29, 59), null, now))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_POLICY);
+    assertThatCode(
+            () ->
+                CashbackPolicy.create(
+                    new BigDecimal("0.03"), LocalDateTime.of(2026, 11, 18, 9, 30), null, now))
+        .doesNotThrowAnyException();
+  }
+
   // 목적: 필수값(요율, 시작 시각)이 없으면 NPE 가 아니라 정책 오류로 거부되는지 확인한다.
   @Test
   @DisplayName("요율이나 시작 시각이 없으면 거부한다")

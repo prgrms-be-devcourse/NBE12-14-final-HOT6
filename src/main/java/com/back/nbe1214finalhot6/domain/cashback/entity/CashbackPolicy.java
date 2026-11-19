@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -56,15 +57,17 @@ public class CashbackPolicy {
   /**
    * 정책을 만든다.
    *
-   * @throws BusinessException 요율이 0 이하이거나 1 초과이거나 소수 넷째 자리를 넘을 때, 종료가 시작보다 늦지 않을 때
+   * @throws BusinessException 요율이 0 이하이거나 1 초과이거나 소수 넷째 자리를 넘을 때, 종료가 시작보다 늦지 않을 때,
+   *     시작이 현재(분 단위)보다 과거일 때
    */
   public static CashbackPolicy create(
       BigDecimal rate, LocalDateTime startsAt, LocalDateTime endsAt, LocalDateTime now) {
-    validate(rate, startsAt, endsAt);
+    validate(rate, startsAt, endsAt, now);
     return new CashbackPolicy(rate.setScale(RATE_SCALE), startsAt, endsAt, now);
   }
 
-  private static void validate(BigDecimal rate, LocalDateTime startsAt, LocalDateTime endsAt) {
+  private static void validate(
+      BigDecimal rate, LocalDateTime startsAt, LocalDateTime endsAt, LocalDateTime now) {
     if (rate == null || startsAt == null) {
       throw new BusinessException(CashbackErrorCode.INVALID_POLICY);
     }
@@ -74,6 +77,10 @@ public class CashbackPolicy {
     if (rate.stripTrailingZeros().scale() > RATE_SCALE) {
       throw new BusinessException(
           CashbackErrorCode.INVALID_POLICY, "요율은 소수 넷째 자리까지만 입력할 수 있습니다");
+    }
+    // 과거에 비어 있던 기간을 나중에 채우면 이력이 실제 적용 결과와 달라진다. "지금 시작" 은 분 단위로 허용한다.
+    if (startsAt.isBefore(now.truncatedTo(ChronoUnit.MINUTES))) {
+      throw new BusinessException(CashbackErrorCode.INVALID_POLICY, "시작 시각은 현재 이후여야 합니다");
     }
     if (endsAt != null && !endsAt.isAfter(startsAt)) {
       throw new BusinessException(
