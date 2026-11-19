@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * @param walletUsedAmount 적립 기준 금액. 데브머니로 결제한 금액(원)
  * @param requestedAt 최초 서버 접수 시각(KST). 요율과 월 기준이 된다
  */
-public record ReserveCommand(
+public record CashbackReserveRequest(
     Long paymentId,
     Long walletId,
     boolean cashbackEligible,

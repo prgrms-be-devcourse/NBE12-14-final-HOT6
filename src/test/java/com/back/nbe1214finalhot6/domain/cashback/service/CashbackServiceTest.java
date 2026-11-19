@@ -3,9 +3,9 @@ package com.back.nbe1214finalhot6.domain.cashback.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
-import com.back.nbe1214finalhot6.domain.cashback.dto.ExclusionReason;
-import com.back.nbe1214finalhot6.domain.cashback.dto.ReserveCommand;
-import com.back.nbe1214finalhot6.domain.cashback.dto.ReserveResult;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackExclusionReason;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveResponse;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,13 +17,13 @@ class CashbackServiceTest {
   @Test
   @DisplayName("임시 구현은 적립 대상이어도 항상 적립 0원을 돌려준다")
   void 항상0원() {
-    ReserveCommand command =
-        new ReserveCommand(1L, 1L, true, 12_000L, LocalDateTime.of(2026, 11, 18, 9, 0));
+    CashbackReserveRequest command =
+        new CashbackReserveRequest(1L, 1L, true, 12_000L, LocalDateTime.of(2026, 11, 18, 9, 0));
 
-    ReserveResult result = service.reserve(command);
+    CashbackReserveResponse result = service.reserve(command);
 
     assertThat(result.earnedAmount()).isZero();
-    assertThat(result.exclusionReason()).isEqualTo(ExclusionReason.NOT_ELIGIBLE);
+    assertThat(result.exclusionReason()).isEqualTo(CashbackExclusionReason.NOT_ELIGIBLE);
   }
 
   @Test

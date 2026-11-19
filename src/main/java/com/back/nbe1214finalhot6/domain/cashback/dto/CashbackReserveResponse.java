@@ -12,17 +12,17 @@ import java.time.LocalDateTime;
  * @param appliedRate 적용한 요율. 제외면 0
  * @param appliedPolicyId 적용한 정책 ID. 없으면 null
  * @param payableAt 지급 예정 시각. 제외면 null
- * @param exclusionReason 적립 제외 사유. 적립됐으면 {@link ExclusionReason#NONE}
+ * @param exclusionReason 적립 제외 사유. 적립됐으면 {@link CashbackExclusionReason#NONE}
  */
-public record ReserveResult(
+public record CashbackReserveResponse(
     long earnedAmount,
     BigDecimal appliedRate,
     Long appliedPolicyId,
     LocalDateTime payableAt,
-    ExclusionReason exclusionReason) {
+    CashbackExclusionReason exclusionReason) {
 
   /** 적립 없이 사유만 알리는 결과. */
-  public static ReserveResult excluded(ExclusionReason reason) {
-    return new ReserveResult(0L, BigDecimal.ZERO, null, null, reason);
+  public static CashbackReserveResponse excluded(CashbackExclusionReason reason) {
+    return new CashbackReserveResponse(0L, BigDecimal.ZERO, null, null, reason);
   }
 }
