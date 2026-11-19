@@ -9,6 +9,7 @@ import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.entity.Payment;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.repository.PaymentRepository;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentIdempotencyService {
 
   private final PaymentRepository paymentRepository;
+  private final Clock clock; //수정 : 시간 기준을 Clock 으로 통일 (한국 시간, 테스트에서 고정 가능)
 
   // Transaction 1. 선점(claim) : (walletId, 멱등키) 복합 유니크 제약으로 중복 요청을 걸러낸다
   @Transactional
@@ -33,7 +35,7 @@ public class PaymentIdempotencyService {
             .walletUsedAmount(0L)
             .cashbackUsedAmount(0L)
             .status(PaymentStatus.PROCESSING)
-            .requestedAt(LocalDateTime.now()) // 서버 최초 접수 시각
+            .requestedAt(LocalDateTime.now(clock)) // 서버 최초 접수 시각 //수정 : Clock 사용
             .build();
     return PaymentResponse.of(paymentRepository.saveAndFlush(payment));
   }
