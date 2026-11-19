@@ -79,6 +79,14 @@ public class Payment {
   @Column(name = "requested_at", nullable = false)
   private LocalDateTime requestedAt;
 
+  // 캐시백 지급 예정 시각 (적립 없으면 null)
+  @Column(name = "cashback_payable_at")
+  private LocalDateTime cashbackPayableAt;
+
+  // 적립 제외 사유 (NONE, NOT_ELIGIBLE, BUDGET_EXHAUSTED, MONTHLY_LIMIT_EXCEEDED)
+  @Column(name = "cashback_exclusion_reason", length = 30)
+  private String cashbackExclusionReason;
+
   @Column(name = "completed_at")
   private LocalDateTime completedAt;
 
@@ -88,4 +96,25 @@ public class Payment {
   // 취소한 가맹점주
   @Column(name = "canceled_by")
   private Long canceledBy;
+
+  public void complete(
+      long walletUsed,
+      long cashbackUsed,
+      Long policyId,
+      BigDecimal rate,
+      long earned,
+      LocalDateTime payableAt,
+      String exclusionReason,
+      LocalDateTime completedAt)
+  {
+      this.status = PaymentStatus.COMPLETED;
+      this.walletUsedAmount = walletUsed;
+      this.cashbackUsedAmount = cashbackUsed;
+      this.appliedPolicyId = policyId;
+      this.appliedRate = rate;
+      this.cashbackEarnedAmount = earned;
+      this.cashbackPayableAt = payableAt;
+      this.cashbackExclusionReason = exclusionReason;
+      this.completedAt = completedAt;
+  }
 }
