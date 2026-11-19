@@ -22,6 +22,7 @@ import lombok.NoArgsConstructor;
 public class QrCode {
 
   public static final Duration VALID_DURATION = Duration.ofMinutes(3);
+  public static final long MAX_AMOUNT = 1_000_000L;
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

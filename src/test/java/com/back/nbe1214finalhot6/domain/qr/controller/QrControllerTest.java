@@ -57,10 +57,30 @@ class QrControllerTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"{}", "{\"amount\": null}", "{\"amount\": 0}", "{\"amount\": -1000}"})
-  @DisplayName("금액이 없거나 1원 미만이면 400")
+  @ValueSource(
+      strings = {
+        "{}",
+        "{\"amount\": null}",
+        "{\"amount\": 0}",
+        "{\"amount\": -1000}",
+        "{\"amount\": 1000001}"
+      })
+  @DisplayName("금액이 없거나 1원 미만이거나 결제 한도(100만원)를 넘으면 400")
   void 금액이잘못되면400(String body) throws Exception {
     expectInvalidRequest(createRequest(1L, body));
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {1L, 1_000_000L})
+  @DisplayName("금액이 1원과 결제 한도(100만원) 경계값이면 201")
+  void 금액경계값이면성공(long amount) throws Exception {
+    given(qrService.createDynamic(eq(1L), any()))
+        .willReturn(new QrCreateResponse("token-1", amount, LocalDateTime.of(2026, 11, 18, 9, 3)));
+
+    mockMvc
+        .perform(createRequest(1L, "{\"amount\": " + amount + "}"))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.data.amount").value(amount));
   }
 
   @Test
