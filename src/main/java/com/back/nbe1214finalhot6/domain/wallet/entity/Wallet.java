@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.UpdateTimestamp;
 
 /** 회원의 현재 잔액. 거래가 일어날 때마다 덮어쓰며, 변경 이력은 WalletTransaction에 쌓음. */
 @Entity
@@ -40,15 +39,15 @@ public class Wallet {
   private long pendingCashback;
 
   @Column(name = "updated_at", nullable = false)
-  @UpdateTimestamp
   private LocalDateTime updatedAt;
 
-  private Wallet(Long userId) {
+  private Wallet(Long userId, LocalDateTime now) {
     this.userId = userId;
+    this.updatedAt = now;
   }
 
-  // 모든 잔액 0원으로 생성
-  public static Wallet create(Long userId) {
-    return new Wallet(userId);
+  // 모든 잔액 0원으로 생성. 시각은 호출자가 Clock으로 만들어 넘김
+  public static Wallet create(Long userId, LocalDateTime now) {
+    return new Wallet(userId, now);
   }
 }

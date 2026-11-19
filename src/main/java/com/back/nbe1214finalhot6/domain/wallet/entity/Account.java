@@ -10,7 +10,6 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
 
 /**
  * 충전의 출처이자 환불의 도착지인 계좌. 회원 1명당 1개.
@@ -39,16 +38,16 @@ public class Account {
   private long balance;
 
   @Column(name = "created_at", nullable = false, updatable = false)
-  @CreationTimestamp
   private LocalDateTime createdAt;
 
-  private Account(Long userId) {
+  private Account(Long userId, LocalDateTime now) {
     this.userId = userId;
     this.balance = INITIAL_BALANCE;
+    this.createdAt = now;
   }
 
-  // 초기 잔액을 채워서 생성
-  public static Account create(Long userId) {
-    return new Account(userId);
+  // 초기 잔액을 채워서 생성. 생성 시각은 호출자가 Clock으로 만들어 넘김
+  public static Account create(Long userId, LocalDateTime now) {
+    return new Account(userId, now);
   }
 }

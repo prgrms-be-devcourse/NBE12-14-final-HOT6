@@ -36,25 +36,25 @@ class WalletRepositoryTest {
   @Test
   @DisplayName("같은 회원의 지갑을 두 번 저장하면 유니크 제약으로 실패한다")
   void wallet_duplicateUserId() {
-    walletRepository.saveAndFlush(Wallet.create(1L));
+    walletRepository.saveAndFlush(Wallet.create(1L, NOW));
 
-    assertThatThrownBy(() -> walletRepository.saveAndFlush(Wallet.create(1L)))
+    assertThatThrownBy(() -> walletRepository.saveAndFlush(Wallet.create(1L, NOW)))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test
   @DisplayName("같은 회원의 계좌를 두 번 저장하면 유니크 제약으로 실패한다")
   void account_duplicateUserId() {
-    accountRepository.saveAndFlush(Account.create(1L));
+    accountRepository.saveAndFlush(Account.create(1L, NOW));
 
-    assertThatThrownBy(() -> accountRepository.saveAndFlush(Account.create(1L)))
+    assertThatThrownBy(() -> accountRepository.saveAndFlush(Account.create(1L, NOW)))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
   @Test
   @DisplayName("계좌는 초기 잔액 100만원으로 저장된다")
   void account_initialBalance() {
-    Account saved = accountRepository.saveAndFlush(Account.create(1L));
+    Account saved = accountRepository.saveAndFlush(Account.create(1L, NOW));
 
     // 저장한 객체가 아니라 DB에서 다시 읽은 값으로 확인
     Account found = accountRepository.findById(saved.getId()).orElseThrow();
