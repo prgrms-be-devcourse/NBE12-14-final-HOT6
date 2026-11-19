@@ -82,8 +82,10 @@ public class CashbackBudgetService {
                 () ->
                     new BusinessException(
                         CashbackErrorCode.BUDGET_NOT_FOUND, "해당 연도의 예산을 찾을 수 없습니다"));
-    if (monthlyBudgetRepository.sumAllocatedExcluding(year, month) + request.allocatedAmount()
-        > annual.getTotalAmount()) {
+    // 덧셈은 long 범위를 넘을 수 있어, 남은 한도와 비교한다(합계 ≤ 연 총액이므로 뺄셈은 안전).
+    long remainingCapacity =
+        annual.getTotalAmount() - monthlyBudgetRepository.sumAllocatedExcluding(year, month);
+    if (request.allocatedAmount() > remainingCapacity) {
       throw new BusinessException(CashbackErrorCode.BUDGET_ALLOCATION_EXCEEDED);
     }
 

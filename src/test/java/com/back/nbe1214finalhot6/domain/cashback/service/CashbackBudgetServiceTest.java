@@ -159,6 +159,8 @@ class CashbackBudgetServiceTest {
     // 자기 달의 기존 배정은 합계에서 빼므로 합계가 딱 3,000,000 이 되는 수정은 허용된다
     assertThat(putMonthly(2026, 11, 2_000_000L).allocatedAmount()).isEqualTo(2_000_000L);
     assertErrorOnMonthly(2026, 11, 2_000_001L, CashbackErrorCode.BUDGET_ALLOCATION_EXCEEDED);
+    // 합계 + 입력값이 long 범위를 넘어 음수가 되어도 검사를 통과하면 안 된다
+    assertErrorOnMonthly(2026, 11, Long.MAX_VALUE, CashbackErrorCode.BUDGET_ALLOCATION_EXCEEDED);
     assertThat(budgetService.getMonthly(2026, 11).allocatedAmount()).isEqualTo(2_000_000L);
     assertErrorOnMonthly(2026, 10, 1L, CashbackErrorCode.INVALID_BUDGET);
   }
