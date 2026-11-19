@@ -1,8 +1,8 @@
 package com.back.nbe1214finalhot6.domain.payment.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
-import com.back.nbe1214finalhot6.domain.cashback.dto.ReserveCommand;
-import com.back.nbe1214finalhot6.domain.cashback.dto.ReserveResult;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveResponse;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackService;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
@@ -50,8 +50,8 @@ public class PaymentTxService {
     // 4. 적립 예정 확보: 가맹점의 cashbackEligible 을 읽어 cashbackService.reserve(command)
     boolean cashbackEligible = merchantService.isCashbackEligible(payment.getMerchantId());
 
-    ReserveResult reserve = cashbackService.reserve(
-      new ReserveCommand( //결제id,지갑id,캐시백적립여부,지갑사용액,결제요청시간
+    CashbackReserveResponse reserve = cashbackService.reserve(
+      new CashbackReserveRequest( //결제id,지갑id,캐시백적립여부,지갑사용액,결제요청시간
               paymentId,
               payment.getWalletId(),
               cashbackEligible,
