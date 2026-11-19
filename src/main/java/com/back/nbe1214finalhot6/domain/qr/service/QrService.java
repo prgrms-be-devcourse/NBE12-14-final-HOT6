@@ -1,10 +1,12 @@
 package com.back.nbe1214finalhot6.domain.qr.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateRequest;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateResponse;
+import com.back.nbe1214finalhot6.domain.qr.dto.QrScanResponse;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrStatusResponse;
 import com.back.nbe1214finalhot6.domain.qr.entity.QrCode;
 import com.back.nbe1214finalhot6.domain.qr.entity.QrStatus;
@@ -48,6 +50,26 @@ public class QrService {
     return QrStatusResponse.of(qrCode, LocalDateTime.now(clock));
   }
 
+  @Transactional(readOnly = true)
+  public QrScanResponse scan(String token) {
+    QrCode qrCode =
+        qrCodeRepository
+            .findByToken(token)
+            .orElseThrow(() -> new BusinessException(QrErrorCode.QR_NOT_FOUND));
+
+    QrStatus status = qrCode.statusAt(LocalDateTime.now(clock));
+    if (status != QrStatus.WAITING) {
+      throw unusable(status);
+    }
+
+    Merchant merchant =
+        merchantRepository
+            .findById(qrCode.getMerchantId())
+            .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+
+    return QrScanResponse.of(qrCode, merchant);
+  }
+
   @Transactional
   public void markUsed(Long qrId) {
     LocalDateTime now = LocalDateTime.now(clock);
@@ -60,7 +82,12 @@ public class QrService {
         qrCodeRepository
             .findStatusById(qrId)
             .orElseThrow(() -> new BusinessException(QrErrorCode.QR_NOT_FOUND));
-    throw new BusinessException(
+    throw unusable(status);
+  }
+
+  // 사용할 수 없는 QR 의 사유. 사용됨이 아니면 만료로 본다. (DB 의 WAITING 은 만료 시각이 지난 경우만 여기 도달한다)
+  private BusinessException unusable(QrStatus status) {
+    return new BusinessException(
         status == QrStatus.USED ? QrErrorCode.QR_ALREADY_USED : QrErrorCode.QR_EXPIRED);
   }
 }
