@@ -27,4 +27,24 @@ class WalletTransactionTypeTest {
     assertThat(WalletTransactionType.CASHBACK_EARN.affectsCashback()).isTrue();
     assertThat(WalletTransactionType.CASHBACK_CLAWBACK.affectsCashback()).isTrue();
   }
+
+  @Test
+  @DisplayName("결제 취소 환급은 사용했던 잔액 종류와 같은 잔액을 늘리는 입금 거래다")
+  void cancelTypes() {
+    assertThat(WalletTransactionType.PAYMENT_CANCEL_DEVMONEY.affectsCashback()).isFalse();
+    assertThat(WalletTransactionType.PAYMENT_CANCEL_CASHBACK.affectsCashback()).isTrue();
+    assertThat(WalletTransactionType.PAYMENT_CANCEL_DEVMONEY.isCredit()).isTrue();
+    assertThat(WalletTransactionType.PAYMENT_CANCEL_CASHBACK.isCredit()).isTrue();
+  }
+
+  @Test
+  @DisplayName("입금 type과 차감 type이 정해져 있다")
+  void direction() {
+    assertThat(WalletTransactionType.CHARGE.isCredit()).isTrue();
+    assertThat(WalletTransactionType.CASHBACK_EARN.isCredit()).isTrue();
+    assertThat(WalletTransactionType.REFUND.isCredit()).isFalse();
+    assertThat(WalletTransactionType.PAYMENT_DEVMONEY.isCredit()).isFalse();
+    assertThat(WalletTransactionType.PAYMENT_CASHBACK.isCredit()).isFalse();
+    assertThat(WalletTransactionType.CASHBACK_CLAWBACK.isCredit()).isFalse();
+  }
 }
