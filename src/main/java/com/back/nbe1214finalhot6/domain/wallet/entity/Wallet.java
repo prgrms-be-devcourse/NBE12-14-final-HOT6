@@ -74,6 +74,7 @@ public class Wallet {
 
   // 입금. 캐시백이면 캐시백 잔액, 아니면 데브머니 잔액에 더하고 반영 후 잔액을 돌려줌
   public long credit(long amount, boolean cashback, LocalDateTime now) {
+    requirePositive(amount);
     long after;
     if (cashback) {
       cashbackBalance = Math.addExact(cashbackBalance, amount);
@@ -86,22 +87,33 @@ public class Wallet {
     return after;
   }
 
-  // 차감. allowNegative는 캐시백에만 적용하고 데브머니는 항상 음수 불가.
-  // 캐시백 잔액이 0 이하일 때의 사용 거절도 "잔액 < 금액" 검사로 함께 막힘
+  // 차감. 캐시백은 allowNegative가 true일 때만 음수를 허용하고, 데브머니는 항상 음수 불가
   public long debit(long amount, boolean cashback, boolean allowNegative, LocalDateTime now) {
-    long current = cashback ? cashbackBalance : balance;
-    boolean mayGoNegative = cashback && allowNegative;
-    if (!mayGoNegative && current < amount) {
-      throw new BusinessException(
-          cashback ? WalletErrorCode.INSUFFICIENT_CASHBACK : WalletErrorCode.INSUFFICIENT_BALANCE);
-    }
-    long after = current - amount;
+    requirePositive(amount);
     if (cashback) {
-      cashbackBalance = after;
-    } else {
-      balance = after;
+      // 캐시백 잔액이 모자라고 음수 허용도 아니면 거절(잔액이 0 이하일 때의 사용도 여기서 막힘)
+      if (cashbackBalance < amount && !allowNegative) {
+        throw new BusinessException(WalletErrorCode.INSUFFICIENT_CASHBACK);
+      }
+      // 음수 허용 시 잔액이 계속 내려갈 수 있으므로 넘침을 검사하며 뺌
+      cashbackBalance = Math.subtractExact(cashbackBalance, amount);
+      updatedAt = now;
+      return cashbackBalance;
     }
+
+    // 데브머니 잔액이 모자라면 무조건 거절
+    if (balance < amount) {
+      throw new BusinessException(WalletErrorCode.INSUFFICIENT_BALANCE);
+    }
+    balance = balance - amount;
     updatedAt = now;
-    return after;
+    return balance;
+  }
+
+  // 0 이하 금액은 방향을 뒤집거나 의미 없는 호출이므로 엔티티에서도 막음(서비스가 먼저 검증하지만 이중 방어)
+  private static void requirePositive(long amount) {
+    if (amount <= 0) {
+      throw new IllegalArgumentException("amount는 양수여야 함: " + amount);
+    }
   }
 }

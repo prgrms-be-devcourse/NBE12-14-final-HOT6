@@ -62,6 +62,39 @@ class WalletTest {
   }
 
   @Test
+  @DisplayName("0 이하 금액은 입금·차감 모두 거절하고 잔액은 그대로다")
+  void nonPositiveAmount_rejected() {
+    Wallet wallet = Wallet.create(1L, NOW);
+    wallet.credit(1_000L, false, NOW);
+
+    assertThatThrownBy(() -> wallet.credit(0L, false, NOW))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> wallet.credit(-1L, false, NOW))
+        .isInstanceOf(IllegalArgumentException.class);
+    // 음수 차감이 입금이 되는 일을 막음
+    assertThatThrownBy(() -> wallet.debit(-500L, false, false, NOW))
+        .isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> wallet.debit(0L, true, true, NOW))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    assertThat(wallet.getBalance()).isEqualTo(1_000L);
+    assertThat(wallet.getCashbackBalance()).isZero();
+  }
+
+  @Test
+  @DisplayName("캐시백 음수 허용 차감이 long 범위를 넘으면 예외가 나고 잔액은 그대로다")
+  void cashbackDebit_overflow() {
+    Wallet wallet = Wallet.create(1L, NOW);
+    wallet.debit(Long.MAX_VALUE, true, true, NOW);
+    long before = wallet.getCashbackBalance();
+
+    assertThatThrownBy(() -> wallet.debit(Long.MAX_VALUE, true, true, NOW))
+        .isInstanceOf(ArithmeticException.class);
+
+    assertThat(wallet.getCashbackBalance()).isEqualTo(before);
+  }
+
+  @Test
   @DisplayName("탈퇴 처리하면 탈퇴 상태가 된다")
   void withdraw() {
     Wallet wallet = Wallet.create(1L, NOW);
