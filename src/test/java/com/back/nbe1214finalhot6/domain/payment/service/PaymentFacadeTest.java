@@ -14,7 +14,6 @@ import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,7 +50,7 @@ class PaymentFacadeTest {
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest request = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     //when
     PaymentResponse response = paymentFacade.pay(key,request);
@@ -71,7 +70,7 @@ class PaymentFacadeTest {
     clock.set(Instant.parse("2026-11-18T01:30:00Z"));
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
-    PaymentRequest request = new PaymentRequest(1L, merchantId, 1L, 10_000L);
+    PaymentRequest request = new PaymentRequest(1L, merchantId, "qr-token-1", 10_000L);
     //when
     PaymentResponse response = paymentFacade.pay(key, request);
     //then
@@ -88,10 +87,10 @@ class PaymentFacadeTest {
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest pastrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentRequest currentrequest = new PaymentRequest(
-            1L, merchantId + 1, 2L, 20_000L //walletId 는 같아야 함 ((walletId, 멱등키)가 유니크라서 지갑이 다르면 새 요청이 됨)
+            1L, merchantId + 1, "qr-token-2", 20_000L //walletId 는 같아야 함 ((walletId, 멱등키)가 유니크라서 지갑이 다르면 새 요청이 됨)
     );
     paymentFacade.pay(key, pastrequest); //먼저 최초 요청으로 기존 행을 만들어 둠
 
@@ -109,10 +108,10 @@ class PaymentFacadeTest {
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest pastrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentRequest currentrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentResponse response = paymentFacade.pay(key, pastrequest); //먼저 최초 요청으로 기존 행을 만들어 둠
     assertThat(response.status()).isEqualTo(PaymentStatus.COMPLETED);
@@ -131,10 +130,10 @@ class PaymentFacadeTest {
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest pastrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentRequest currentrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     //when & then
     PaymentResponse pastresponse = paymentFacade.pay(key, pastrequest); //기존요청
@@ -144,25 +143,25 @@ class PaymentFacadeTest {
 
   }
 
-  @Disabled("FAILED 재시도 정책 확정 및 T2 연결 후 활성화")
   @Test
-  @DisplayName("같은 멱등키, 같은 요청, '실패'상태 => 재시도가능이므로 '진행중'처리")
+  @DisplayName("같은 멱등키, 같은 요청, '실패'상태 => 재시도 없이 기존 실패 결과 반환")
   void 같은멱등키같은요청인데실패상태(){
     //given
     Long merchantId = saveMerchant();
     String key = UUID.randomUUID().toString();
     PaymentRequest pastrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
     PaymentRequest currentrequest = new PaymentRequest(
-            1L, merchantId, 1L, 10_000L
+            1L, merchantId, "qr-token-1", 10_000L
     );
-    PaymentResponse pastresponse = paymentFacade.pay(key, pastrequest); //기존요청
-    //기존요청 완료처리
-    paymentRepository.updateStatusIfCurrent(pastresponse.paymentId(),PaymentStatus.PROCESSING,PaymentStatus.FAILED);
+    PaymentResponse pastresponse = paymentFacade.pay(key, pastrequest); //기존요청 (COMPLETED)
+    //기존요청을 실패 상태로 바꿔 둔다
+    paymentRepository.updateStatusIfCurrent(pastresponse.paymentId(),PaymentStatus.COMPLETED,PaymentStatus.FAILED);
+    //when
     PaymentResponse currentresponse = paymentFacade.pay(key, currentrequest);
-    assertThat(currentresponse.status()).isEqualTo(PaymentStatus.PROCESSING);
-    //when & then
-
+    //then : 새로 처리하지 않고 기존 행의 실패 결과를 그대로 돌려준다
+    assertThat(currentresponse.paymentId()).isEqualTo(pastresponse.paymentId());
+    assertThat(currentresponse.status()).isEqualTo(PaymentStatus.FAILED);
   }
 }

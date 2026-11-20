@@ -3,6 +3,7 @@ package com.back.nbe1214finalhot6.domain.payment.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
@@ -45,10 +46,19 @@ class PaymentTxServiceTest {
             .save(Merchant.create(null, "테스트가맹점", "인천", true)).getId();
   }
 
+  // 결제 요청 (다른 결제 테스트와 동일한 헬퍼)
+  private PaymentRequest request(Long merchantId, long amount) {
+    return new PaymentRequest(1L, merchantId, "qr-token-1", amount);
+  }
+
+  // 새 멱등키 (PaymentFacadeFailureTest 와 동일)
+  private String newKey() {
+    return UUID.randomUUID().toString();
+  }
+
   // PROCESSING 상태의 결제 행을 만들고 그 id 를 돌려준다 (T1)
   private Long claimPayment(Long merchantId, long amount) {
-    PaymentRequest request = new PaymentRequest(1L, merchantId, 1L, amount);
-    return paymentIdempotencyService.claim(UUID.randomUUID().toString(), request).paymentId();
+    return paymentIdempotencyService.claim(newKey(), request(merchantId, amount)).paymentId();
   }
 
   @Test
@@ -74,12 +84,11 @@ class PaymentTxServiceTest {
     // given
     Long merchantId = saveMerchant();
     Long paymentId = claimPayment(merchantId,10_000L);
-    doThrow(new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)).when(qrService).markUsed(any());
+    doThrow(new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND)).when(qrService).markUsed(any(), any(), anyLong(), any());
     // when & then 1 : 예외 확인
     assertThatThrownBy(()-> paymentTxService.tx(paymentId)).isInstanceOf(BusinessException.class);
     // then 2 : 롤백 확인
     Payment saved = paymentRepository.findById(paymentId).orElseThrow();
-    System.out.println("상태값:" + saved.getStatus().toString());
     assertThat(saved.getStatus()).isEqualTo(PaymentStatus.PROCESSING);
   }
 }

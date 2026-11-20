@@ -1,7 +1,6 @@
 package com.back.nbe1214finalhot6.domain.merchant.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
-import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
@@ -43,7 +42,7 @@ public class MerchantService {
   public boolean isCashbackEligible(Long merchantId) {
     return merchantRepository
         .findById(merchantId)
-        .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND))
+        .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND))
         .isCashbackEligible();
   }
 
