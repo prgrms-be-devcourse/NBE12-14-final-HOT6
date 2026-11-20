@@ -199,7 +199,7 @@ DB는 PostgreSQL 기준(11/16 결정, 기획서에는 아직 MySQL 표기)이고
 | 테이블 | 용도 | 단계 | 상태 | 기획서 대비 변경 |
 |---|---|---|---|---|
 | `cashback_policy` | 정책(요율 구간) | 1 | 구현(#28, #49) | 단일 종류(기본 요율), 기간 겹침 금지. 달 중 인하로만 만든다. 추가 요율(EXTRA)은 MVP 이후 |
-| `cashback_policy_history` | 정책 변경 이력 | 1 | 예정 | 신규 |
+| `cashback_policy_history` | 정책 변경 이력 | 1 | 구현(#49) | 신규 |
 | `cashback_annual_budget` | 연 예산 | 1 | 구현(#31) | `cashback_budget` 이름 변경(기획서 8절), 예약·지급 합계 추가 |
 | `cashback_monthly_budget` | 월 예산 | 1~2 | 구현(#42, #49) | 배정·이월 유입·예약·지급 분리, 상태, **대비금**, **월 기본 요율**, 중단 예약 시각 |
 | `cashback_budget_transfer` | 이월 이력 | 2 | 예정 | 신규 |
@@ -240,19 +240,19 @@ erDiagram
 
 한 행은 **요율 구간**이다. 정책(월 정책)은 월 예산과 이 구간들을 묶어 부르는 말이다. 구간은 요율 인하 API 로만 만들고, 인하할 때마다 "적용 시각 ~ 다음 달 1일 0시" 구간이 하나 생긴다. 월 기본 요율은 월 예산의 `base_rate`에 둔다([9절](#9-개발하면서-판단할-것) 17번).
 
-**`cashback_policy_history`** — 정책 변경 이력
+**`cashback_policy_history`** — 정책 변경 이력 (구현)
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
 | `id` | BIGINT PK | |
 | `policy_id` | BIGINT | 대상 정책 |
 | `action` | VARCHAR | `CREATE` / `UPDATE` |
-| `changed_by` | BIGINT | 변경한 운영자 ID(인증 머지 후) |
+| `changed_by` | BIGINT, null | 변경한 운영자 ID. 인증 머지 전까지 null |
 | `changed_at` | TIMESTAMP | |
 | `before_rate`, `before_starts_at`, `before_ends_at` | | 변경 전 값. `CREATE`면 null |
 | `after_rate`, `after_starts_at`, `after_ends_at` | | 변경 후 값 |
 
-입력값·근거까지 남길지는 [9절](#9-개발하면서-판단할-것) 7번에서 정한다(남기면 JSON 컬럼 추가).
+인하 한 번에 새 구간의 `CREATE` 한 줄과, 끝난 구간이 있으면 그 구간의 `UPDATE`(종료 시각 변경) 한 줄이 같은 트랜잭션으로 남는다. 입력값·근거까지 남길지는 [9절](#9-개발하면서-판단할-것) 7번에서 정한다(남기면 JSON 컬럼 추가).
 
 **`cashback_annual_budget`** — 연 예산
 
@@ -354,6 +354,7 @@ erDiagram
 | 11-18 | 금액 컬럼 `NUMERIC(15,4)` → `BIGINT` | 결제·지갑이 `Long`을 쓰고, 소수 유지 지급은 도전 과제 |
 | 11-18 | 월 한도의 이용자 식별을 `wallet_id`로, 적립 상태명을 `PENDING` 기준으로 정리 | `ReserveCommand`에 이용자 ID가 없음 |
 | 11-19 | `cashback_monthly_budget`에 `base_rate` 추가 | 달마다 기본 요율을 두고 달 중에는 인하만 하므로, 인하 구간이 없는 때의 요율을 저장할 곳이 필요하다(9절 17번) |
+| 11-19 | `cashback_policy_history` 구현 | 인하로 만든 구간과 끝낸 구간의 변경 전후 값을 남긴다 |
 
 ## 6. 구현 순서 (제안)
 

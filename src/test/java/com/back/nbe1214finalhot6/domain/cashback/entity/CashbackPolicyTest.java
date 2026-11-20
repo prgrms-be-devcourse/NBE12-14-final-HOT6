@@ -122,14 +122,17 @@ class CashbackPolicyTest {
     assertThat(policy.getEndsAt()).isEqualTo(mid);
   }
 
-  // 목적: 무기한 구간도 종료 시각을 정해 줄일 수 있는지 확인한다.
+  // 목적: 무기한 구간도 종료 시각을 정해 줄일 수 있는지, 스냅샷이 이후 변경의 영향을 받지 않는지 확인한다.
   @Test
-  @DisplayName("무기한 구간의 종료를 정할 수 있다")
-  void shortenEnd_openEnded() {
+  @DisplayName("무기한 구간의 종료를 정할 수 있고 스냅샷은 변경 전 값을 유지한다")
+  void shortenEnd_openEndedAndSnapshot() {
     CashbackPolicy policy = CashbackPolicy.create(new BigDecimal("0.03"), START, null, NOW);
+    CashbackPolicy snapshot = policy.snapshot();
 
     policy.shortenEnd(END);
 
     assertThat(policy.getEndsAt()).isEqualTo(END);
+    assertThat(snapshot.getEndsAt()).isNull();
+    assertThat(snapshot.getRate()).isEqualByComparingTo("0.03");
   }
 }

@@ -66,6 +66,13 @@ public class CashbackPolicy {
     return new CashbackPolicy(rate.setScale(RATE_SCALE), startsAt, endsAt, now);
   }
 
+  /** 변경 전 값을 기록하기 위한 복사본. 저장하지 않는다. */
+  public CashbackPolicy snapshot() {
+    CashbackPolicy copy = new CashbackPolicy(rate, startsAt, endsAt, createdAt);
+    copy.id = id;
+    return copy;
+  }
+
   /**
    * 종료 시각을 앞당긴다. 요율 인하 때 현재 구간을 적용 시각에 끝내는 데 쓴다.
    *
