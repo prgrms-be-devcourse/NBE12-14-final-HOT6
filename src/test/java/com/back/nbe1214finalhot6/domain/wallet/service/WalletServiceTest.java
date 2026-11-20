@@ -3,6 +3,8 @@ package com.back.nbe1214finalhot6.domain.wallet.service;
 import static com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType.CASHBACK_CLAWBACK;
 import static com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType.CASHBACK_EARN;
 import static com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType.CHARGE;
+import static com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType.PAYMENT_CANCEL_CASHBACK;
+import static com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType.PAYMENT_CANCEL_DEVMONEY;
 import static com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType.PAYMENT_CASHBACK;
 import static com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType.PAYMENT_DEVMONEY;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -224,6 +226,202 @@ class WalletServiceTest {
 
     assertThat(wallet().getBalance()).isZero();
     assertThat(ledgers()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("결제 차감은 충전금과 캐시백을 한 번에 차감하고 원장에 두 줄을 남긴다")
+  void debitPayment_bothBuckets() {
+    fund(50_000L, 10_000L);
+
+    walletService.debitPayment(walletId, 20_000L, 10_000L, 100L);
+
+    assertThat(wallet().getBalance()).isEqualTo(30_000L);
+    assertThat(wallet().getCashbackBalance()).isZero();
+    WalletTransaction devMoney = ledgers(PAYMENT_DEVMONEY).get(0);
+    assertThat(devMoney.getAmount()).isEqualTo(-20_000L);
+    assertThat(devMoney.getBalanceAfter()).isEqualTo(30_000L);
+    assertThat(devMoney.getRefKey()).isEqualTo(100L);
+    WalletTransaction cashback = ledgers(PAYMENT_CASHBACK).get(0);
+    assertThat(cashback.getAmount()).isEqualTo(-10_000L);
+    assertThat(cashback.getBalanceAfter()).isZero();
+    assertThat(cashback.getRefKey()).isEqualTo(100L);
+  }
+
+  @Test
+  @DisplayName("결제 차감에서 0원인 쪽은 원장을 만들지 않는다")
+  void debitPayment_zeroSideSkipped() {
+    fund(50_000L, 10_000L);
+
+    walletService.debitPayment(walletId, 30_000L, 0L, 101L);
+
+    assertThat(wallet().getBalance()).isEqualTo(20_000L);
+    assertThat(wallet().getCashbackBalance()).isEqualTo(10_000L);
+    assertThat(ledgers(PAYMENT_DEVMONEY)).hasSize(1);
+    assertThat(ledgers(PAYMENT_CASHBACK)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("결제 차감과 환급은 음수이거나 둘 다 0원이면 WAL-003으로 거절된다")
+  void paymentAmounts_invalid() {
+    fund(50_000L, 10_000L);
+
+    assertFails(
+        () -> walletService.debitPayment(walletId, 0L, 0L, 102L), WalletErrorCode.INVALID_AMOUNT);
+    assertFails(
+        () -> walletService.debitPayment(walletId, -1L, 100L, 102L),
+        WalletErrorCode.INVALID_AMOUNT);
+    assertFails(
+        () -> walletService.creditPaymentCancel(walletId, 100L, -1L, 102L),
+        WalletErrorCode.INVALID_AMOUNT);
+
+    assertThat(wallet().getBalance()).isEqualTo(50_000L);
+    assertThat(wallet().getCashbackBalance()).isEqualTo(10_000L);
+  }
+
+  @Test
+  @DisplayName("같은 결제 ID로 결제 차감을 다시 요청하면 한 번만 반영된다")
+  void debitPayment_duplicateAppliedOnce() {
+    fund(50_000L, 10_000L);
+
+    walletService.debitPayment(walletId, 20_000L, 10_000L, 103L);
+    walletService.debitPayment(walletId, 20_000L, 10_000L, 103L);
+
+    assertThat(wallet().getBalance()).isEqualTo(30_000L);
+    assertThat(wallet().getCashbackBalance()).isZero();
+    assertThat(ledgers(PAYMENT_DEVMONEY)).hasSize(1);
+    assertThat(ledgers(PAYMENT_CASHBACK)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("캐시백이 부족하면 WAL-005로 거절되고 먼저 처리한 충전금 차감도 취소된다")
+  void debitPayment_cashbackShortage_rollsBackDevMoney() {
+    fund(50_000L, 500L);
+
+    assertFails(
+        () -> walletService.debitPayment(walletId, 20_000L, 501L, 104L),
+        WalletErrorCode.INSUFFICIENT_CASHBACK);
+
+    assertThat(wallet().getBalance()).isEqualTo(50_000L);
+    assertThat(wallet().getCashbackBalance()).isEqualTo(500L);
+    assertThat(ledgers(PAYMENT_DEVMONEY)).isEmpty();
+    assertThat(ledgers(PAYMENT_CASHBACK)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("결제 취소 환급은 낸 칸 그대로 돌려주고, 다시 요청해도 한 번만 반영된다")
+  void creditPaymentCancel_restoresAndAppliedOnce() {
+    fund(50_000L, 10_000L);
+    walletService.debitPayment(walletId, 20_000L, 10_000L, 105L);
+
+    walletService.creditPaymentCancel(walletId, 20_000L, 10_000L, 105L);
+    walletService.creditPaymentCancel(walletId, 20_000L, 10_000L, 105L);
+
+    assertThat(wallet().getBalance()).isEqualTo(50_000L);
+    assertThat(wallet().getCashbackBalance()).isEqualTo(10_000L);
+    WalletTransaction devMoney = ledgers(PAYMENT_CANCEL_DEVMONEY).get(0);
+    assertThat(devMoney.getAmount()).isEqualTo(20_000L);
+    WalletTransaction cashback = ledgers(PAYMENT_CANCEL_CASHBACK).get(0);
+    assertThat(cashback.getAmount()).isEqualTo(10_000L);
+    assertThat(ledgers(PAYMENT_CANCEL_DEVMONEY)).hasSize(1);
+    assertThat(ledgers(PAYMENT_CANCEL_CASHBACK)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("같은 결제 ID의 결제 차감이 동시에 와도 한 번만 반영되고 예외가 없다")
+  void debitPayment_concurrentDuplicate_appliedOnce() throws Exception {
+    fund(50_000L, 10_000L);
+
+    List<Throwable> errors =
+        runConcurrently(5, i -> walletService.debitPayment(walletId, 20_000L, 10_000L, 200L));
+
+    assertThat(errors).isEmpty();
+    assertThat(wallet().getBalance()).isEqualTo(30_000L);
+    assertThat(wallet().getCashbackBalance()).isZero();
+    assertThat(ledgers(PAYMENT_DEVMONEY)).hasSize(1);
+    assertThat(ledgers(PAYMENT_CASHBACK)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("결제 차감에서 충전금이 부족하면 WAL-004로 거절되고 캐시백도 차감되지 않는다")
+  void debitPayment_insufficientDevMoney() {
+    fund(1_000L, 10_000L);
+
+    assertFails(
+        () -> walletService.debitPayment(walletId, 2_000L, 1_000L, 106L),
+        WalletErrorCode.INSUFFICIENT_BALANCE);
+
+    assertThat(wallet().getBalance()).isEqualTo(1_000L);
+    assertThat(wallet().getCashbackBalance()).isEqualTo(10_000L);
+    assertThat(ledgers(PAYMENT_DEVMONEY)).isEmpty();
+    assertThat(ledgers(PAYMENT_CASHBACK)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("결제 차감과 환급은 탈퇴한 지갑이면 WAL-002, 없는 지갑이면 WAL-001로 거절된다")
+  void paymentMethods_withdrawnAndMissingWallet() {
+    fund(50_000L, 10_000L);
+    walletService.debitPayment(walletId, 20_000L, 10_000L, 107L);
+    Wallet wallet = wallet();
+    wallet.withdraw(NOW);
+    walletRepository.save(wallet);
+
+    assertFails(
+        () -> walletService.debitPayment(walletId, 1_000L, 0L, 108L),
+        WalletErrorCode.WALLET_WITHDRAWN);
+    assertFails(
+        () -> walletService.creditPaymentCancel(walletId, 20_000L, 10_000L, 107L),
+        WalletErrorCode.WALLET_WITHDRAWN);
+    assertFails(
+        () -> walletService.debitPayment(walletId + 9_999L, 1_000L, 0L, 109L),
+        WalletErrorCode.WALLET_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("결제 차감 기록이 없는 결제 ID는 환급할 수 없다")
+  void creditPaymentCancel_withoutDebit_rejected() {
+    fund(50_000L, 10_000L);
+
+    assertThatThrownBy(() -> walletService.creditPaymentCancel(walletId, 20_000L, 0L, 110L))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(wallet().getBalance()).isEqualTo(50_000L);
+    assertThat(ledgers(PAYMENT_CANCEL_DEVMONEY)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("결제 때 낸 금액보다 많이 환급할 수 없다")
+  void creditPaymentCancel_overRefund_rejected() {
+    fund(50_000L, 10_000L);
+    walletService.debitPayment(walletId, 20_000L, 10_000L, 111L);
+
+    assertThatThrownBy(() -> walletService.creditPaymentCancel(walletId, 20_001L, 0L, 111L))
+        .isInstanceOf(IllegalStateException.class);
+    // 캐시백 칸을 안 낸 만큼 넘게 환급하는 경우도 막음
+    assertThatThrownBy(() -> walletService.creditPaymentCancel(walletId, 0L, 10_001L, 111L))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(wallet().getBalance()).isEqualTo(30_000L);
+    assertThat(wallet().getCashbackBalance()).isZero();
+    assertThat(ledgers(PAYMENT_CANCEL_DEVMONEY)).isEmpty();
+  }
+
+  @Test
+  @DisplayName("결제를 차감한 지갑이 아닌 다른 지갑으로는 환급할 수 없다")
+  void creditPaymentCancel_otherWallet_rejected() {
+    fund(50_000L, 10_000L);
+    walletService.debitPayment(walletId, 20_000L, 0L, 112L);
+    Long otherWalletId = walletRepository.save(Wallet.create(2L, NOW)).getId();
+
+    assertThatThrownBy(() -> walletService.creditPaymentCancel(otherWalletId, 20_000L, 0L, 112L))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertThat(walletRepository.findById(otherWalletId).orElseThrow().getBalance()).isZero();
+  }
+
+  // 결제 테스트용 사전 잔액 준비(충전금 입금과 캐시백 지급)
+  private void fund(long devMoney, long cashback) {
+    walletService.credit(walletId, devMoney, CHARGE, null);
+    walletService.credit(walletId, cashback, CASHBACK_EARN, 1L);
   }
 
   private Wallet wallet() {
