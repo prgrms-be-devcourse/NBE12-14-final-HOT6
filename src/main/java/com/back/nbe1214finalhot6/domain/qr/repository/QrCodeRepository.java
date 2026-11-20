@@ -1,7 +1,6 @@
 package com.back.nbe1214finalhot6.domain.qr.repository;
 
 import com.back.nbe1214finalhot6.domain.qr.entity.QrCode;
-import com.back.nbe1214finalhot6.domain.qr.entity.QrStatus;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,13 +16,27 @@ public interface QrCodeRepository extends JpaRepository<QrCode, Long> {
   @Query(
       """
       update QrCode q
-         set q.status = com.back.nbe1214finalhot6.domain.qr.entity.QrStatus.USED
-       where q.id = :id
+         set q.status = com.back.nbe1214finalhot6.domain.qr.entity.QrStatus.USED,
+             q.usedAt = :usedAt
+       where q.token = :token
+         and q.merchantId = :merchantId
+         and q.amount = :amount
          and q.status = com.back.nbe1214finalhot6.domain.qr.entity.QrStatus.WAITING
-         and q.expiresAt > :now
+         and q.expiresAt > :requestedAt
       """)
-  int markUsedIfAvailable(@Param("id") Long id, @Param("now") LocalDateTime now);
+  int markUsedIfMatches(
+      @Param("token") String token,
+      @Param("merchantId") Long merchantId,
+      @Param("amount") Long amount,
+      @Param("requestedAt") LocalDateTime requestedAt,
+      @Param("usedAt") LocalDateTime usedAt);
 
-  @Query("select q.status from QrCode q where q.id = :id")
-  Optional<QrStatus> findStatusById(@Param("id") Long id);
+  @Query(
+      """
+      select new com.back.nbe1214finalhot6.domain.qr.repository.QrSnapshot(
+             q.merchantId, q.amount, q.status)
+        from QrCode q
+       where q.token = :token
+      """)
+  Optional<QrSnapshot> findSnapshotByToken(@Param("token") String token);
 }

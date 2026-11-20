@@ -1,6 +1,7 @@
 package com.back.nbe1214finalhot6.domain.qr.controller;
 
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
+import com.back.nbe1214finalhot6.domain.qr.dto.QrScanResponse;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrStatusResponse;
 import com.back.nbe1214finalhot6.domain.qr.service.QrService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class QrTokenController {
 
   private final QrService qrService;
+
+  @Operation(
+      summary = "QR 스캔 조회",
+      description = "손님이 QR 을 스캔했을 때 결제 전에 가맹점, 금액, 적립 대상 여부를 보여 준다. 응답의 qrId 는 결제 요청에 사용한다. 만료된 QR 은 410, 이미 사용된 QR 은 409 를 반환한다")
+  @GetMapping
+  public ApiResponse<QrScanResponse> scan(@PathVariable String token) {
+    return ApiResponse.ok(qrService.scan(token));
+  }
 
   @Operation(
       summary = "QR 상태 조회",

@@ -66,13 +66,17 @@ public class CashbackAnnualBudget {
   /**
    * 총액을 바꾼다.
    *
-   * @throws BusinessException 총액이 0 이하이거나, 이미 확보·지급한 금액보다 작을 때
+   * @param allocatedSum 이미 월별로 배정한 금액의 합
+   * @throws BusinessException 총액이 0 이하이거나, 이미 확보·지급한 금액보다 작을 때(CSH-007), 월 배정 합계보다 작을 때(CSH-005)
    */
-  public void changeTotal(long totalAmount) {
+  public void changeTotal(long totalAmount, long allocatedSum) {
     validateTotal(totalAmount);
     if (totalAmount < reservedAmount + paidAmount) {
       throw new BusinessException(
           CashbackErrorCode.INVALID_BUDGET, "이미 확보하거나 지급한 금액보다 작게 줄일 수 없습니다");
+    }
+    if (totalAmount < allocatedSum) {
+      throw new BusinessException(CashbackErrorCode.BUDGET_ALLOCATION_EXCEEDED);
     }
     this.totalAmount = totalAmount;
   }

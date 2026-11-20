@@ -1,5 +1,7 @@
 package com.back.nbe1214finalhot6.domain.qr.entity;
 
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -48,7 +50,13 @@ public class QrCode {
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
+  @Column(name = "used_at")
+  private LocalDateTime usedAt;
+
   private QrCode(Long merchantId, Long amount, LocalDateTime now) {
+    if (amount == null || amount < 1 || amount > MAX_AMOUNT) {
+      throw new BusinessException(CommonErrorCode.INVALID_REQUEST);
+    }
     this.token = UUID.randomUUID().toString();
     this.merchantId = merchantId;
     this.amount = amount;
