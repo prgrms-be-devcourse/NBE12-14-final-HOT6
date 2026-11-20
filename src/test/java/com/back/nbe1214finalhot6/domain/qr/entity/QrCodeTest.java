@@ -1,10 +1,15 @@
 package com.back.nbe1214finalhot6.domain.qr.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class QrCodeTest {
 
@@ -33,5 +38,29 @@ class QrCodeTest {
     assertThat(qrCode.statusAt(expiresAt)).isEqualTo(QrStatus.EXPIRED);
     assertThat(qrCode.isExpired(expiresAt)).isTrue();
     assertThat(qrCode.statusAt(expiresAt.plusSeconds(1))).isEqualTo(QrStatus.EXPIRED);
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {1L, 1_000_000L})
+  @DisplayName("금액이 1원과 100만원 경계값이면 생성된다")
+  void 금액경계값은생성(long amount) {
+    assertThat(QrCode.createDynamic(1L, amount, NOW).getAmount()).isEqualTo(amount);
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {0L, -1L, 1_000_001L})
+  @DisplayName("금액이 1원 미만이거나 100만원을 넘으면 예외가 발생한다")
+  void 금액범위를벗어나면예외(long amount) {
+    assertThatThrownBy(() -> QrCode.createDynamic(1L, amount, NOW))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_REQUEST));
+  }
+
+  @Test
+  @DisplayName("금액이 없으면 예외가 발생한다")
+  void 금액이없으면예외() {
+    assertThatThrownBy(() -> QrCode.createDynamic(1L, null, NOW))
+        .isInstanceOf(BusinessException.class);
   }
 }

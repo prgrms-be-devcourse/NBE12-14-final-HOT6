@@ -40,8 +40,9 @@ public class Payment {
   @Column(name = "merchant_id", nullable = false)
   private Long merchantId;
 
-  @Column(name = "qr_id")
-  private Long qrId;
+  // 이용자가 스캔한 QR 토큰(UUID). T1 에서 저장해 두고 요청 내용 비교와 QR 사용 처리에 쓴다
+  @Column(name = "qr_token", length = 64)
+  private String qrToken;
 
   @Column(name = "idempotency_key", nullable = false, length = 100)
   private String idempotencyKey;
@@ -96,6 +97,19 @@ public class Payment {
   // 취소한 가맹점주
   @Column(name = "canceled_by")
   private Long canceledBy;
+
+  // T3 실패 기록. 처리 중(PROCESSING)인 건만 FAILED 로 바꾸고 사유 코드를 남긴다.
+  // failureCode 는 던져진 BusinessException 의 코드(예: PAY-002, QR-003)를 그대로 받는다.
+  public void failure(String failureCode) {
+    if (this.status != PaymentStatus.PROCESSING) {
+      throw new IllegalStateException("처리 중인 결제만 실패 처리할 수 있습니다. 현재 상태: " + this.status);
+    }
+    if (failureCode == null || failureCode.isBlank()) {
+      throw new IllegalArgumentException("실패 코드는 비어 있을 수 없습니다");
+    }
+    this.status = PaymentStatus.FAILED;
+    this.failureCode = failureCode;
+  }
 
   public void complete(
       long walletUsed,
