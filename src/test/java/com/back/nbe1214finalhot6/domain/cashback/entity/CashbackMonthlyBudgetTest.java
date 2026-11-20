@@ -44,7 +44,8 @@ class CashbackMonthlyBudgetTest {
   void contingency_roundsDown() {
     assertThat(CashbackMonthlyBudget.create(2026, 12, 29L, RATE, BASE).getContingencyAmount())
         .isEqualTo(2L);
-    assertThat(CashbackMonthlyBudget.create(2026, 12, 9L, RATE, BASE).getContingencyAmount()).isZero();
+    assertThat(CashbackMonthlyBudget.create(2026, 12, 9L, RATE, BASE).getContingencyAmount())
+        .isZero();
   }
 
   // 목적: 월이 1~12 를 벗어나면 거부되는지 확인한다.

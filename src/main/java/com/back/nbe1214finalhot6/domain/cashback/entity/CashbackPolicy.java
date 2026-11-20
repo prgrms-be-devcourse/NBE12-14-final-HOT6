@@ -67,6 +67,21 @@ public class CashbackPolicy {
   }
 
   /**
+   * 종료 시각을 앞당긴다. 요율 인하 때 현재 구간을 적용 시각에 끝내는 데 쓴다.
+   *
+   * @throws BusinessException 새 종료가 시작보다 늦지 않을 때, 기존 종료보다 늦을 때
+   */
+  public void shortenEnd(LocalDateTime newEndsAt) {
+    if (newEndsAt == null
+        || !newEndsAt.isAfter(startsAt)
+        || (endsAt != null && newEndsAt.isAfter(endsAt))) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_POLICY, "구간의 종료 시각은 시작 이후이면서 기존 종료 이전이어야 합니다");
+    }
+    this.endsAt = newEndsAt;
+  }
+
+  /**
    * 요율 형식을 검사한다. 정책 구간과 월 기본 요율이 같은 규칙을 쓴다.
    *
    * @throws BusinessException 없거나 0 이하이거나 1 초과이거나 소수 넷째 자리를 넘을 때

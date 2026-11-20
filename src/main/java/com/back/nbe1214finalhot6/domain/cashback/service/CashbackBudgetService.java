@@ -69,8 +69,8 @@ public class CashbackBudgetService {
    *
    * <p>기본 요율은 선택 입력이다. 새로 만드는 달에서 비우면 이전 달 값을 이어받는다.
    *
-   * @throws BusinessException 월·금액 오류나 지난 달(CSH-007), 요율 오류나 이어받을 값 없음(CSH-003), 연 예산 없음(CSH-004), 합계
-   *     초과(CSH-005), 예약·지급이 시작된 달(CSH-008)
+   * @throws BusinessException 월·금액 오류나 지난 달(CSH-007), 요율 오류나 이어받을 값 없음(CSH-003), 연 예산 없음(CSH-004),
+   *     합계 초과(CSH-005), 예약·지급이 시작된 달(CSH-008)
    */
   @Transactional
   public MonthlyBudgetResponse putMonthly(int year, int month, MonthlyBudgetRequest request) {
