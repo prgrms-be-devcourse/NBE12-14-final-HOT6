@@ -11,7 +11,7 @@ import org.springframework.http.HttpStatus;
 public enum CashbackErrorCode implements ErrorCode {
   // 정책
   POLICY_NOT_FOUND("CSH-001", HttpStatus.NOT_FOUND, "캐시백 정책을 찾을 수 없습니다"),
-  POLICY_PERIOD_OVERLAP("CSH-002", HttpStatus.CONFLICT, "같은 유형의 정책 기간이 겹칩니다"),
+  POLICY_PERIOD_OVERLAP("CSH-002", HttpStatus.CONFLICT, "요율 적용 기간이 기존 구간과 겹칩니다"),
   INVALID_POLICY("CSH-003", HttpStatus.BAD_REQUEST, "정책 요율 또는 기간이 올바르지 않습니다"),
 
   // 예산
@@ -23,7 +23,10 @@ public enum CashbackErrorCode implements ErrorCode {
 
   // 예산 금액
   INVALID_BUDGET("CSH-007", HttpStatus.BAD_REQUEST, "예산 금액이 올바르지 않습니다"),
-  BUDGET_IN_USE("CSH-008", HttpStatus.CONFLICT, "예약 또는 지급이 시작된 월 예산은 수정할 수 없습니다");
+  BUDGET_IN_USE("CSH-008", HttpStatus.CONFLICT, "예약 또는 지급이 시작된 월 예산은 수정할 수 없습니다"),
+
+  // 요율 인하
+  RATE_REDUCTION_LIMIT_EXCEEDED("CSH-009", HttpStatus.CONFLICT, "이번 달 요율 인하 횟수를 초과했습니다");
 
   private final String code;
   private final HttpStatus status;

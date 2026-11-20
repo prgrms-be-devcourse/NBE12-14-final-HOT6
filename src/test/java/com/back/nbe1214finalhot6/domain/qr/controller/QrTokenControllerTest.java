@@ -31,7 +31,7 @@ class QrTokenControllerTest {
   @MockitoBean private QrService qrService;
 
   @Test
-  @DisplayName("스캔 조회 시 QR 식별자, 가맹점, 금액, 적립 대상 여부, 만료 시각을 반환한다")
+  @DisplayName("스캔 조회 시 가맹점, 금액, 적립 대상 여부, 만료 시각을 반환한다")
   void 스캔조회성공() throws Exception {
     given(qrService.scan("token-1"))
         .willReturn(

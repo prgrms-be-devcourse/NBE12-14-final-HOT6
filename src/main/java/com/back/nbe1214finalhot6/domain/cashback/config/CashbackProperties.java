@@ -11,6 +11,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param emergencyRatio 긴급선 비율. 대비금 × 비율까지 남으면 즉시 중단한다
  * @param noticeDays 공지 후 중단까지의 일수. 공지일 + N일 00:00(KST)에 중단한다
  * @param payoutDelayDays 지급 지연 일수. 결제 다음날 00:00 + N일에 지급한다
+ * @param rateChangeNoticeDays 요율 인하 예고 일수. 적용 시각은 현재 분 + N일 이후여야 한다(0 이면 즉시 가능)
+ * @param maxRateReductionsPerMonth 한 달에 요율을 인하할 수 있는 최대 횟수
  * @param scheduler 스케줄러 설정
  */
 @ConfigurationProperties(prefix = "cashback")
@@ -19,6 +21,8 @@ public record CashbackProperties(
     @DefaultValue("0.5") BigDecimal emergencyRatio,
     @DefaultValue("3") int noticeDays,
     @DefaultValue("3") int payoutDelayDays,
+    @DefaultValue("0") int rateChangeNoticeDays,
+    @DefaultValue("1") int maxRateReductionsPerMonth,
     @DefaultValue Scheduler scheduler) {
 
   /**

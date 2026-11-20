@@ -62,16 +62,25 @@ public class CashbackMonthlyBudget {
   @Column(name = "contingency_amount", nullable = false)
   private long contingencyAmount;
 
+  // 그 달의 기본 요율(소수 비율). 달 중 인하 구간이 없을 때 적용한다. 이전에 만든 행은 비어 있을 수 있다
+  @Column(name = "base_rate", precision = 5, scale = CashbackPolicy.RATE_SCALE)
+  private BigDecimal baseRate;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
   private BudgetStatus status;
 
   private CashbackMonthlyBudget(
-      int budgetYear, int budgetMonth, long allocatedAmount, long contingencyAmount) {
+      int budgetYear,
+      int budgetMonth,
+      long allocatedAmount,
+      long contingencyAmount,
+      BigDecimal baseRate) {
     this.budgetYear = budgetYear;
     this.budgetMonth = budgetMonth;
     this.allocatedAmount = allocatedAmount;
     this.contingencyAmount = contingencyAmount;
+    this.baseRate = baseRate;
     this.status = BudgetStatus.ACTIVE;
   }
 
@@ -79,34 +88,49 @@ public class CashbackMonthlyBudget {
    * 월 예산을 만든다.
    *
    * @param contingencyRate 대비금 비율. 배정 × 비율을 내림해 확정한다
-   * @throws BusinessException 연이 4자리가 아니거나 월이 1~12가 아니거나 배정이 0 이하일 때
+   * @param baseRate 그 달의 기본 요율
+   * @throws BusinessException 연이 4자리가 아니거나 월이 1~12가 아니거나 배정이 0 이하이거나 기본 요율이 올바르지 않을 때
    */
   public static CashbackMonthlyBudget create(
-      int budgetYear, int budgetMonth, long allocatedAmount, BigDecimal contingencyRate) {
+      int budgetYear,
+      int budgetMonth,
+      long allocatedAmount,
+      BigDecimal contingencyRate,
+      BigDecimal baseRate) {
     if (budgetYear < 1000 || budgetYear > 9999) {
       throw new BusinessException(CashbackErrorCode.INVALID_BUDGET, "연도는 4자리여야 합니다");
     }
     validateMonth(budgetMonth);
     validateAllocated(allocatedAmount);
+    CashbackPolicy.validateRate(baseRate);
     return new CashbackMonthlyBudget(
         budgetYear,
         budgetMonth,
         allocatedAmount,
-        contingency(allocatedAmount, contingencyRate));
+        contingency(allocatedAmount, contingencyRate),
+        baseRate.setScale(CashbackPolicy.RATE_SCALE));
   }
 
   /**
    * 배정을 바꾸고 대비금을 다시 확정한다.
    *
-   * @throws BusinessException 배정이 0 이하일 때, 예약·지급이 이미 시작되었을 때
+   * @param baseRate 새 기본 요율. null 이면 기존 값을 유지한다
+   * @throws BusinessException 배정이나 기본 요율이 올바르지 않을 때, 예약·지급이 이미 시작되었을 때
    */
-  public void changeAllocated(long allocatedAmount, BigDecimal contingencyRate) {
+  public void changeAllocated(
+      long allocatedAmount, BigDecimal contingencyRate, BigDecimal baseRate) {
     validateAllocated(allocatedAmount);
+    if (baseRate != null) {
+      CashbackPolicy.validateRate(baseRate);
+    }
     if (reservedAmount + paidAmount > 0) {
       throw new BusinessException(CashbackErrorCode.BUDGET_IN_USE);
     }
     this.allocatedAmount = allocatedAmount;
     this.contingencyAmount = contingency(allocatedAmount, contingencyRate);
+    if (baseRate != null) {
+      this.baseRate = baseRate.setScale(CashbackPolicy.RATE_SCALE);
+    }
   }
 
   /** 아직 확보하지 않은 남은 예산(배정 + 이월 유입 - 예약 - 지급). */

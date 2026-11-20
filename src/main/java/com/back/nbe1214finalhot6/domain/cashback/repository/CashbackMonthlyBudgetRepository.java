@@ -30,6 +30,18 @@ public interface CashbackMonthlyBudgetRepository
           + " where m.budgetYear = :year and m.budgetMonth <> :month")
   long sumAllocatedExcluding(@Param("year") int year, @Param("month") int month);
 
+  /** 해당 연·월보다 앞선 달 중 기본 요율이 있는 가장 가까운 달. 기본 요율을 이전 달에서 이어받을 때 쓴다. */
+  @Query(
+      """
+      select m from CashbackMonthlyBudget m
+      where m.baseRate is not null
+        and (m.budgetYear < :year or (m.budgetYear = :year and m.budgetMonth < :month))
+      order by m.budgetYear desc, m.budgetMonth desc
+      limit 1
+      """)
+  Optional<CashbackMonthlyBudget> findLatestBaseRateBefore(
+      @Param("year") int year, @Param("month") int month);
+
   /** 해당 연도의 월 배정 합계. */
   @Query(
       "select coalesce(sum(m.allocatedAmount), 0) from CashbackMonthlyBudget m"
