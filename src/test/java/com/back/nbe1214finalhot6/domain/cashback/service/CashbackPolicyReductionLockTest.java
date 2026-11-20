@@ -9,6 +9,7 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyHistoryRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.math.BigDecimal;
@@ -38,11 +39,13 @@ class CashbackPolicyReductionLockTest {
   @Autowired private CashbackPolicyService policyService;
   @Autowired private CashbackBudgetService budgetService;
   @Autowired private CashbackPolicyRepository policyRepository;
+  @Autowired private CashbackPolicyHistoryRepository historyRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   @Autowired private CashbackAnnualBudgetRepository annualBudgetRepository;
 
   @AfterEach
   void cleanUp() {
+    historyRepository.deleteAll();
     policyRepository.deleteAll();
     monthlyBudgetRepository.deleteAll();
     annualBudgetRepository.deleteAll();
@@ -94,5 +97,6 @@ class CashbackPolicyReductionLockTest {
     }
 
     assertThat(policyRepository.count()).isEqualTo(1);
+    assertThat(historyRepository.count()).isEqualTo(1);
   }
 }
