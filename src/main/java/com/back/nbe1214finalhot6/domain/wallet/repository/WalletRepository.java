@@ -13,7 +13,7 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
   // 회원의 지갑 조회
   Optional<Wallet> findByUserId(Long userId);
 
-  /** 지갑 행을 잠그고 읽음. 결제 락 순서(결제 → 지갑 → QR → 예산)의 '지갑' 단계. */
+  /** 지갑 행을 잠그고 읽음. 결제 락 순서(결제 → QR → 지갑 → 예산)의 '지갑' 단계. */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT w FROM Wallet w WHERE w.id = :id")
   Optional<Wallet> findByIdForUpdate(@Param("id") Long id);
