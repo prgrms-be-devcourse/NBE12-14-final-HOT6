@@ -10,9 +10,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.transaction.annotation.Transactional;
 
 /** 다른 도메인이 주입받는 창구가 스프링 컨텍스트에 하나만 등록되어 있는지 확인한다. */
 @IntegrationTest
+@Transactional
 class CashbackServiceWiringTest {
 
   @Autowired CashbackService cashbackService;
