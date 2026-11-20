@@ -11,6 +11,7 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.YearMonth;
 import java.util.List;
@@ -66,8 +67,10 @@ public class CashbackBudgetService {
    * <p>연 예산 행을 잠근 채 합계를 검증하므로 동시에 배정해도 합계가 연 예산을 넘지 않는다. 이어서 해당 월 예산 행도 잠가서, 그 사이 커밋된
    * 예약 금액을 낡은 값으로 덮어쓰지 않고 사용 여부도 최신 값으로 판단한다. 잠금 순서는 연 -> 월이다.
    *
-   * @throws BusinessException 월·금액 오류나 지난 달(CSH-007), 연 예산 없음(CSH-004), 합계 초과(CSH-005), 예약·지급이 시작된
-   *     달(CSH-008)
+   * <p>기본 요율은 선택 입력이다. 새로 만드는 달에서 비우면 이전 달 값을 이어받는다.
+   *
+   * @throws BusinessException 월·금액 오류나 지난 달(CSH-007), 요율 오류나 이어받을 값 없음(CSH-003), 연 예산 없음(CSH-004), 합계
+   *     초과(CSH-005), 예약·지급이 시작된 달(CSH-008)
    */
   @Transactional
   public MonthlyBudgetResponse putMonthly(int year, int month, MonthlyBudgetRequest request) {
@@ -97,11 +100,30 @@ public class CashbackBudgetService {
       budget =
           monthlyBudgetRepository.save(
               CashbackMonthlyBudget.create(
-                  year, month, request.allocatedAmount(), properties.contingencyRate()));
+                  year,
+                  month,
+                  request.allocatedAmount(),
+                  properties.contingencyRate(),
+                  baseRateForNewMonth(year, month, request.baseRate())));
     } else {
-      budget.changeAllocated(request.allocatedAmount(), properties.contingencyRate());
+      budget.changeAllocated(
+          request.allocatedAmount(), properties.contingencyRate(), request.baseRate());
     }
     return MonthlyBudgetResponse.from(budget);
+  }
+
+  /** 새로 만드는 달의 기본 요율. 입력이 없으면 가장 가까운 이전 달의 값을 이어받고, 이어받을 값이 없으면 거절한다. */
+  private BigDecimal baseRateForNewMonth(int year, int month, BigDecimal requested) {
+    if (requested != null) {
+      return requested;
+    }
+    return monthlyBudgetRepository
+        .findLatestBaseRateBefore(year, month)
+        .map(CashbackMonthlyBudget::getBaseRate)
+        .orElseThrow(
+            () ->
+                new BusinessException(
+                    CashbackErrorCode.INVALID_POLICY, "이어받을 이전 달의 기본 요율이 없어 입력해야 합니다"));
   }
 
   @Transactional(readOnly = true)

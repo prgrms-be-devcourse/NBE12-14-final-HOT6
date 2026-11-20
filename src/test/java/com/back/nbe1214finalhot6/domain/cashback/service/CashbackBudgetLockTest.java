@@ -97,7 +97,7 @@ class CashbackBudgetLockTest {
   @DisplayName("월 배정 변경은 행 잠금이 풀릴 때까지 기다리고 그 사이 예약된 달은 수정하지 못한다")
   void putMonthly_waitsForLockAndSeesReserved() throws Exception {
     budgetService.putAnnual(2026, new AnnualBudgetRequest(12_000_000L));
-    budgetService.putMonthly(2026, 12, new MonthlyBudgetRequest(1_000_000L));
+    budgetService.putMonthly(2026, 12, new MonthlyBudgetRequest(1_000_000L, new java.math.BigDecimal("0.03")));
     TransactionTemplate tx = new TransactionTemplate(transactionManager);
     CountDownLatch locked = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
@@ -120,7 +120,7 @@ class CashbackBudgetLockTest {
 
       Future<?> change =
           executor.submit(
-              () -> budgetService.putMonthly(2026, 12, new MonthlyBudgetRequest(2_000_000L)));
+              () -> budgetService.putMonthly(2026, 12, new MonthlyBudgetRequest(2_000_000L, null)));
       assertThatThrownBy(() -> change.get(1, TimeUnit.SECONDS))
           .isInstanceOf(TimeoutException.class);
 

@@ -14,6 +14,7 @@ import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -101,7 +102,8 @@ class CashbackBudgetServiceTest {
   // ---- 월 배정 (테스트 시계: 2026-11-18 09:00 KST) ----
 
   private MonthlyBudgetResponse putMonthly(int year, int month, long amount) {
-    return budgetService.putMonthly(year, month, new MonthlyBudgetRequest(amount));
+    return budgetService.putMonthly(
+        year, month, new MonthlyBudgetRequest(amount, new BigDecimal("0.03")));
   }
 
   private void assertErrorOnMonthly(int year, int month, long amount, CashbackErrorCode code) {
@@ -174,6 +176,59 @@ class CashbackBudgetServiceTest {
     putMonthly(2026, 12, 1_000_000L);
 
     assertThat(putMonthly(2027, 1, 1_000_000L).allocatedAmount()).isEqualTo(1_000_000L);
+  }
+
+  private MonthlyBudgetResponse putMonthly(int year, int month, long amount, String baseRate) {
+    return budgetService.putMonthly(
+        year,
+        month,
+        new MonthlyBudgetRequest(amount, baseRate == null ? null : new BigDecimal(baseRate)));
+  }
+
+  // 목적: 기본 요율을 주면 저장되고, 새 달에서 비우면 가장 가까운 이전 달(건너뛴 달 포함)의 값을 이어받는지 확인한다.
+  @Test
+  @DisplayName("기본 요율은 입력하면 저장하고 비우면 이전 달 값을 이어받는다")
+  void putMonthly_baseRateCarriedOver() {
+    budgetService.putAnnual(2026, new AnnualBudgetRequest(12_000_000L));
+    budgetService.putAnnual(2027, new AnnualBudgetRequest(12_000_000L));
+
+    assertThat(putMonthly(2026, 11, 1_000L, "0.05").baseRate().toPlainString())
+        .isEqualTo("0.0500");
+    // 12월은 건너뛰고 다음 해 2월에 비우면 11월 값을 이어받는다
+    assertThat(putMonthly(2027, 2, 1_000L, null).baseRate().toPlainString()).isEqualTo("0.0500");
+    // 가장 가까운 이전 달은 2027-02 이므로 3월에 비우면 그 값이다
+    putMonthly(2027, 2, 1_000L, "0.04");
+    assertThat(putMonthly(2027, 3, 1_000L, null).baseRate().toPlainString()).isEqualTo("0.0400");
+  }
+
+  // 목적: 이어받을 이전 달이 없는 첫 달에 비우면 CSH-003 으로 거부되고 저장되지 않는지 확인한다.
+  @Test
+  @DisplayName("이어받을 이전 달이 없으면 기본 요율을 반드시 입력해야 한다")
+  void putMonthly_baseRateRequiredForFirstMonth() {
+    budgetService.putAnnual(2026, new AnnualBudgetRequest(12_000_000L));
+
+    assertThatThrownBy(() -> putMonthly(2026, 12, 1_000L, null))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_POLICY);
+    assertThat(monthlyBudgetRepository.count()).isZero();
+  }
+
+  // 목적: 이미 있는 달에서 비우면 기본 요율이 유지되고, 값을 주면 바뀌며, 잘못된 값은 거부되는지 확인한다.
+  @Test
+  @DisplayName("이미 있는 달은 비우면 기본 요율을 유지하고 주면 바꾼다")
+  void putMonthly_baseRateOnExistingMonth() {
+    budgetService.putAnnual(2026, new AnnualBudgetRequest(12_000_000L));
+    putMonthly(2026, 12, 1_000L, "0.03");
+
+    assertThat(putMonthly(2026, 12, 2_000L, null).baseRate().toPlainString())
+        .isEqualTo("0.0300");
+    assertThat(putMonthly(2026, 12, 2_000L, "0.02").baseRate().toPlainString())
+        .isEqualTo("0.0200");
+    assertThatThrownBy(() -> putMonthly(2026, 12, 2_000L, "1.5"))
+        .isInstanceOf(BusinessException.class)
+        .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_POLICY);
+    assertThat(budgetService.getMonthly(2026, 12).baseRate().toPlainString())
+        .isEqualTo("0.0200");
   }
 
   // 목적: 지난 달은 거부되고, 현재 달과 미래 달은 허용되는지 확인한다.
