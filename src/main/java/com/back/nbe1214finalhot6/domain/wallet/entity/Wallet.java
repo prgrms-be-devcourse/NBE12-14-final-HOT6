@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 /** 회원의 현재 잔액. 거래가 일어날 때마다 덮어쓰며, 변경 이력은 WalletTransaction에 쌓음. */
 @Entity
@@ -42,8 +43,10 @@ public class Wallet {
   @Column(name = "pending_cashback", nullable = false)
   private long pendingCashback;
 
-  // 지갑 상태. 탈퇴하면 WITHDRAWN이 되어 입금·차감을 거절함
+  // 지갑 상태. 탈퇴하면 WITHDRAWN이 되어 입금·차감을 거절함.
+  // DB 기본값 ACTIVE: 기존 행이 있는 테이블에 컬럼을 추가하거나 SQL로 직접 넣어도 NOT NULL 오류가 나지 않게 함
   @Enumerated(EnumType.STRING)
+  @ColumnDefault("'ACTIVE'")
   @Column(nullable = false, length = 20)
   private WalletStatus status;
 
