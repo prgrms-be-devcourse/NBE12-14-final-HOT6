@@ -115,17 +115,17 @@ class PaymentQueryServiceTest {
   }
 
   @Test
-  @DisplayName("없는 멱등키로 조회하면 RESOURCE_NOT_FOUND(COM-009) 예외가 난다")
+  @DisplayName("없는 멱등키로 조회하면 PAYMENT_NOT_FOUND(PAY-003) 예외가 난다")
   void 없는키_조회() {
     // when & then
     assertThatThrownBy(() -> paymentQueryService.findByKey(1L, newKey()))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
-        .isEqualTo(CommonErrorCode.RESOURCE_NOT_FOUND);
+        .isEqualTo(PaymentErrorCode.PAYMENT_NOT_FOUND);
   }
 
   @Test
-  @DisplayName("다른 지갑의 멱등키로 조회하면 없는 것으로 취급되어 RESOURCE_NOT_FOUND 예외가 난다")
+  @DisplayName("다른 지갑의 멱등키로 조회하면 없는 것으로 취급되어 PAYMENT_NOT_FOUND 예외가 난다")
   void 다른지갑의키_조회불가() {
     // given : 1번 지갑으로 결제를 하나 만든다
     Long merchantId = saveMerchant();
@@ -136,7 +136,7 @@ class PaymentQueryServiceTest {
     assertThatThrownBy(() -> paymentQueryService.findByKey(2L, key))
         .isInstanceOf(BusinessException.class)
         .extracting(e -> ((BusinessException) e).getErrorCode())
-        .isEqualTo(CommonErrorCode.RESOURCE_NOT_FOUND);
+        .isEqualTo(PaymentErrorCode.PAYMENT_NOT_FOUND);
   }
 
   @Test

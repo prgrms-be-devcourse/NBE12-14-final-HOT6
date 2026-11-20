@@ -11,7 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.idempotency.IdempotencyKeys;
-import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
+import com.back.nbe1214finalhot6.domain.payment.exception.PaymentErrorCode;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.service.PaymentFacade;
@@ -104,19 +104,19 @@ class PaymentControllerTest {
   }
 
   @Test
-  @DisplayName("없는 키이면 404 (COM-009)")
+  @DisplayName("없는 키이면 404 (PAY-003)")
   void 없는키_404() throws Exception {
     // given : 서비스가 "없는 키"라고 답한다
     String key = UUID.randomUUID().toString();
     given(paymentQueryService.findByKey(1L, key))
-            .willThrow(new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+            .willThrow(new BusinessException(PaymentErrorCode.PAYMENT_NOT_FOUND));
 
     // when & then
     mockMvc
             .perform(get("/api/payments/by-key/{key}", key).param("walletId", "1"))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.code").value("COM-009"));
+            .andExpect(jsonPath("$.code").value("PAY-003"));
   }
 
   @Test

@@ -40,7 +40,7 @@ public class PaymentController {
           "응답을 못 받은 결제를 같은 멱등키로 다시 조회한다. "
               + "결제를 새로 처리하지 않고 저장된 결과만 반환한다. "
               + "상태는 COMPLETED(완료) / FAILED(failureCode 참고) / PROCESSING(처리 중, 잠시 후 다시 조회) / CANCELED. "
-              + "404(COM-009)는 서버가 받은 적 없는 키라는 뜻이므로 같은 키로 다시 결제해도 된다")
+              + "404(PAY-003)는 서버가 받은 적 없는 키라는 뜻이므로 같은 키로 다시 결제해도 된다")
   @GetMapping("/by-key/{key}")
   public ApiResponse<PaymentResponse> requery(
       @PathVariable String key,

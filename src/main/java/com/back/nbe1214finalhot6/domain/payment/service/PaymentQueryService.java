@@ -2,7 +2,7 @@ package com.back.nbe1214finalhot6.domain.payment.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
-import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
+import com.back.nbe1214finalhot6.domain.payment.exception.PaymentErrorCode;
 import com.back.nbe1214finalhot6.domain.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +21,6 @@ public class PaymentQueryService {
     return paymentRepository
         .findByWalletIdAndIdempotencyKey(walletId, key)
         .map(PaymentResponse::of)
-        .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+        .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_NOT_FOUND));
   }
 }
