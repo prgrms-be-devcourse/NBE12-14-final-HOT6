@@ -10,6 +10,7 @@ import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateRequest;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateResponse;
+import com.back.nbe1214finalhot6.domain.qr.dto.QrPaymentTarget;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrScanResponse;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrStatusResponse;
 import com.back.nbe1214finalhot6.domain.qr.entity.QrCode;
@@ -116,8 +117,7 @@ class QrServiceTest {
     Long merchantId = saveMerchant();
     QrCreateResponse created = qrService.createDynamic(merchantId, new QrCreateRequest(1000L));
     QrCode qrCode = qrCodeRepository.findByToken(created.token()).orElseThrow();
-    qrService.markUsed(
-        qrCode.getToken(), qrCode.getMerchantId(), qrCode.getAmount(), LocalDateTime.now(clock));
+    qrService.markUsed(qrCode.getToken(), LocalDateTime.now(clock));
     entityManager.clear();
 
     assertThat(qrService.getStatus(created.token()).status()).isEqualTo(QrStatus.USED);
@@ -141,7 +141,7 @@ class QrServiceTest {
     QrCode qr = saveQr();
     LocalDateTime now = LocalDateTime.now(clock);
 
-    qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), now);
+    qrService.markUsed(qr.getToken(), now);
     entityManager.clear();
 
     QrCode used = qrCodeRepository.findById(qr.getId()).orElseThrow();
@@ -156,7 +156,7 @@ class QrServiceTest {
     LocalDateTime requestedAt = LocalDateTime.now(clock).plusMinutes(2).plusSeconds(59);
     clock.advance(Duration.ofMinutes(10));
 
-    qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), requestedAt);
+    qrService.markUsed(qr.getToken(), requestedAt);
     entityManager.clear();
 
     assertThat(qrCodeRepository.findById(qr.getId()).orElseThrow().getStatus())
@@ -169,9 +169,7 @@ class QrServiceTest {
     QrCode qr = saveQr();
     LocalDateTime requestedAt = qr.getExpiresAt();
 
-    assertThatThrownBy(
-            () ->
-                qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), requestedAt))
+    assertThatThrownBy(() -> qrService.markUsed(qr.getToken(), requestedAt))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_EXPIRED));
@@ -184,64 +182,12 @@ class QrServiceTest {
   void 이미사용된QR은사용처리실패() {
     QrCode qr = saveQr();
     LocalDateTime now = LocalDateTime.now(clock);
-    qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), now);
+    qrService.markUsed(qr.getToken(), now);
 
-    assertThatThrownBy(
-            () -> qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), now))
+    assertThatThrownBy(() -> qrService.markUsed(qr.getToken(), now))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_ALREADY_USED));
-  }
-
-  @Test
-  @DisplayName("가맹점이 다르면 QR_MISMATCH 예외가 발생하고 상태는 그대로다")
-  void 가맹점이다르면실패() {
-    QrCode qr = saveQr();
-    LocalDateTime now = LocalDateTime.now(clock);
-
-    assertThatThrownBy(
-            () -> qrService.markUsed(qr.getToken(), qr.getMerchantId() + 1, qr.getAmount(), now))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_MISMATCH));
-    assertThat(qrCodeRepository.findById(qr.getId()).orElseThrow().getStatus())
-        .isEqualTo(QrStatus.WAITING);
-  }
-
-  @Test
-  @DisplayName("금액이 다르면 QR_MISMATCH 예외가 발생하고 상태는 그대로다")
-  void 금액이다르면실패() {
-    QrCode qr = saveQr();
-    LocalDateTime now = LocalDateTime.now(clock);
-
-    assertThatThrownBy(
-            () -> qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount() - 1, now))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_MISMATCH));
-    assertThat(qrCodeRepository.findById(qr.getId()).orElseThrow().getStatus())
-        .isEqualTo(QrStatus.WAITING);
-  }
-
-  @Test
-  @DisplayName("실패 원인이 겹치면 불일치가 사용됨과 만료보다 먼저 판별된다")
-  void 불일치가사용됨과만료보다우선() {
-    QrCode used = saveQr();
-    LocalDateTime now = LocalDateTime.now(clock);
-    qrService.markUsed(used.getToken(), used.getMerchantId(), used.getAmount(), now);
-    QrCode expired = saveQr();
-    LocalDateTime late = expired.getExpiresAt().plusMinutes(1);
-
-    assertThatThrownBy(
-            () -> qrService.markUsed(used.getToken(), used.getMerchantId(), 1L, now))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_MISMATCH));
-    assertThatThrownBy(
-            () -> qrService.markUsed(expired.getToken(), expired.getMerchantId(), 1L, late))
-        .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_MISMATCH));
   }
 
   @Test
@@ -249,11 +195,10 @@ class QrServiceTest {
   void 사용됨이만료보다우선() {
     QrCode qr = saveQr();
     LocalDateTime now = LocalDateTime.now(clock);
-    qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), now);
+    qrService.markUsed(qr.getToken(), now);
     LocalDateTime late = qr.getExpiresAt().plusMinutes(10);
 
-    assertThatThrownBy(
-            () -> qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), late))
+    assertThatThrownBy(() -> qrService.markUsed(qr.getToken(), late))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_ALREADY_USED));
@@ -265,10 +210,9 @@ class QrServiceTest {
     QrCode qr = saveQr();
     LocalDateTime now = LocalDateTime.now(clock);
     qrCodeRepository.findByToken(qr.getToken()).orElseThrow();
-    qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), now);
+    qrService.markUsed(qr.getToken(), now);
 
-    assertThatThrownBy(
-            () -> qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), now))
+    assertThatThrownBy(() -> qrService.markUsed(qr.getToken(), now))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_ALREADY_USED));
@@ -279,8 +223,7 @@ class QrServiceTest {
   void 접수시각이없으면실패() {
     QrCode qr = saveQr();
 
-    assertThatThrownBy(
-            () -> qrService.markUsed(qr.getToken(), qr.getMerchantId(), qr.getAmount(), null))
+    assertThatThrownBy(() -> qrService.markUsed(qr.getToken(), null))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(CommonErrorCode.INVALID_REQUEST));
@@ -291,8 +234,7 @@ class QrServiceTest {
   @Test
   @DisplayName("존재하지 않는 토큰이면 QR_NOT_FOUND 예외가 발생한다")
   void 없는토큰은사용처리실패() {
-    assertThatThrownBy(
-            () -> qrService.markUsed("unknown-token", 1L, 1000L, LocalDateTime.now(clock)))
+    assertThatThrownBy(() -> qrService.markUsed("unknown-token", LocalDateTime.now(clock)))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_NOT_FOUND));
@@ -334,8 +276,7 @@ class QrServiceTest {
     Long merchantId = saveMerchant();
     QrCreateResponse created = qrService.createDynamic(merchantId, new QrCreateRequest(1000L));
     QrCode qrCode = qrCodeRepository.findByToken(created.token()).orElseThrow();
-    qrService.markUsed(
-        qrCode.getToken(), qrCode.getMerchantId(), qrCode.getAmount(), LocalDateTime.now(clock));
+    qrService.markUsed(qrCode.getToken(), LocalDateTime.now(clock));
     entityManager.clear();
 
     assertThatThrownBy(() -> qrService.scan(created.token()))
@@ -363,6 +304,39 @@ class QrServiceTest {
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_NOT_FOUND));
+  }
+
+  @Test
+  @DisplayName("결제 대상 조회 시 QR 에 저장된 가맹점과 금액을 반환한다")
+  void 결제대상조회성공() {
+    QrCode qr = saveQr();
+
+    QrPaymentTarget target = qrService.getPaymentTarget(qr.getToken());
+
+    assertThat(target.merchantId()).isEqualTo(qr.getMerchantId());
+    assertThat(target.amount()).isEqualTo(qr.getAmount());
+  }
+
+  @Test
+  @DisplayName("결제 대상 조회는 QR 상태를 검사하지 않고 값만 반환한다")
+  void 결제대상조회는상태를검사하지않는다() {
+    QrCode used = saveQr();
+    qrService.markUsed(used.getToken(), LocalDateTime.now(clock));
+    QrCode expired = saveQr();
+    clock.advance(Duration.ofMinutes(10));
+
+    assertThat(qrService.getPaymentTarget(used.getToken()).amount()).isEqualTo(used.getAmount());
+    assertThat(qrService.getPaymentTarget(expired.getToken()).amount())
+        .isEqualTo(expired.getAmount());
+  }
+
+  @Test
+  @DisplayName("결제 대상 조회 시 존재하지 않는 토큰이면 QR_NOT_FOUND 예외가 발생한다")
+  void 결제대상조회없는토큰() {
+    assertThatThrownBy(() -> qrService.getPaymentTarget("unknown-token"))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(QrErrorCode.QR_NOT_FOUND));
   }
 
   private QrCode saveQr() {

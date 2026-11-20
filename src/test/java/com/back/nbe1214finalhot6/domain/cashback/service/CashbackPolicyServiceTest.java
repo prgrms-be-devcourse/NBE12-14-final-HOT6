@@ -10,8 +10,11 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
+import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicyHistory;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PolicyHistoryAction;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyHistoryRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.math.BigDecimal;
@@ -37,6 +40,7 @@ class CashbackPolicyServiceTest {
   @Autowired private CashbackPolicyService policyService;
   @Autowired private CashbackBudgetService budgetService;
   @Autowired private CashbackPolicyRepository policyRepository;
+  @Autowired private CashbackPolicyHistoryRepository historyRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
 
   // 11월 예산은 기본 요율 0.05 로 둔다
@@ -83,6 +87,7 @@ class CashbackPolicyServiceTest {
     assertReduceError("0.06", NOV_20, CashbackErrorCode.INVALID_POLICY);
 
     assertThat(policyRepository.count()).isZero();
+    assertThat(historyRepository.count()).isZero();
   }
 
   // 목적: 요율 형식 오류가 CSH-003 으로 거부되는지 확인한다.
@@ -152,6 +157,24 @@ class CashbackPolicyServiceTest {
 
     assertThat(dec.endsAt()).isEqualTo(JAN_1);
     assertThat(policyService.effectiveRate(DEC_10)).contains(new BigDecimal("0.0300"));
+  }
+
+  // 목적: 인하 한 번에 구간 생성 이력 1건이 남고, 인하 대상 구간이 없으면 변경 이력은 없는지 확인한다.
+  @Test
+  @DisplayName("인하하면 구간 생성 이력이 남는다")
+  void reduce_recordsCreateHistory() {
+    PolicyResponse created = reduce("0.03", NOV_20);
+
+    List<CashbackPolicyHistory> histories = historyRepository.findAll();
+    assertThat(histories).hasSize(1);
+    CashbackPolicyHistory history = histories.getFirst();
+    assertThat(history.getPolicyId()).isEqualTo(created.policyId());
+    assertThat(history.getAction()).isEqualTo(PolicyHistoryAction.CREATE);
+    assertThat(history.getChangedBy()).isNull();
+    assertThat(history.getBeforeRate()).isNull();
+    assertThat(history.getAfterRate().toPlainString()).isEqualTo("0.0300");
+    assertThat(history.getAfterStartsAt()).isEqualTo(NOV_20);
+    assertThat(history.getAfterEndsAt()).isEqualTo(DEC_1);
   }
 
   // 목적: 월 기본 요율로 대체되는 구간이 없을 때 적용 요율이 월 기본 요율이고, 월 예산도 없으면 비어 있는지 확인한다.

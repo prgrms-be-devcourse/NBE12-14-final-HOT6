@@ -9,11 +9,15 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
+import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicyHistory;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PolicyHistoryAction;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyHistoryRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +45,7 @@ class CashbackPolicyReductionLimitTest {
   @Autowired private CashbackPolicyService policyService;
   @Autowired private CashbackBudgetService budgetService;
   @Autowired private CashbackPolicyRepository policyRepository;
+  @Autowired private CashbackPolicyHistoryRepository historyRepository;
 
   @BeforeEach
   void setUpNovemberBudget() {
@@ -60,9 +65,9 @@ class CashbackPolicyReductionLimitTest {
   }
 
   // 목적: 인하한 구간 위에서 다시 인하하면 기존 구간이 적용 시각에 끝나고 새 구간이 이어지며(경계 오적용 없음),
-  // 횟수를 넘으면 거부되는지 확인한다.
+  // 변경 이력이 구간 종료 변경 1건과 생성 1건으로 남는지, 횟수를 넘으면 거부되는지 확인한다.
   @Test
-  @DisplayName("연속 인하하면 기존 구간이 적용 시각에 끝나고 새 구간이 이어진다")
+  @DisplayName("연속 인하하면 기존 구간이 적용 시각에 끝나고 새 구간이 이어지며 이력이 남는다")
   void reduce_chainedReductions() {
     PolicyResponse first = reduce("0.04", NOV_20);
     PolicyResponse second = reduce("0.03", NOV_25);
@@ -74,6 +79,16 @@ class CashbackPolicyReductionLimitTest {
     assertThat(policyService.effectiveRate(NOV_25.minusSeconds(1)))
         .contains(new BigDecimal("0.0400"));
     assertThat(policyService.effectiveRate(NOV_25)).contains(new BigDecimal("0.0300"));
+
+    List<CashbackPolicyHistory> forFirst =
+        historyRepository.findAllByPolicyIdOrderByIdAsc(first.policyId());
+    assertThat(forFirst).extracting(CashbackPolicyHistory::getAction)
+        .containsExactly(PolicyHistoryAction.CREATE, PolicyHistoryAction.UPDATE);
+    CashbackPolicyHistory update = forFirst.get(1);
+    assertThat(update.getBeforeEndsAt()).isEqualTo(DEC_1);
+    assertThat(update.getAfterEndsAt()).isEqualTo(NOV_25);
+    assertThat(update.getAfterRate().toPlainString()).isEqualTo("0.0400");
+    assertThat(historyRepository.count()).isEqualTo(3);
 
     assertReduceError("0.02", NOV_28, CashbackErrorCode.RATE_REDUCTION_LIMIT_EXCEEDED);
     assertThat(policyRepository.count()).isEqualTo(2);
@@ -112,5 +127,6 @@ class CashbackPolicyReductionLimitTest {
     assertReduceError("0.03", NOV_20, CashbackErrorCode.POLICY_PERIOD_OVERLAP);
 
     assertThat(policyRepository.count()).isEqualTo(1);
+    assertThat(historyRepository.count()).isZero();
   }
 }

@@ -6,6 +6,7 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetResponse;
+import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackAnnualBudget;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
@@ -14,7 +15,9 @@ import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudge
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.YearMonth;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +26,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class CashbackBudgetService {
+
+  // 적립을 받는 상태. 중단·마감 달에는 예산을 확보하지 않는다
+  private static final Set<BudgetStatus> RESERVABLE_STATUSES =
+      EnumSet.of(BudgetStatus.ACTIVE, BudgetStatus.NOTICED);
 
   private final CashbackAnnualBudgetRepository annualBudgetRepository;
   private final CashbackMonthlyBudgetRepository monthlyBudgetRepository;
@@ -124,6 +131,73 @@ public class CashbackBudgetService {
             () ->
                 new BusinessException(
                     CashbackErrorCode.INVALID_POLICY, "이어받을 이전 달의 기본 요율이 없어 입력해야 합니다"));
+  }
+
+  /**
+   * 결제가 적립액만큼 예산을 확보한다. 캐시백 도메인 내부 전용이며, 결제 도메인은 {@code CashbackService.reserve} 만
+   * 호출한다.
+   *
+   * <p>연 예산, 월 예산 순서로 조건부 UPDATE 를 실행하며, 한 문장 안에서 남은 예산을 확인하고 늘리므로 동시에 확보해도 예산을 넘지 않는다.
+   * 호출한 쪽의 트랜잭션에 참여한다.
+   *
+   * <p>영속성 컨텍스트를 비우지 않으므로 결제 트랜잭션이 읽어 둔 엔티티가 분리되지 않는다. 같은 트랜잭션에서 예산 엔티티를 미리 읽어 두면 갱신 전 값일 수
+   * 있어서, 확보 결과는 반환값으로 판단한다.
+   *
+   * <p>예산이 모자라거나 없거나 적립이 중단된 것은 예외가 아니라 결과로 돌려준다(결제는 그대로 진행된다). 부분 확보는 없고 전액이거나 아무것도 확보하지
+   * 않는다. 월 예산에서 실패하면 먼저 늘린 연 예산 확보를 같은 트랜잭션에서 되돌린다. 연 예산 행의 잠금을 쥐고 있어 되돌리는 사이에 다른 결제가 끼어들지
+   * 못한다.
+   *
+   * @throws BusinessException 금액이 0 이하이거나 월이 1~12 가 아닐 때(CSH-007)
+   */
+  @Transactional
+  public BudgetReserveResult reserveBudget(int year, int month, long amount) {
+    validateReservation(month, amount);
+    if (annualBudgetRepository.reserve(year, amount) == 0) {
+      return annualBudgetRepository.existsByBudgetYear(year)
+          ? BudgetReserveResult.INSUFFICIENT
+          : BudgetReserveResult.NO_BUDGET;
+    }
+    if (monthlyBudgetRepository.reserve(year, month, amount, RESERVABLE_STATUSES) == 0) {
+      annualBudgetRepository.release(year, amount);
+      return monthlyFailure(year, month);
+    }
+    return BudgetReserveResult.RESERVED;
+  }
+
+  /**
+   * 확보했던 예산을 되돌린다. 캐시백 도메인 내부 전용이며, 결제 도메인은 {@code CashbackService.cancel} 만
+   * 호출한다. 호출한 쪽의 트랜잭션에 참여하고, 연 예산, 월 예산 순서로 되돌린다.
+   *
+   * @throws BusinessException 금액이 0 이하이거나 월이 1~12 가 아닐 때, 확보한 금액보다 많이 되돌리려 할 때(CSH-007). 예외가 나면 이미
+   *     되돌린 부분도 함께 롤백된다
+   */
+  @Transactional
+  public void releaseBudget(int year, int month, long amount) {
+    validateReservation(month, amount);
+    if (annualBudgetRepository.release(year, amount) == 0
+        || monthlyBudgetRepository.release(year, month, amount) == 0) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_BUDGET, "확보한 금액보다 많이 되돌릴 수 없습니다");
+    }
+  }
+
+  private static void validateReservation(int month, long amount) {
+    CashbackMonthlyBudget.validateMonth(month);
+    if (amount <= 0) {
+      throw new BusinessException(CashbackErrorCode.INVALID_BUDGET, "금액은 0보다 커야 합니다");
+    }
+  }
+
+  /** 월 예산 확보가 실패한 이유. 월 예산이 없으면 없음, 적립을 받지 않는 상태면 중단, 그 밖에는 예산 부족이다. */
+  private BudgetReserveResult monthlyFailure(int year, int month) {
+    return monthlyBudgetRepository
+        .findStatus(year, month)
+        .map(
+            status ->
+                RESERVABLE_STATUSES.contains(status)
+                    ? BudgetReserveResult.INSUFFICIENT
+                    : BudgetReserveResult.NOT_ACTIVE)
+        .orElse(BudgetReserveResult.NO_BUDGET);
   }
 
   @Transactional(readOnly = true)

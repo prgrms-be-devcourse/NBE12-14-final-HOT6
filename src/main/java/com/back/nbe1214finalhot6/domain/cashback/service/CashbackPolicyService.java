@@ -6,8 +6,10 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
+import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicyHistory;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyHistoryRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -30,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CashbackPolicyService {
 
   private final CashbackPolicyRepository policyRepository;
+  private final CashbackPolicyHistoryRepository historyRepository;
   private final CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   private final CashbackProperties properties;
   private final Clock clock;
@@ -87,7 +90,9 @@ public class CashbackPolicyService {
           "새 요율은 현재 요율(" + currentRate.toPlainString() + ")보다 낮아야 합니다");
     }
 
+    CashbackPolicy before = null;
     if (covering != null) {
+      before = covering.snapshot();
       covering.shortenEnd(effectiveAt);
     }
     CashbackPolicy successor =
@@ -96,6 +101,11 @@ public class CashbackPolicyService {
       throw new BusinessException(CashbackErrorCode.POLICY_PERIOD_OVERLAP);
     }
     policyRepository.save(successor);
+
+    if (covering != null) {
+      historyRepository.save(CashbackPolicyHistory.updated(before, covering, null, now));
+    }
+    historyRepository.save(CashbackPolicyHistory.created(successor, null, now));
     return PolicyResponse.from(successor);
   }
 

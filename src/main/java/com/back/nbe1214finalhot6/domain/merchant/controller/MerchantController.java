@@ -44,7 +44,7 @@ public class MerchantController {
 
   @Operation(
       summary = "가맹점 수정",
-      description = "이름, 주소, 적립 대상 여부 중 요청에 포함된 항목만 수정한다. 포함되지 않은 항목은 기존 값을 유지한다")
+      description = "이름, 주소 중 요청에 포함된 항목만 수정한다. 포함되지 않은 항목은 기존 값을 유지하며, 적립 대상 여부는 수정할 수 없다")
   @PatchMapping("/{merchantId}")
   public ApiResponse<MerchantResponse> update(
       @PathVariable Long merchantId, @Valid @RequestBody MerchantUpdateRequest request) {
