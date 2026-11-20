@@ -54,4 +54,16 @@ public class OperatorSetting {
     settingKey.validate(settingValue);
     return new OperatorSetting(settingKey, settingValue, updatedBy, now);
   }
+
+  /**
+   * 값을 바꾼다.
+   *
+   * @throws com.back.nbe1214finalhot6.common.exception.BusinessException 값이 키의 허용 범위를 벗어났을 때
+   */
+  public void changeValue(long settingValue, Long updatedBy, LocalDateTime now) {
+    settingKey.validate(settingValue);
+    this.settingValue = settingValue;
+    this.updatedBy = updatedBy;
+    this.updatedAt = now;
+  }
 }

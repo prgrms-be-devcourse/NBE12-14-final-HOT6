@@ -11,7 +11,7 @@
  *       이 패키지의 엔티티·리포지토리를 직접 사용하지 않는다.
  *   <li>키마다 기본값, 최솟값, 하드 상한이 {@link com.back.nbe1214finalhot6.setting.SettingKey} 에 코드로 정의된다.
  *       하드 상한은 법적 한도 같은 값이라 운영자가 바꿀 수 없다.
- *   <li>값을 바꾸는 운영자 API 와 변경 이력은 별도 이슈에서 이 패키지에 추가한다.
+ *   <li>값은 운영자 API({@code OperatorSettingAdminController})로만 바꾼다. 값이 실제로 바뀔 때마다 변경 이력을 남긴다.
  * </ul>
  */
 package com.back.nbe1214finalhot6.setting;
