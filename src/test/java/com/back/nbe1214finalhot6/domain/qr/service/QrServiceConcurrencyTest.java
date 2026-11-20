@@ -50,7 +50,7 @@ class QrServiceConcurrencyTest {
               ready.countDown();
               start.await();
               try {
-                qrService.markUsed(qr.getToken(), 1L, 1000L, now);
+                qrService.markUsed(qr.getToken(), now);
                 return null;
               } catch (BusinessException e) {
                 return (QrErrorCode) e.getErrorCode();
