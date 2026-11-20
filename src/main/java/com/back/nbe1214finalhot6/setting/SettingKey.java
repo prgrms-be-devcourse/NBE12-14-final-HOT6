@@ -34,6 +34,20 @@ public enum SettingKey {
     this.hardMax = hardMax;
   }
 
+  /**
+   * 이름으로 키를 찾는다.
+   *
+   * @throws BusinessException 없는 키일 때(SET-001)
+   */
+  public static SettingKey from(String name) {
+    for (SettingKey key : values()) {
+      if (key.name().equals(name)) {
+        return key;
+      }
+    }
+    throw new BusinessException(SettingErrorCode.INVALID_SETTING, "알 수 없는 설정 키입니다: " + name);
+  }
+
   public String description() {
     return description;
   }
