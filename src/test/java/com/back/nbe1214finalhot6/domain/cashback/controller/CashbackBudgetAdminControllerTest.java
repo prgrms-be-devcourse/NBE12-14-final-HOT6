@@ -123,7 +123,16 @@ class CashbackBudgetAdminControllerTest {
 
   private MonthlyBudgetResponse monthly(int month) {
     return new MonthlyBudgetResponse(
-        2026, month, 1_000_000L, 0L, 0L, 0L, 100_000L, 1_000_000L, BudgetStatus.ACTIVE);
+        2026,
+        month,
+        1_000_000L,
+        0L,
+        0L,
+        0L,
+        100_000L,
+        1_000_000L,
+        new java.math.BigDecimal("0.0300"),
+        BudgetStatus.ACTIVE);
   }
 
   // 목적: 월 배정 PUT 이 200 과 대비금·상태를 포함한 응답으로 내려가는지 확인한다.
@@ -143,6 +152,7 @@ class CashbackBudgetAdminControllerTest {
         .andExpect(jsonPath("$.data.budgetMonth").value(12))
         .andExpect(jsonPath("$.data.allocatedAmount").value(1_000_000))
         .andExpect(jsonPath("$.data.contingencyAmount").value(100_000))
+        .andExpect(jsonPath("$.data.baseRate").value(0.03))
         .andExpect(jsonPath("$.data.status").value("ACTIVE"));
   }
 
