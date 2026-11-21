@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
-import com.back.nbe1214finalhot6.domain.wallet.dto.MerchantWalletTransactionResponse;
 import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantAccount;
 import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantWallet;
 import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantWalletTransaction;
@@ -56,10 +55,8 @@ class MerchantWalletServiceTest {
   void 입금_잔액증가와_원장기록() {
     service.createFor(MERCHANT_ID);
 
-    MerchantWalletTransactionResponse response = service.deposit(MERCHANT_ID, 10_000L, 1L);
+    service.deposit(MERCHANT_ID, 10_000L, 1L);
 
-    assertThat(response.amount()).isEqualTo(10_000L);
-    assertThat(response.balanceAfter()).isEqualTo(10_000L);
     assertThat(walletRepository.findByMerchantId(MERCHANT_ID).orElseThrow().getBalance())
         .isEqualTo(10_000L);
     MerchantWalletTransaction saved =
@@ -67,6 +64,7 @@ class MerchantWalletServiceTest {
             .findByTypeAndRefKey(MerchantWalletTransactionType.SETTLEMENT_PAYOUT, 1L)
             .orElseThrow();
     assertThat(saved.getAmount()).isEqualTo(10_000L);
+    assertThat(saved.getBalanceAfter()).isEqualTo(10_000L);
   }
 
   @Test
@@ -75,9 +73,8 @@ class MerchantWalletServiceTest {
     service.createFor(MERCHANT_ID);
 
     service.deposit(MERCHANT_ID, 10_000L, 1L);
-    MerchantWalletTransactionResponse second = service.deposit(MERCHANT_ID, 10_000L, 1L);
+    service.deposit(MERCHANT_ID, 10_000L, 1L);
 
-    assertThat(second.balanceAfter()).isEqualTo(10_000L);
     assertThat(walletRepository.findByMerchantId(MERCHANT_ID).orElseThrow().getBalance())
         .isEqualTo(10_000L);
     assertThat(transactionRepository.count()).isEqualTo(1);
@@ -131,7 +128,8 @@ class MerchantWalletServiceTest {
                         () -> {
                           ready.countDown();
                           start.await();
-                          return service.deposit(MERCHANT_ID, 10_000L, 1L);
+                          service.deposit(MERCHANT_ID, 10_000L, 1L);
+                          return null;
                         }))
             .collect(java.util.stream.Collectors.toList());
     ready.await();
@@ -174,14 +172,18 @@ class MerchantWalletServiceTest {
     service.createFor(MERCHANT_ID);
     service.deposit(MERCHANT_ID, 10_000L, 1L);
 
-    MerchantWalletTransactionResponse response = service.withdrawToAccount(MERCHANT_ID, 4_000L, 1L);
+    service.withdrawToAccount(MERCHANT_ID, 4_000L, 1L);
 
-    assertThat(response.amount()).isEqualTo(-4_000L);
-    assertThat(response.balanceAfter()).isEqualTo(6_000L);
     MerchantWallet wallet = walletRepository.findByMerchantId(MERCHANT_ID).orElseThrow();
     MerchantAccount account = accountRepository.findByMerchantId(MERCHANT_ID).orElseThrow();
     assertThat(wallet.getBalance()).isEqualTo(6_000L);
     assertThat(account.getBalance()).isEqualTo(4_000L);
+    MerchantWalletTransaction saved =
+        transactionRepository
+            .findByTypeAndRefKey(MerchantWalletTransactionType.PAYOUT_TO_ACCOUNT, 1L)
+            .orElseThrow();
+    assertThat(saved.getAmount()).isEqualTo(-4_000L);
+    assertThat(saved.getBalanceAfter()).isEqualTo(6_000L);
   }
 
   @Test
