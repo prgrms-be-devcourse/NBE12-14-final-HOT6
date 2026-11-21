@@ -11,7 +11,7 @@ export type MerchantResponse = MerchantRegisterResponse;
 export type MerchantUpdateRequest = { name?: string; address?: string };
 export type PageResponse<T> = { content: T[]; page: number; size: number; totalElements: number; totalPages: number };
 
-export type PaymentRequest = { walletId: number; merchantId: number; qrId: number; amount: number };
+export type PaymentRequest = { walletId: number; merchantId: number; qrToken: string; amount: number };
 export type PaymentStatus = "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELED";
 export type PaymentResponse = {
   paymentId: number;
@@ -23,4 +23,10 @@ export type PaymentResponse = {
   appliedRate: number | null;
   cashbackPayableAt: string | null;
   cashbackExclusionReason: string | null;
+  failureCode?: string | null;
 };
+
+export type QrStatus = "WAITING" | "USED" | "EXPIRED";
+export type QrCreateResponse = { token: string; amount: number; expiresAt: string };
+export type QrScanResponse = { merchantId: number; merchantName: string; amount: number; cashbackEligible: boolean; expiresAt: string };
+export type QrStatusResponse = { status: QrStatus; expiresAt: string };

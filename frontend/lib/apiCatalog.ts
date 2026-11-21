@@ -24,6 +24,12 @@ export const BASE_CATALOG: Endpoint[] = [
   },
   {
     id: "POST /api/payments", method: "POST", path: "/api/payments", tag: "결제", summary: "변동 QR 결제", idempotency: true,
-    body: JSON.stringify({ walletId: 1, merchantId: 1, qrId: 1, amount: 12000 }, null, 2),
+    body: JSON.stringify({ walletId: 1, merchantId: 1, qrToken: "QR 생성 응답의 token", amount: 12000 }, null, 2),
   },
+  {
+    id: "POST /api/merchants/{merchantId}/qr/dynamic", method: "POST", path: "/api/merchants/1/qr/dynamic", tag: "QR", summary: "결제 QR 생성 (3분 만료)",
+    body: JSON.stringify({ amount: 12000 }, null, 2),
+  },
+  { id: "GET /api/qr/{token}", method: "GET", path: "/api/qr/{token}", tag: "QR", summary: "QR 스캔 조회" },
+  { id: "GET /api/qr/{token}/status", method: "GET", path: "/api/qr/{token}/status", tag: "QR", summary: "QR 상태 조회" },
 ];
