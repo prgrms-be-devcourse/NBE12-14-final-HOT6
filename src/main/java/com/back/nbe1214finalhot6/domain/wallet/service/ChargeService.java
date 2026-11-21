@@ -13,6 +13,7 @@ import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
 import com.back.nbe1214finalhot6.domain.wallet.repository.AccountTransactionRepository;
 import com.back.nbe1214finalhot6.domain.wallet.repository.ChargeRepository;
 import com.back.nbe1214finalhot6.domain.wallet.repository.WalletRepository;
+import jakarta.persistence.EntityManager;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -31,6 +32,7 @@ public class ChargeService {
   private final ChargeRepository chargeRepository;
   private final ChargeLimitService chargeLimitService;
   private final WalletService walletService;
+  private final EntityManager entityManager;
   private final Clock clock;
 
   /**
@@ -79,6 +81,9 @@ public class ChargeService {
         accountRepository
             .findByUserIdForUpdate(wallet.getUserId())
             .orElseThrow(() -> new BusinessException(WalletErrorCode.ACCOUNT_NOT_FOUND));
+    // 같은 트랜잭션에서 잠그기 전에 이 계좌를 먼저 읽었다면 JPA가 그때 읽은 낡은 객체를 돌려줌.
+    // 그대로 쓰면 그 사이 다른 요청이 커밋한 잔액 변경을 덮어쓰므로, 잠근 직후 DB의 최신 값으로 다시 읽음
+    entityManager.refresh(account);
     if (account.getBalance() < amount) {
       throw new BusinessException(WalletErrorCode.INSUFFICIENT_ACCOUNT_BALANCE);
     }

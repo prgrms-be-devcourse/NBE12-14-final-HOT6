@@ -38,6 +38,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 모의계좌 → 지갑 충전. 한도는 기본값(보유 200만원, 월 충전 100만원), 계좌 초기 잔액은 200만원. */
 @IntegrationTest
@@ -52,6 +55,7 @@ class ChargeServiceTest {
   @Autowired AccountTransactionRepository accountTransactionRepository;
   @Autowired WalletTransactionRepository walletTransactionRepository;
   @Autowired ChargeRepository chargeRepository;
+  @Autowired PlatformTransactionManager transactionManager;
 
   // 실제 동작은 그대로 두고, 지갑 입금이 실패하는 상황만 만들기 위한 spy
   @MockitoSpyBean WalletService walletService;
@@ -249,6 +253,37 @@ class ChargeServiceTest {
     assertThat(wallet().getBalance()).isEqualTo(1_000_000L);
   }
 
+  @Test
+  @DisplayName("잠그기 전에 계좌를 먼저 읽었어도 최신 잔액으로 차감한다(다른 요청의 충전이 사라지지 않음)")
+  void accountReadEarlier_usesLatestBalance() {
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(
+            status -> {
+              accountRepository.findByUserId(USER_ID); // 먼저 일반 조회(낡은 객체가 남음)
+              // 그 사이 다른 트랜잭션이 10만원을 충전하고 커밋
+              inNewTransaction(() -> chargeService.charge(walletId, 100_000L, "key-1"));
+              chargeService.charge(walletId, 100_000L, "key-2");
+            });
+
+    assertThat(account().getBalance()).isEqualTo(Account.INITIAL_BALANCE - 200_000L);
+    assertThat(wallet().getBalance()).isEqualTo(200_000L);
+  }
+
+  @Test
+  @DisplayName("잠그기 전에 지갑을 먼저 읽었어도 다른 요청의 충전이 사라지지 않는다")
+  void walletReadEarlier_doesNotLoseOtherCharge() {
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(
+            status -> {
+              walletRepository.findById(walletId); // 먼저 일반 조회(낡은 객체가 남음)
+              inNewTransaction(() -> chargeService.charge(walletId, 100_000L, "key-1"));
+              chargeService.charge(walletId, 100_000L, "key-2");
+            });
+
+    assertThat(wallet().getBalance()).isEqualTo(200_000L);
+    assertThat(account().getBalance()).isEqualTo(Account.INITIAL_BALANCE - 200_000L);
+  }
+
   // 충전이 실패했을 때 계좌 잔액·지갑·충전·원장이 모두 처음 그대로인지 확인
   private void assertNothingChanged(long accountBalance) {
     assertThat(account().getBalance()).isEqualTo(accountBalance);
@@ -256,6 +291,13 @@ class ChargeServiceTest {
     assertThat(charges()).isEmpty();
     assertThat(accountLedgers()).isEmpty();
     assertThat(walletLedgers()).isEmpty();
+  }
+
+  // 별도 트랜잭션으로 실행하고 커밋함. 다른 요청이 끼어든 상황을 만들 때 사용
+  private void inNewTransaction(Runnable action) {
+    TransactionTemplate template = new TransactionTemplate(transactionManager);
+    template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    template.executeWithoutResult(status -> action.run());
   }
 
   private Wallet wallet() {
