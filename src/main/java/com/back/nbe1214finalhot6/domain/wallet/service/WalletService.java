@@ -7,6 +7,7 @@ import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType;
 import com.back.nbe1214finalhot6.domain.wallet.exception.WalletErrorCode;
 import com.back.nbe1214finalhot6.domain.wallet.repository.WalletRepository;
 import com.back.nbe1214finalhot6.domain.wallet.repository.WalletTransactionRepository;
+import jakarta.persistence.EntityManager;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ public class WalletService {
 
   private final WalletRepository walletRepository;
   private final WalletTransactionRepository walletTransactionRepository;
+  private final EntityManager entityManager;
   private final Clock clock;
 
   /**
@@ -158,6 +160,9 @@ public class WalletService {
         walletRepository
             .findByIdForUpdate(walletId)
             .orElseThrow(() -> new BusinessException(WalletErrorCode.WALLET_NOT_FOUND));
+    // 같은 트랜잭션에서 잠그기 전에 이 지갑을 먼저 읽었다면 JPA가 그때 읽은 낡은 객체를 돌려줌.
+    // 그대로 쓰면 그 사이 다른 요청이 커밋한 변경(다른 칸 포함)을 덮어써서 입금이 사라지므로, 잠근 직후 DB의 최신 값으로 다시 읽음
+    entityManager.refresh(wallet);
 
     // 2. 이미 반영된 (type, refKey)는 건너뜀. 잠금 안에서 확인하므로 동시 요청도 한 번만 반영됨
     //    (유니크 위반 예외에 기대지 않음). 남은 게 없으면 정상 반환
