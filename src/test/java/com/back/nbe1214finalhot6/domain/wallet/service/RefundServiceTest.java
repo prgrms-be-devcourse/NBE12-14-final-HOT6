@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
@@ -64,6 +65,7 @@ class RefundServiceTest {
 
   // 실제 동작은 그대로 두고, 지갑 차감 직후 실패하는 상황만 만들기 위한 spy
   @MockitoSpyBean WalletService walletService;
+  @MockitoSpyBean AccountTransactionRepository accountTransactionRepositorySpy;
 
   private Long walletId;
 
@@ -250,6 +252,20 @@ class RefundServiceTest {
             })
         .when(walletService)
         .debit(any(), anyLong(), any(), any(), anyBoolean());
+
+    assertThatThrownBy(() -> refundService.refund(walletId, 100_000L, "key-1"))
+        .isInstanceOf(IllegalStateException.class);
+
+    assertNothingChanged();
+  }
+
+  @Test
+  @DisplayName("계좌 입금과 계좌 원장 기록에서 실패해도 지갑 차감과 환불 기록까지 모두 롤백된다")
+  void rollback_whenAccountLedgerSaveFails() {
+    // 지갑 차감과 환불 기록, 계좌 입금까지 끝난 뒤 계좌 원장 저장에서 실패하는 상황
+    doThrow(new IllegalStateException("계좌 원장 저장 실패"))
+        .when(accountTransactionRepositorySpy)
+        .save(any());
 
     assertThatThrownBy(() -> refundService.refund(walletId, 100_000L, "key-1"))
         .isInstanceOf(IllegalStateException.class);
