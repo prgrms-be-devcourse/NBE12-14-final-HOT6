@@ -16,6 +16,7 @@ import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserStatus;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
+import com.back.nbe1214finalhot6.domain.wallet.service.WalletOpeningService;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,7 @@ class AuthServiceTest {
 
   @Mock private UserRepository userRepository;
   @Mock private PasswordEncoder passwordEncoder;
+  @Mock private WalletOpeningService walletOpeningService;
   @InjectMocks private AuthService authService;
 
   private final SignupRequest request =
@@ -65,6 +67,9 @@ class AuthServiceTest {
     assertThat(response.name()).isEqualTo("홍길동");
     assertThat(response.email()).isEqualTo("user@example.com");
     assertThat(response.role()).isEqualTo(UserRole.USER);
+
+    // 저장된 회원의 ID로 모의계좌·지갑 생성을 요청하는지 확인
+    verify(walletOpeningService).open(saved.getId());
   }
 
   // 이메일이 중복이면 DUPLICATE_EMAIL 로 거절, 암호화나 저장까지 가지 않는지 확인
@@ -79,7 +84,7 @@ class AuthServiceTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(AuthErrorCode.DUPLICATE_EMAIL));
 
     verify(userRepository, never()).saveAndFlush(any());
-    verifyNoInteractions(passwordEncoder);
+    verifyNoInteractions(passwordEncoder, walletOpeningService);
   }
 
   // 전화번호가 중복이면 DUPLICATE_PHONE 으로 거절, 암호화나 저장까지 가지 않는지 확인
@@ -94,7 +99,7 @@ class AuthServiceTest {
             e -> assertThat(e.getErrorCode()).isEqualTo(AuthErrorCode.DUPLICATE_PHONE));
 
     verify(userRepository, never()).saveAndFlush(any());
-    verifyNoInteractions(passwordEncoder);
+    verifyNoInteractions(passwordEncoder, walletOpeningService);
   }
 
   // 사전 확인을 통과한 뒤 DB unique 제약에 걸리면(동시 가입) 제약 이름으로 중복 에러를 구분하는지 확인
