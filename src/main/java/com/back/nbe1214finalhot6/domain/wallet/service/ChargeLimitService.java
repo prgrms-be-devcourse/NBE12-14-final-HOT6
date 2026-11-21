@@ -51,22 +51,46 @@ public class ChargeLimitService {
         walletRepository
             .findBalanceById(walletId)
             .orElseThrow(() -> new BusinessException(WalletErrorCode.WALLET_NOT_FOUND));
-    long holdingLimit = operatorSettingService.getLong(SettingKey.WALLET_HOLDING_LIMIT);
-    if (amount > holdingLimit - balance) {
+    if (amount > holdingLimit() - balance) {
       throw new BusinessException(WalletErrorCode.HOLDING_LIMIT_EXCEEDED);
     }
 
     // 월 충전 한도: 이번 달 CHARGE 합계만 봄. REFUND는 빼지 않으므로 환불해도 한도가 복원되지 않음
-    long monthlyLimit = operatorSettingService.getLong(SettingKey.WALLET_MONTHLY_CHARGE_LIMIT);
-    YearMonth month = YearMonth.from(now);
-    long charged =
-        walletTransactionRepository.sumAmount(
-            walletId,
-            WalletTransactionType.CHARGE,
-            month.atDay(1).atStartOfDay(),
-            month.plusMonths(1).atDay(1).atStartOfDay());
-    if (amount > monthlyLimit - charged) {
+    if (amount > monthlyChargeLimit() - chargedThisMonth(walletId, now)) {
       throw new BusinessException(WalletErrorCode.MONTHLY_CHARGE_LIMIT_EXCEEDED);
     }
+  }
+
+  // 아래 네 메서드는 충전 검사와 지갑 조회 화면이 같은 규칙을 쓰도록 한 곳에 둠
+
+  /** 보유 한도(운영자 설정). 운영자가 바꾼 적이 없으면 기본값. */
+  public long holdingLimit() {
+    return operatorSettingService.getLong(SettingKey.WALLET_HOLDING_LIMIT);
+  }
+
+  /** 월 충전 한도(운영자 설정). 운영자가 바꾼 적이 없으면 기본값. */
+  public long monthlyChargeLimit() {
+    return operatorSettingService.getLong(SettingKey.WALLET_MONTHLY_CHARGE_LIMIT);
+  }
+
+  /**
+   * 이번 달 누적 충전액. now가 속한 달(한국 시간 달력월)의 지갑 원장 CHARGE 합계이며, REFUND는 빼지 않음.
+   */
+  public long chargedThisMonth(Long walletId, LocalDateTime now) {
+    YearMonth month = YearMonth.from(now);
+    return walletTransactionRepository.sumAmount(
+        walletId,
+        WalletTransactionType.CHARGE,
+        month.atDay(1).atStartOfDay(),
+        month.plusMonths(1).atDay(1).atStartOfDay());
+  }
+
+  /**
+   * 남은 충전 가능액. 보유 한도와 월 충전 한도 중 더 빡빡한 쪽이며, 한도를 이미 넘은 상태면 음수가 아니라 0. assertChargeable이 허용하는 최대 충전액과
+   * 같음.
+   */
+  public static long chargeableAmount(
+      long devMoney, long holdingLimit, long monthlyChargeLimit, long chargedThisMonth) {
+    return Math.max(0, Math.min(holdingLimit - devMoney, monthlyChargeLimit - chargedThisMonth));
   }
 }
