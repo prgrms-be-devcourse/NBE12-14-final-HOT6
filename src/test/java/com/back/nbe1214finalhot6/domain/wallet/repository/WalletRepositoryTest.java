@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.back.nbe1214finalhot6.domain.wallet.entity.Account;
 import com.back.nbe1214finalhot6.domain.wallet.entity.Wallet;
+import com.back.nbe1214finalhot6.domain.wallet.entity.WalletStatus;
 import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransaction;
 import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 /** 엔티티가 테이블로 만들어지고 DB 유니크 제약이 동작하는지 확인함. */
 @IntegrationTest
@@ -24,6 +26,7 @@ class WalletRepositoryTest {
   @Autowired WalletRepository walletRepository;
   @Autowired AccountRepository accountRepository;
   @Autowired WalletTransactionRepository walletTransactionRepository;
+  @Autowired JdbcTemplate jdbcTemplate;
 
   // 테스트가 DB에 남긴 행 정리(원장 → 지갑 → 계좌 순)
   @AfterEach
@@ -40,6 +43,21 @@ class WalletRepositoryTest {
 
     assertThatThrownBy(() -> walletRepository.saveAndFlush(Wallet.create(1L, NOW)))
         .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  @DisplayName("status 없이 SQL로 지갑을 넣어도 DB 기본값 ACTIVE로 저장된다")
+  void wallet_statusDefaultsToActive() {
+    // 엔티티를 거치지 않고 status를 뺀 채로 넣어, 컬럼의 DB 기본값을 확인
+    jdbcTemplate.update(
+        "INSERT INTO wallet (user_id, balance, cashback_balance, pending_cashback, updated_at)"
+            + " VALUES (?, 0, 0, 0, ?)",
+        900L,
+        NOW);
+
+    Wallet found = walletRepository.findByUserId(900L).orElseThrow();
+
+    assertThat(found.getStatus()).isEqualTo(WalletStatus.ACTIVE);
   }
 
   @Test
