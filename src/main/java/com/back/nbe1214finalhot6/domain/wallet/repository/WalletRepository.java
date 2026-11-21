@@ -17,4 +17,11 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT w FROM Wallet w WHERE w.id = :id")
   Optional<Wallet> findByIdForUpdate(@Param("id") Long id);
+
+  /**
+   * 데브머니 잔액만 값으로 읽음. 같은 트랜잭션에서 이미 읽어 둔 Wallet 엔티티(낡았을 수 있음)를 거치지 않고 DB의 현재 값을 읽음.
+   * 같은 트랜잭션에서 아직 저장하지 않은 변경은 이 조회 전에 자동으로 반영됨.
+   */
+  @Query("SELECT w.balance FROM Wallet w WHERE w.id = :id")
+  Optional<Long> findBalanceById(@Param("id") Long id);
 }

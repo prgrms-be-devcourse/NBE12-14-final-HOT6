@@ -16,7 +16,11 @@ public enum WalletErrorCode implements ErrorCode {
   // 금액
   INVALID_AMOUNT("WAL-003", HttpStatus.BAD_REQUEST, "금액은 0보다 커야 합니다"),
   INSUFFICIENT_BALANCE("WAL-004", HttpStatus.CONFLICT, "데브머니 잔액이 부족합니다"),
-  INSUFFICIENT_CASHBACK("WAL-005", HttpStatus.CONFLICT, "사용할 수 있는 캐시백이 부족합니다");
+  INSUFFICIENT_CASHBACK("WAL-005", HttpStatus.CONFLICT, "사용할 수 있는 캐시백이 부족합니다"),
+
+  // 충전 한도
+  HOLDING_LIMIT_EXCEEDED("WAL-006", HttpStatus.CONFLICT, "보유 한도를 초과하여 충전할 수 없습니다"),
+  MONTHLY_CHARGE_LIMIT_EXCEEDED("WAL-007", HttpStatus.CONFLICT, "월 충전 한도를 초과하여 충전할 수 없습니다");
 
   private final String code;
   private final HttpStatus status;

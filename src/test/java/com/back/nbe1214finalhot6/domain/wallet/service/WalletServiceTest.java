@@ -33,6 +33,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @IntegrationTest
@@ -416,6 +417,64 @@ class WalletServiceTest {
         .isInstanceOf(IllegalStateException.class);
 
     assertThat(walletRepository.findById(otherWalletId).orElseThrow().getBalance()).isZero();
+  }
+
+  @Test
+  @DisplayName("잠그기 전에 지갑을 먼저 읽었어도 최신 잔액으로 차감한다(다른 요청의 입금이 사라지지 않음)")
+  void debit_afterEarlierRead_usesLatestBalance() {
+    walletService.credit(walletId, 1_000_000L, CHARGE, null);
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(
+            status -> {
+              walletRepository.findById(walletId); // 먼저 일반 조회(낡은 객체가 남음)
+              // 그 사이 다른 트랜잭션이 90만원을 충전하고 커밋
+              inNewTransaction(() -> walletService.credit(walletId, 900_000L, CHARGE, null));
+              walletService.debit(walletId, 1L, PAYMENT_DEVMONEY, 1L, false);
+            });
+
+    assertThat(wallet().getBalance()).isEqualTo(1_899_999L);
+  }
+
+  @Test
+  @DisplayName("잠그기 전에 지갑을 먼저 읽었어도 다른 요청의 입금이 사라지지 않는다")
+  void credit_afterEarlierRead_doesNotLoseOtherDeposit() {
+    walletService.credit(walletId, 1_000_000L, CHARGE, null);
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(
+            status -> {
+              walletRepository.findById(walletId);
+              inNewTransaction(() -> walletService.credit(walletId, 900_000L, CHARGE, null));
+              walletService.credit(walletId, 1L, CHARGE, null);
+            });
+
+    assertThat(wallet().getBalance()).isEqualTo(1_900_001L);
+  }
+
+  @Test
+  @DisplayName("다른 요청이 캐시백을 입금한 뒤에도, 먼저 읽은 요청의 데브머니 입금이 캐시백 잔액을 덮어쓰지 않는다")
+  void credit_afterEarlierRead_doesNotOverwriteOtherColumn() {
+    walletService.credit(walletId, 1_000_000L, CHARGE, null);
+
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(
+            status -> {
+              walletRepository.findById(walletId);
+              // 그 사이 다른 트랜잭션이 캐시백 300원을 지급하고 커밋
+              inNewTransaction(() -> walletService.credit(walletId, 300L, CASHBACK_EARN, 1L));
+              walletService.credit(walletId, 100_000L, CHARGE, null);
+            });
+
+    assertThat(wallet().getBalance()).isEqualTo(1_100_000L);
+    assertThat(wallet().getCashbackBalance()).isEqualTo(300L);
+  }
+
+  // 별도 트랜잭션으로 실행하고 커밋함. 다른 요청이 끼어든 상황을 만들 때 사용
+  private void inNewTransaction(Runnable action) {
+    TransactionTemplate template = new TransactionTemplate(transactionManager);
+    template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    template.executeWithoutResult(status -> action.run());
   }
 
   // 결제 테스트용 사전 잔액 준비(충전금 입금과 캐시백 지급)
