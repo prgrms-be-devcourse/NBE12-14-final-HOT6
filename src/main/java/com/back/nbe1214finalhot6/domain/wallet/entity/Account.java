@@ -1,5 +1,7 @@
 package com.back.nbe1214finalhot6.domain.wallet.entity;
 
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.domain.wallet.exception.WalletErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -49,5 +51,18 @@ public class Account {
   // 초기 잔액을 채워서 생성. 생성 시각은 호출자가 Clock으로 만들어 넘김
   public static Account create(Long userId, LocalDateTime now) {
     return new Account(userId, now);
+  }
+
+  // 출금. 잔액이 모자라면 거절하고, 출금한 뒤의 잔액을 돌려줌
+  public long debit(long amount) {
+    // 호출 실수(버그)이므로 내부 방어로 막음. 금액 검증(WAL-003)은 서비스가 먼저 함
+    if (amount <= 0) {
+      throw new IllegalArgumentException("amount는 양수여야 함: " + amount);
+    }
+    if (balance < amount) {
+      throw new BusinessException(WalletErrorCode.INSUFFICIENT_ACCOUNT_BALANCE);
+    }
+    balance = balance - amount;
+    return balance;
   }
 }

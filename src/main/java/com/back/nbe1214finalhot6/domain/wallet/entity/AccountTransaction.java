@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import lombok.AccessLevel;
@@ -20,6 +21,11 @@ import lombok.NoArgsConstructor;
 @Entity
 @Table(
     name = "account_transaction",
+    uniqueConstraints =
+        // 같은 거래의 중복 기록 방지(충전 ID 등). ref_key가 null인 거래(가입 보너스)는 중복으로 보지 않음
+        @UniqueConstraint(
+            name = "uk_account_transaction_type_ref_key",
+            columnNames = {"type", "ref_key"}),
     // 계좌별 거래 내역 조회용
     indexes =
         @Index(
@@ -48,6 +54,10 @@ public class AccountTransaction {
   @Column(name = "balance_after", nullable = false, updatable = false)
   private long balanceAfter;
 
+  // 거래의 원인이 된 ID(충전 ID 등). 가입 보너스처럼 원인 행이 없으면 null
+  @Column(name = "ref_key", updatable = false)
+  private Long refKey;
+
   // 생성 시각. 엔티티가 만들지 않고 호출자가 Clock으로 만든 시각을 받음
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
@@ -58,6 +68,7 @@ public class AccountTransaction {
       AccountTransactionType type,
       long amount,
       long balanceAfter,
+      Long refKey,
       LocalDateTime createdAt) {
     // 필수 값을 빠뜨리면 DB까지 가기 전에 여기서 막음
     this.accountId = Objects.requireNonNull(accountId, "accountId는 필수");
@@ -69,5 +80,6 @@ public class AccountTransaction {
     }
     this.amount = amount;
     this.balanceAfter = balanceAfter;
+    this.refKey = refKey;
   }
 }
