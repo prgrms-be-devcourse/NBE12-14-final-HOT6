@@ -65,4 +65,14 @@ public class Account {
     balance = balance - amount;
     return balance;
   }
+
+  // 입금. 입금한 뒤의 잔액을 돌려줌
+  public long credit(long amount) {
+    // 호출 실수(버그)이므로 내부 방어로 막음. 금액 검증(WAL-003)은 서비스가 먼저 함
+    if (amount <= 0) {
+      throw new IllegalArgumentException("amount는 양수여야 함: " + amount);
+    }
+    balance = Math.addExact(balance, amount);
+    return balance;
+  }
 }
