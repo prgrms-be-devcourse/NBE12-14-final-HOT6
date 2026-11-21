@@ -24,4 +24,10 @@ public interface WalletRepository extends JpaRepository<Wallet, Long> {
    */
   @Query("SELECT w.balance FROM Wallet w WHERE w.id = :id")
   Optional<Long> findBalanceById(@Param("id") Long id);
+
+  /**
+   * 지갑 요약(ID, 데브머니·캐시백 잔액, 상태)을 값으로 읽음. 조회 화면용.
+   * 엔티티가 아니라 값만 읽어서, 같은 요청에서 이미 읽어 둔 낡은 Wallet 엔티티에 영향받지 않음.
+   */
+  Optional<WalletSummary> findSummaryByUserId(Long userId);
 }
