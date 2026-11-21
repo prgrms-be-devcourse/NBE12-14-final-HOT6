@@ -48,11 +48,11 @@ export type Accrual = {
 };
 
 export const accruals: Accrual[] = [
-  { id: "a1", merchant: "○○카페", date: "11.17", desc: "결제 12,000원 × 2.0%", amount: 240, status: "예정" },
-  { id: "a2", merchant: "△△마트", date: "11.16", desc: "결제 9,000원 × 2.0%", amount: 180, status: "예정" },
+  { id: "a1", merchant: "○○카페", date: "11.17", desc: "결제 12,000원 × 10%", amount: 1200, status: "예정" },
+  { id: "a2", merchant: "△△마트", date: "11.16", desc: "결제 9,000원 × 10%", amount: 900, status: "예정" },
   { id: "a3", merchant: "□□서점", date: "11.14", desc: "제외: 예산 소진", amount: 0, status: "제외" },
-  { id: "a4", merchant: "○○카페", date: "11.05", desc: "결제 12,000원 × 2.0%", amount: 240, status: "지급완료" },
-  { id: "a5", merchant: "◇◇분식", date: "11.03", desc: "결제 6,000원 × 2.0%", amount: 120, status: "지급완료" },
+  { id: "a4", merchant: "○○카페", date: "11.05", desc: "결제 12,000원 × 10%", amount: 1200, status: "지급완료" },
+  { id: "a5", merchant: "◇◇분식", date: "11.03", desc: "결제 6,000원 × 10%", amount: 600, status: "지급완료" },
 ];
 
 export const user = { name: "홍길동", email: "hong@mail.com", maskedEmail: "ab***@gmail.com" };
@@ -80,18 +80,11 @@ export const dailySettles = [
   { date: "11.12", net: 356000, carry: 0 },
 ];
 
-export const budgetRows = [
-  { month: "9월", assigned: "800만", spent: "710만", reserved: "0", left: "90만" },
-  { month: "10월", assigned: "800만", spent: "650만", reserved: "40만", left: "110만" },
-  { month: "11월", assigned: "800만", spent: "420만", reserved: "180만", left: "200만" },
-  { month: "12월", assigned: "800만", spent: "-", reserved: "-", left: "800만" },
-];
-
 export const policyHistory = [
-  { date: "11.01", rate: "2.0% → 1.5%", period: "12.01 ~", note: "예고 발송" },
-  { date: "10.01", rate: "1.5% → 2.0%", period: "10.01 ~ 11.30", note: "시행" },
-  { date: "09.01", rate: "2.5% → 1.5%", period: "09.01 ~ 09.30", note: "시행" },
-  { date: "08.01", rate: "신규 2.5%", period: "08.01 ~ 08.31", note: "시행" },
+  { date: "11.01", rate: "10% → 5%", period: "12.01 ~", note: "예고 발송" },
+  { date: "10.01", rate: "5% → 10%", period: "10.01 ~ 11.30", note: "시행" },
+  { date: "09.01", rate: "15% → 5%", period: "09.01 ~ 09.30", note: "시행" },
+  { date: "08.01", rate: "신규 15%", period: "08.01 ~ 08.31", note: "시행" },
 ];
 
 export const weekdays = ["월", "화", "수", "목", "금", "토", "일"];

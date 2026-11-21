@@ -13,7 +13,7 @@ export default function CashbackPage() {
       <Header title="내 캐시백" />
       <div className="space-y-3 px-5 pb-4">
         <div className="rounded-xl border border-amber-500 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
-          <span className="font-semibold">정책 변경 예고</span> · 다음 달부터 요율 2.0% → 1.5%
+          <span className="font-semibold">정책 변경 예고</span> · 다음 달부터 요율 10% → 5%
         </div>
         <section className="card">
           <div className="note">이번 달 캐시백</div>

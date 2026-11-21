@@ -19,7 +19,7 @@ export default function MerchantQrPage() {
 
   return (
     <>
-      <Header title="동적 QR 생성" />
+      <Header title="QR 생성" />
       <div className="space-y-4 px-5 pb-5">
         <div>
           <label htmlFor="amt" className="label">결제 금액</label>
@@ -36,7 +36,7 @@ export default function MerchantQrPage() {
         <button type="button" onClick={create} disabled={amount === 0 || amount > LIMITS.perPayment} className="btn btn-primary disabled:opacity-40">QR 생성</button>
         {gen && (
           <section className="card text-center">
-            <div className={`mx-auto grid h-44 w-44 grid-cols-7 gap-0.5 rounded-lg border-2 border-blue-600 p-2 ${status === "대기중" ? "" : "opacity-30"}`} aria-label="QR 코드 자리">
+            <div className={`mx-auto grid h-44 w-44 grid-cols-7 gap-0.5 rounded-lg border-2 border-brand-600 p-2 ${status === "대기중" ? "" : "opacity-30"}`} aria-label="QR 코드 자리">
               {Array.from({ length: 49 }, (_, i) => <span key={i} className={((i * 7 + (i >> 2)) % 3 === 0) ? "bg-slate-800" : "bg-slate-100"} />)}
             </div>
             <p className="mt-3 text-sm">남은 시간 {status === "대기중" ? <Countdown key={gen} seconds={179} onExpire={expire} className="font-semibold" /> : <span className="font-semibold">00:00</span>}</p>
@@ -51,9 +51,8 @@ export default function MerchantQrPage() {
           </div>
         </div>
         {gen && status === "대기중" && (
-          <Link href="/merchant/paid" className="btn btn-outline btn-sm">(데모) 이용자가 결제함</Link>
+          <Link href="/merchant/paid" className="btn btn-outline btn-sm">(데모) 회원이 결제함</Link>
         )}
-        <div className="card-dash"><ul className="space-y-0.5"><li>• 3분 후 자동 만료</li><li>• 사용된 QR은 재사용 불가</li><li>• 이용자가 스캔하면 결제 진행</li></ul></div>
       </div>
     </>
   );

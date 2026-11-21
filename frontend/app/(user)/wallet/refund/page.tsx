@@ -16,7 +16,7 @@ export default function RefundPage() {
       <div className="space-y-4 px-5">
         <div className="card-gray flex items-baseline justify-between">
           <span className="text-[13px] text-zinc-500">환불 가능 잔액</span>
-          <span className="text-lg font-semibold text-blue-900">{won(max)}</span>
+          <span className="text-lg font-semibold text-slate-900">{won(max)}</span>
         </div>
         <div>
           <label htmlFor="amt" className="label">환불 금액</label>
@@ -37,15 +37,9 @@ export default function RefundPage() {
         </div>
         <div className="flex items-baseline justify-between border-t border-zinc-200 pt-3">
           <span className="text-[13px] text-zinc-500">환불 후 잔액</span>
-          <span className="text-xl font-bold text-blue-900">{won(max - amount)}</span>
+          <span className="text-xl font-bold text-slate-900">{won(max - amount)}</span>
         </div>
         <Link href="/wallet" aria-disabled={amount === 0} className={`btn btn-danger ${amount === 0 ? "pointer-events-none opacity-40" : ""}`}>환불하기</Link>
-        <div className="card-dash">
-          <ul className="space-y-0.5">
-            <li>• 환불 금액은 모의계좌로 입금</li>
-            <li>• 거래내역에 환불로 기록</li>
-          </ul>
-        </div>
       </div>
     </>
   );

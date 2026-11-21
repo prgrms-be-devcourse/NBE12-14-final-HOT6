@@ -18,7 +18,7 @@ export default function MerchantNav() {
       {TABS.map((t) => {
         const on = t.match.some((m) => path.startsWith(m));
         return (
-          <Link key={t.href} href={t.href} aria-current={on ? "page" : undefined} className={`flex flex-col items-center gap-1 pb-2.5 pt-2.5 text-[12px] tracking-tight ${on ? "font-bold text-emerald-600" : "text-slate-500"}`}>
+          <Link key={t.href} href={t.href} aria-current={on ? "page" : undefined} className={`flex flex-col items-center gap-1 pb-2.5 pt-2 text-[12px] tracking-tight ${on ? "border-t-2 border-brand-600 font-bold text-brand-600" : "border-t-2 border-transparent text-slate-500"}`}>
             {t.icon}
             {t.label}
           </Link>

@@ -20,6 +20,7 @@ export default function MerchantRegisterPage() {
   const [pos, setPos] = useState<LatLng | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
   useEffect(() => setOwnerId(loadCtx().ownerId), []);
 
   const submit = async (e: React.FormEvent) => {
@@ -43,9 +44,8 @@ export default function MerchantRegisterPage() {
       <form onSubmit={submit} className="space-y-3 px-5 pb-5">
         <label className="block"><span className="label">가맹점명</span><input className="field" required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="block"><span className="label">주소</span><input className="field" required maxLength={200} value={address} onChange={(e) => setAddress(e.target.value)} /></label>
-        <label className="block"><span className="label">업종 (지도 마크에 표시 · API 미지원 · 이 브라우저에만 저장)</span><select className="field" value={category} onChange={(e) => setCategory(e.target.value)}>{CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.icon} {c.value}</option>)}</select></label>
-        <label className="block"><span className="label">연락처 (API 미지원 · 전송 안 함)</span><input className="field" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
-        <label className="block"><span className="label">ownerId (개발용 · 인증 연동 전 임시)</span><input className="field" inputMode="numeric" value={ownerId} onChange={(e) => setOwnerId(Number(e.target.value.replace(/\D/g, "")) || 0)} /></label>
+        <label className="block"><span className="label">업종</span><select className="field" value={category} onChange={(e) => setCategory(e.target.value)}>{CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.icon} {c.value}</option>)}</select></label>
+        <label className="block"><span className="label">연락처</span><input className="field" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} /></label>
         <div className="card space-y-2 !p-3.5">
           <div>
             <span className="block text-sm font-semibold">캐시백 적립 대상 증빙</span>
@@ -59,11 +59,11 @@ export default function MerchantRegisterPage() {
         <div>
           <span className="label">지도 (위치 선택)</span>
           <MapPicker value={pos} onChange={setPos} />
-          <p className="note mt-1">{pos ? `선택한 위치 ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)} (좌표는 API 미지원 · 이 브라우저에만 저장)` : "지도를 눌러 가맹점 위치를 선택하세요"}</p>
+          <p className="note mt-1">{pos ? `선택한 위치 ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}` : "지도를 눌러 가맹점 위치를 선택하세요"}</p>
         </div>
+        <p className="note">연락처, 업종, 위치는 이 기기에만 저장되고 서버로 전송되지 않아요.</p>
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">{error}</p>}
         <button type="submit" disabled={busy || !name.trim() || !address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "등록 중…" : "등록"}</button>
-        <div className="card-dash"><ul className="space-y-0.5"><li>• POST /api/merchants 로 등록됩니다</li><li>• 증빙 서류를 첨부하면 revenueProof 가 함께 전송됩니다</li><li>• 등록 후 merchantId 가 개발용 식별자에 저장됩니다</li></ul></div>
       </form>
     </>
   );

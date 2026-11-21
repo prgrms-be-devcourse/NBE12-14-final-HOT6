@@ -22,7 +22,6 @@ export default function MerchantMonthlyPage() {
           </div>
           <p className="note mt-2">이월 {won(0)}</p>
         </section>
-        <div className="card-dash"><ul className="space-y-0.5"><li>• 월 정산은 일 정산 합계 기준</li><li>• 월 마감 후 확정</li></ul></div>
       </div>
     </>
   );

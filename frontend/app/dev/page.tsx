@@ -3,22 +3,22 @@ import DevContextPanel from "@/components/DevContextPanel";
 
 type Item = { href: string; label: string; star?: boolean };
 const LANES: { title: string; note?: string; items: Item[] }[] = [
-  { title: "이용자 앱 · 가입 / 로그인", items: [
+  { title: "회원 앱 · 가입 / 로그인", items: [
     { href: "/signup", label: "① 회원가입", star: true }, { href: "/pin-setup", label: "② 간편비밀번호 설정" },
     { href: "/login", label: "③ 로그인", star: true }, { href: "/pin", label: "④ 간편비밀번호 입력" }, { href: "/locked", label: "⑤ 잠금 · 이메일 인증" } ] },
-  { title: "이용자 앱 · 지갑 / 충전 / 환불", items: [
+  { title: "회원 앱 · 지갑 / 충전 / 환불", items: [
     { href: "/wallet", label: "⑥ 지갑 홈", star: true }, { href: "/wallet/charge", label: "⑦ 충전 금액 입력", star: true },
     { href: "/wallet/pg?amount=50000", label: "⑧ PG 결제" }, { href: "/wallet?charged=50000", label: "⑨ 충전 후 지갑 홈", star: true }, { href: "/wallet/refund", label: "⑩ 지갑 환불" } ] },
-  { title: "이용자 앱 · 결제 / 캐시백", items: [
+  { title: "회원 앱 · 결제 / 캐시백", items: [
     { href: "/pay/scan", label: "⑪ QR 스캔 · 미리보기", star: true }, { href: "/stores", label: "가맹점 찾기 (추가)" }, { href: "/pay/receipt", label: "⑫ 결제 완료 · 영수증", star: true },
     { href: "/pay/history", label: "⑬ 결제 내역 · 취소" }, { href: "/cashback", label: "⑭ 내 캐시백" }, { href: "/cashback/accruals", label: "⑮ 캐시백 적립내역" } ] },
-  { title: "이용자 앱 · 마이페이지", items: [
+  { title: "회원 앱 · 마이페이지", items: [
     { href: "/my", label: "⑯ 마이페이지" }, { href: "/my/profile", label: "⑰ 내정보 수정" }, { href: "/my/withdraw", label: "⑱ 회원 탈퇴 · 정산" } ] },
   { title: "사장님 앱", items: [
     { href: "/merchant/register", label: "① 가맹점 등록", star: true }, { href: "/merchant/edit", label: "② 정보 · 상태관리" },
-    { href: "/merchant/qr", label: "③ 동적 QR 생성", star: true }, { href: "/merchant/paid", label: "④ QR 결제 완료 확인", star: true },
+    { href: "/merchant/qr", label: "③ QR 생성", star: true }, { href: "/merchant/paid", label: "④ QR 결제 완료 확인", star: true },
     { href: "/merchant/payments", label: "⑤ 결제 내역" }, { href: "/merchant/daily", label: "⑥ 일 정산" }, { href: "/merchant/monthly", label: "⑦ 월 정산" } ] },
-  { title: "운영자", items: [
+  { title: "운영팀", items: [
     { href: "/admin", label: "① 대시보드" }, { href: "/admin/policy", label: "② 정책 · 예산 관리", star: true }, { href: "/admin/settle", label: "③ 정산 · 원장 대사" } ] },
 ];
 

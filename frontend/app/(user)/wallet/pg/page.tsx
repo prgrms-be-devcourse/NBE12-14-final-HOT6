@@ -35,10 +35,6 @@ function PgForm() {
         <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" className="h-4 w-4" /> 결제 정보 제공 동의</label>
       </div>
       <Link href={`/wallet?charged=${amount}`} className="btn btn-primary">{won(amount)} 결제</Link>
-      <div className="card-dash">
-        <div className="mb-1 font-semibold">결제 후 처리</div>
-        <p>① PG 승인 ② 서버 승인 검증 ③ 지갑 충전 반영 → 완료 화면</p>
-      </div>
     </div>
   );
 }

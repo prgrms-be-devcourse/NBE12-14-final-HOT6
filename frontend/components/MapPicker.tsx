@@ -13,7 +13,9 @@ export default function MapPicker({ value, onChange, height = 180 }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const state = useRef<{ map: import("leaflet").Map; marker: import("leaflet").CircleMarker | null; L: typeof import("leaflet") } | null>(null);
   const cb = useRef(onChange);
-  cb.current = onChange;
+  useEffect(() => {
+    cb.current = onChange;
+  });
 
   useEffect(() => {
     let dead = false;

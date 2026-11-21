@@ -13,6 +13,7 @@ const FIELDS: [NumKey, string][] = [
 
 export default function DevContextPanel() {
   const [ctx, setCtx] = useState<DevContext>(DEFAULT_CTX);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
   useEffect(() => setCtx(loadCtx()), []);
   const change = (k: NumKey, v: string) => {
     const n = Number(v.replace(/\D/g, "")) || 0;
