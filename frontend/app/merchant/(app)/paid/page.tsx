@@ -3,13 +3,13 @@ import Header from "@/components/Header";
 import { won } from "@/lib/format";
 
 export default function MerchantPaidPage() {
-  const rows = [["결제번호", "PAY-0001"], ["결제 시각", "11.17 12:31"], ["이용자", "○○○님"]];
+  const rows = [["결제번호", "PAY-0001"], ["결제 시각", "11.17 12:31"], ["회원", "○○○님"]];
   return (
     <>
       <Header title="QR 결제 완료 확인" />
       <div className="space-y-4 px-5 pb-5">
         <div>
-          <span className="label">동적 QR</span>
+          <span className="label">QR</span>
           <div className="flex gap-2">{["대기중", "결제완료", "만료"].map((s) => <span key={s} className={`chip flex-1 text-center ${s === "결제완료" ? "chip-on" : ""}`}>{s}</span>)}</div>
         </div>
         <section className="card text-center">

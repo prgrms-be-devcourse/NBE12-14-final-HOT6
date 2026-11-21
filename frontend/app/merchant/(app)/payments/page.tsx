@@ -18,7 +18,6 @@ export default function MerchantPaymentsPage() {
             </li>
           ))}
         </ul>
-        <div className="card-dash"><ul className="space-y-0.5"><li>• 취소 건은 순매출에서 차감</li><li>• 이용자 이름은 마스킹</li></ul></div>
       </div>
     </>
   );

@@ -43,13 +43,6 @@ export default function PayHistoryPage() {
             </li>
           ))}
         </ul>
-        <div className="card-dash mt-4">
-          <ul className="space-y-0.5">
-            <li>• 취소 시 지갑 환급 · 적립 취소</li>
-            <li>• 중복 취소 방지</li>
-            <li>• 같은 요청 재전송 시 기존 결과 반환</li>
-          </ul>
-        </div>
       </div>
     </>
   );

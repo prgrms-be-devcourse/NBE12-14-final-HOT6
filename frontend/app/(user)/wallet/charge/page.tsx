@@ -22,7 +22,7 @@ export default function ChargePage() {
       <div className="space-y-4 px-5">
         <div className="card-gray flex items-baseline justify-between">
           <span className="text-[13px] text-zinc-500">현재 잔액</span>
-          <span className="text-lg font-semibold text-blue-900">{won(wallet.devMoney)}</span>
+          <span className="text-lg font-semibold text-slate-900">{won(wallet.devMoney)}</span>
         </div>
         <div>
           <label htmlFor="amt" className="label">충전 금액</label>
@@ -46,14 +46,6 @@ export default function ChargePage() {
           <span className="amt-in text-xl font-bold">{won(wallet.devMoney + amount)}</span>
         </div>
         <Link href={`/wallet/pg?amount=${amount}`} aria-disabled={amount === 0 || !!error} className={`btn btn-primary ${amount === 0 || error ? "pointer-events-none opacity-40" : ""}`}>충전하기</Link>
-        <div className="card-dash">
-          <ul className="space-y-0.5">
-            <li>• 월 충전 한도 {won(LIMITS.monthlyCharge)} · 이번 달 {won(wallet.monthlyCharged)} 사용</li>
-            <li>• 지갑 보유 한도 {won(LIMITS.holding)}</li>
-            <li>• 충전하기 → PG 결제창으로 이동</li>
-            <li>• 승인 완료 후 지갑에 잔액 반영</li>
-          </ul>
-        </div>
       </div>
     </>
   );

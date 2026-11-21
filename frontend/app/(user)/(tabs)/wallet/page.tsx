@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import Amount from "@/components/Amount";
 import Header from "@/components/Header";
 import Progress from "@/components/Progress";
 import TxRow from "@/components/TxRow";
@@ -9,7 +10,7 @@ import { wallet, walletTxs, type Tx } from "@/lib/mock";
 export default function WalletPage({ searchParams }: { searchParams: Promise<{ charged?: string }> }) {
   return (
     <>
-      <Header title="내 지갑" right={<Link href="/my">마이페이지</Link>} />
+      <Header title="내 지갑" />
       <Suspense fallback={null}>
         <WalletBody searchParams={searchParams} />
       </Suspense>
@@ -31,19 +32,16 @@ async function WalletBody({ searchParams }: { searchParams: Promise<{ charged?: 
     <>
       <div className="px-5">
         {done && (
-          <p role="status" className="mb-3 rounded-full bg-blue-600 py-2 text-center text-[13px] font-semibold text-white">
+          <p role="status" className="mb-3 rounded-lg bg-brand-600 py-2.5 text-center text-[13px] font-bold text-white">
             {won(amount)} 충전이 완료되었습니다
           </p>
         )}
-        <section className="card-gray">
-          <div className="flex items-baseline justify-between">
-            <span className="text-[13px] text-zinc-500">캐시백 잔액</span>
-            <span className="amt-cb text-[22px] font-semibold">{won(wallet.cashbackBalance)}</span>
-          </div>
-          <div className="my-3 h-px bg-blue-100" />
-          <div className="flex items-baseline justify-between">
-            <span className="text-[13px] text-zinc-500">데브머니 잔액</span>
-            <span className="text-[26px] font-bold text-blue-900">{won(balance)}</span>
+        <section className="card !p-5">
+          <span className="text-[13px] font-medium text-slate-500">데브머니 잔액</span>
+          <div className="mt-0.5"><Amount value={balance} size="xl" /></div>
+          <div className="mt-2 flex items-baseline justify-between border-t border-slate-200 pt-2.5">
+            <span className="text-[13px] text-slate-500">캐시백 잔액</span>
+            <Amount value={wallet.cashbackBalance} kind="cashback" size="md" />
           </div>
           <div className="mt-4 flex gap-2.5">
             <Link href="/wallet/charge" className="btn btn-primary">충전</Link>
@@ -53,7 +51,7 @@ async function WalletBody({ searchParams }: { searchParams: Promise<{ charged?: 
 
         <section className="card mt-3">
           <div className="flex justify-between">
-            <span className="font-medium">이번 달 캐시백 적립</span>
+            <span className="font-bold">이번 달 캐시백 적립</span>
             <span className="text-[13px]">
               {wallet.monthlyCashback.toLocaleString("ko-KR")} / {won(wallet.monthlyLimit)}
             </span>
@@ -66,7 +64,10 @@ async function WalletBody({ searchParams }: { searchParams: Promise<{ charged?: 
           <p className="note mt-1.5">월 적립 한도 {won(wallet.monthlyLimit)} 중 {won(wallet.monthlyCashback)} 적립 (적립 예정 포함)</p>
         </section>
 
-        <h2 className="mx-1.5 mb-1.5 mt-5 text-base font-medium">거래내역</h2>
+        <div className="mx-1.5 mb-1.5 mt-6 flex items-baseline justify-between">
+          <h2 className="text-base font-bold">거래내역</h2>
+          <span className="note tabular-nums">{txs[0].date.slice(0, 5)} ~ {txs[txs.length - 1].date.slice(0, 5)} · {txs.length}건</span>
+        </div>
         <ul className="pb-4">
           {txs.map((t) => <TxRow key={t.id} tx={t} />)}
         </ul>
