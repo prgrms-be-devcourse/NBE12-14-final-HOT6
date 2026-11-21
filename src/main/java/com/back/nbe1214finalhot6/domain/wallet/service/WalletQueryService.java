@@ -39,20 +39,17 @@ public class WalletQueryService {
       throw new BusinessException(WalletErrorCode.WALLET_WITHDRAWN);
     }
 
-    LocalDateTime now = LocalDateTime.now(clock);
-    long holdingLimit = chargeLimitService.holdingLimit();
-    long monthlyChargeLimit = chargeLimitService.monthlyChargeLimit();
-    long chargedThisMonth = chargeLimitService.chargedThisMonth(wallet.getId(), now);
+    // 한도 현황은 충전 검사가 쓰는 ChargeLimitService에서 받음(같은 설정값, 같은 계산)
+    ChargeLimitUsage limits = chargeLimitService.usage(wallet.getId(), LocalDateTime.now(clock));
 
     return new WalletResponse(
         wallet.getBalance(),
         wallet.getCashbackBalance(),
         // 캐시백 잔액이 음수(회수로 생긴 부채)면 쓸 수 있는 캐시백은 0
         Math.max(0, wallet.getCashbackBalance()),
-        holdingLimit,
-        monthlyChargeLimit,
-        chargedThisMonth,
-        ChargeLimitService.chargeableAmount(
-            wallet.getBalance(), holdingLimit, monthlyChargeLimit, chargedThisMonth));
+        limits.holdingLimit(),
+        limits.monthlyChargeLimit(),
+        limits.chargedThisMonth(),
+        limits.chargeableAmount(wallet.getBalance()));
   }
 }
