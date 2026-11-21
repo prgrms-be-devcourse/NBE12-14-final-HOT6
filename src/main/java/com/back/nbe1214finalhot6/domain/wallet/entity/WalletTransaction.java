@@ -69,8 +69,8 @@ public class WalletTransaction {
   @Column(name = "balance_after", nullable = false, updatable = false)
   private long balanceAfter;
 
-  // 멱등 키. 적립 건 ID, 결제 ID 등 호출자가 정함.
-  // 충전·환불은 null이며(유니크에서 null끼리는 중복으로 보지 않음), 중복 방지는 charge·refund의 idempotency_key가 맡음
+  // 멱등 키. 적립 건 ID, 결제 ID, 충전 ID 등 호출자가 정함.
+  // 원인 행이 없으면 null이며(유니크에서 null끼리는 중복으로 보지 않음), 충전의 중복 방지는 charge의 idempotency_key가 맡음
   @Column(name = "ref_key", updatable = false)
   private Long refKey;
 
