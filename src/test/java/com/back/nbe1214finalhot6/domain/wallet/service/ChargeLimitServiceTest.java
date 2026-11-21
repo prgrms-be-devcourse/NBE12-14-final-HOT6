@@ -24,6 +24,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** 보유 한도(기본 200만원)와 월 충전 한도(기본 100만원) 검사를 확인함. 월은 한국 시간 달력월. */
 @IntegrationTest
@@ -36,6 +40,8 @@ class ChargeLimitServiceTest {
   @Autowired WalletRepository walletRepository;
   @Autowired WalletTransactionRepository walletTransactionRepository;
   @Autowired OperatorSettingRepository operatorSettingRepository;
+  @Autowired WalletService walletService;
+  @Autowired PlatformTransactionManager transactionManager;
 
   // 테스트가 DB에 남긴 행 정리(원장 → 지갑 → 설정 순)
   @AfterEach
@@ -50,10 +56,10 @@ class ChargeLimitServiceTest {
   void holdingLimit_boundary() {
     Wallet wallet = wallet(1, 1_500_000L, 0L);
 
-    assertThatCode(() -> chargeLimitService.assertChargeable(wallet, 500_000L, NOW))
+    assertThatCode(() -> check(wallet.getId(), 500_000L, NOW))
         .doesNotThrowAnyException();
     assertFails(
-        () -> chargeLimitService.assertChargeable(wallet, 500_001L, NOW),
+        () -> check(wallet.getId(), 500_001L, NOW),
         WalletErrorCode.HOLDING_LIMIT_EXCEEDED);
   }
 
@@ -63,7 +69,7 @@ class ChargeLimitServiceTest {
     // 캐시백 300만원이 보유 한도에 포함된다면 100만원 충전도 거절됨(월 한도는 100만원이라 딱 맞음)
     Wallet wallet = wallet(1, 0L, 3_000_000L);
 
-    assertThatCode(() -> chargeLimitService.assertChargeable(wallet, 1_000_000L, NOW))
+    assertThatCode(() -> check(wallet.getId(), 1_000_000L, NOW))
         .doesNotThrowAnyException();
   }
 
@@ -74,10 +80,10 @@ class ChargeLimitServiceTest {
     ledger(wallet, CHARGE, 600_000L, LocalDateTime.of(2026, 11, 5, 10, 0));
     ledger(wallet, CHARGE, 300_000L, LocalDateTime.of(2026, 11, 10, 10, 0));
 
-    assertThatCode(() -> chargeLimitService.assertChargeable(wallet, 100_000L, NOW))
+    assertThatCode(() -> check(wallet.getId(), 100_000L, NOW))
         .doesNotThrowAnyException();
     assertFails(
-        () -> chargeLimitService.assertChargeable(wallet, 100_001L, NOW),
+        () -> check(wallet.getId(), 100_001L, NOW),
         WalletErrorCode.MONTHLY_CHARGE_LIMIT_EXCEEDED);
   }
 
@@ -90,13 +96,12 @@ class ChargeLimitServiceTest {
     // 같은 달의 마지막 순간에는 한도가 찬 상태
     assertFails(
         () ->
-            chargeLimitService.assertChargeable(wallet, 1L, LocalDateTime.of(2026, 11, 30, 23, 59, 59)),
+            check(wallet.getId(), 1L, LocalDateTime.of(2026, 11, 30, 23, 59, 59)),
         WalletErrorCode.MONTHLY_CHARGE_LIMIT_EXCEEDED);
     // 12월 1일 0시부터는 새 달
     assertThatCode(
             () ->
-                chargeLimitService.assertChargeable(
-                    wallet, 1_000_000L, LocalDateTime.of(2026, 12, 1, 0, 0)))
+                check(wallet.getId(), 1_000_000L, LocalDateTime.of(2026, 12, 1, 0, 0)))
         .doesNotThrowAnyException();
   }
 
@@ -107,10 +112,10 @@ class ChargeLimitServiceTest {
     ledger(wallet, CHARGE, 400_000L, LocalDateTime.of(2026, 10, 31, 23, 59, 59)); // 지난달, 제외
     ledger(wallet, CHARGE, 600_000L, LocalDateTime.of(2026, 11, 1, 0, 0, 0)); // 이번 달, 포함
 
-    assertThatCode(() -> chargeLimitService.assertChargeable(wallet, 400_000L, NOW))
+    assertThatCode(() -> check(wallet.getId(), 400_000L, NOW))
         .doesNotThrowAnyException();
     assertFails(
-        () -> chargeLimitService.assertChargeable(wallet, 400_001L, NOW),
+        () -> check(wallet.getId(), 400_001L, NOW),
         WalletErrorCode.MONTHLY_CHARGE_LIMIT_EXCEEDED);
   }
 
@@ -121,10 +126,10 @@ class ChargeLimitServiceTest {
     ledger(wallet, CHARGE, 900_000L, LocalDateTime.of(2026, 11, 5, 10, 0));
     ledger(wallet, REFUND, -500_000L, LocalDateTime.of(2026, 11, 10, 10, 0));
 
-    assertThatCode(() -> chargeLimitService.assertChargeable(wallet, 100_000L, NOW))
+    assertThatCode(() -> check(wallet.getId(), 100_000L, NOW))
         .doesNotThrowAnyException();
     assertFails(
-        () -> chargeLimitService.assertChargeable(wallet, 100_001L, NOW),
+        () -> check(wallet.getId(), 100_001L, NOW),
         WalletErrorCode.MONTHLY_CHARGE_LIMIT_EXCEEDED);
   }
 
@@ -136,7 +141,7 @@ class ChargeLimitServiceTest {
     ledger(other, CHARGE, 1_000_000L, LocalDateTime.of(2026, 11, 5, 10, 0));
     ledger(wallet, CASHBACK_EARN, 500_000L, LocalDateTime.of(2026, 11, 6, 10, 0));
 
-    assertThatCode(() -> chargeLimitService.assertChargeable(wallet, 1_000_000L, NOW))
+    assertThatCode(() -> check(wallet.getId(), 1_000_000L, NOW))
         .doesNotThrowAnyException();
   }
 
@@ -150,16 +155,16 @@ class ChargeLimitServiceTest {
 
     // 보유 한도를 100만원으로 낮춤: 잔액 60만원이면 40만원까지 충전 가능
     Wallet small = wallet(1, 600_000L, 0L);
-    assertThatCode(() -> chargeLimitService.assertChargeable(small, 400_000L, NOW))
+    assertThatCode(() -> check(small.getId(), 400_000L, NOW))
         .doesNotThrowAnyException();
     assertFails(
-        () -> chargeLimitService.assertChargeable(small, 400_001L, NOW),
+        () -> check(small.getId(), 400_001L, NOW),
         WalletErrorCode.HOLDING_LIMIT_EXCEEDED);
 
     // 잔액이 이미 낮춘 한도보다 크면 충전만 거절하고 잔액은 그대로
     Wallet over = wallet(2, 1_500_000L, 0L);
     assertFails(
-        () -> chargeLimitService.assertChargeable(over, 1L, NOW),
+        () -> check(over.getId(), 1L, NOW),
         WalletErrorCode.HOLDING_LIMIT_EXCEEDED);
     assertThat(walletRepository.findById(over.getId()).orElseThrow().getBalance())
         .isEqualTo(1_500_000L);
@@ -168,7 +173,7 @@ class ChargeLimitServiceTest {
     Wallet charged = wallet(3, 0L, 0L);
     ledger(charged, CHARGE, 800_000L, LocalDateTime.of(2026, 11, 5, 10, 0));
     assertFails(
-        () -> chargeLimitService.assertChargeable(charged, 1L, NOW),
+        () -> check(charged.getId(), 1L, NOW),
         WalletErrorCode.MONTHLY_CHARGE_LIMIT_EXCEEDED);
   }
 
@@ -179,7 +184,7 @@ class ChargeLimitServiceTest {
     ledger(wallet, CHARGE, 1_000_000L, LocalDateTime.of(2026, 11, 5, 10, 0));
 
     assertFails(
-        () -> chargeLimitService.assertChargeable(wallet, 200_000L, NOW),
+        () -> check(wallet.getId(), 200_000L, NOW),
         WalletErrorCode.HOLDING_LIMIT_EXCEEDED);
   }
 
@@ -189,7 +194,7 @@ class ChargeLimitServiceTest {
     Wallet wallet = wallet(1, 1_000L, 0L);
 
     assertFails(
-        () -> chargeLimitService.assertChargeable(wallet, Long.MAX_VALUE, NOW),
+        () -> check(wallet.getId(), Long.MAX_VALUE, NOW),
         WalletErrorCode.HOLDING_LIMIT_EXCEEDED);
   }
 
@@ -198,10 +203,44 @@ class ChargeLimitServiceTest {
   void nonPositiveAmount_rejected() {
     Wallet wallet = wallet(1, 0L, 0L);
 
-    assertThatThrownBy(() -> chargeLimitService.assertChargeable(wallet, 0L, NOW))
+    assertThatThrownBy(() -> check(wallet.getId(), 0L, NOW))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> chargeLimitService.assertChargeable(wallet, -1L, NOW))
+    assertThatThrownBy(() -> check(wallet.getId(), -1L, NOW))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  @DisplayName("잠그기 전에 읽어 둔 낡은 엔티티가 있어도 DB의 최신 잔액으로 검사한다")
+  void staleEntity_doesNotAffectCheck() {
+    Wallet wallet = wallet(1, 1_000_000L, 0L);
+
+    assertFails(
+        () ->
+            new TransactionTemplate(transactionManager)
+                .executeWithoutResult(
+                    status -> {
+                      walletRepository.findById(wallet.getId()); // 먼저 일반 조회(낡은 객체가 남음)
+                      // 그 사이 다른 트랜잭션이 90만원을 충전하고 커밋(실제 잔액 190만원)
+                      inNewTransaction(
+                          () -> walletService.credit(wallet.getId(), 900_000L, CHARGE, 1L));
+                      chargeLimitService.assertChargeable(wallet.getId(), 200_000L, NOW);
+                    }),
+        WalletErrorCode.HOLDING_LIMIT_EXCEEDED);
+  }
+
+  @Test
+  @DisplayName("호출한 쪽의 트랜잭션 없이 부르면 바로 예외가 난다")
+  void withoutTransaction_rejected() {
+    Wallet wallet = wallet(1, 0L, 0L);
+
+    assertThatThrownBy(() -> chargeLimitService.assertChargeable(wallet.getId(), 1L, NOW))
+        .isInstanceOf(IllegalTransactionStateException.class);
+  }
+
+  @Test
+  @DisplayName("없는 지갑이면 WAL-001로 거절한다")
+  void walletNotFound() {
+    assertFails(() -> check(999_999L, 1L, NOW), WalletErrorCode.WALLET_NOT_FOUND);
   }
 
   // 데브머니·캐시백 잔액을 가진 지갑 저장. 회원 ID는 테스트마다 구분하기 위해 번호로 만듦
@@ -226,6 +265,19 @@ class ChargeLimitServiceTest {
             .balanceAfter(0L)
             .createdAt(at)
             .build());
+  }
+
+  // 한도 검사는 호출한 쪽의 트랜잭션이 필수(MANDATORY)라서 트랜잭션 안에서 호출함. 실제로는 충전 서비스의 트랜잭션이 이 역할을 함
+  private void check(Long walletId, long amount, LocalDateTime now) {
+    new TransactionTemplate(transactionManager)
+        .executeWithoutResult(status -> chargeLimitService.assertChargeable(walletId, amount, now));
+  }
+
+  // 별도 트랜잭션으로 실행하고 커밋함. 다른 요청이 끼어든 상황을 만들 때 사용
+  private void inNewTransaction(Runnable action) {
+    TransactionTemplate template = new TransactionTemplate(transactionManager);
+    template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    template.executeWithoutResult(status -> action.run());
   }
 
   private void assertFails(ThrowingCallable call, WalletErrorCode expected) {
