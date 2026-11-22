@@ -25,6 +25,7 @@ export default function ScanPage() {
   const [load, setLoad] = useState<Load>({ kind: "idle" });
   const [expired, setExpired] = useState(false);
   const [scenario, setScenario] = useState<Scenario>("normal");
+  const [cashbackInput, setCashbackInput] = useState(""); // 비우면 0 (캐시백을 쓰지 않고 데브머니로만 결제)
 
   const lookup = (t: string) => {
     const v = t.trim();
@@ -52,14 +53,18 @@ export default function ScanPage() {
 
   const qr = load.kind === "ok" ? load.qr : null;
   const amount = qr?.amount ?? 0;
-  const p = computePreview(amount, qr && !qr.cashbackEligible ? "notEligible" : scenario);
-  const earning = p.reason === "NONE";
+  // 캐시백 사용 금액: 0 ~ 결제금액. 나머지는 데브머니로 낸다. 적립은 데브머니로 낸 금액 기준이다
+  const cashbackUsed = cashbackInput.trim() === "" ? 0 : Number(cashbackInput);
+  const cashbackOk = Number.isInteger(cashbackUsed) && cashbackUsed >= 0 && cashbackUsed <= amount;
+  const devMoney = cashbackOk ? amount - cashbackUsed : amount;
+  const p = computePreview(devMoney, qr && !qr.cashbackEligible ? "notEligible" : scenario);
+  const earning = p.reason === "NONE" && devMoney > 0;
   const overLimit = amount > LIMITS.perPayment;
-  const valid = !!qr && !expired && walletId > 0 && amount > 0 && !overLimit;
+  const valid = !!qr && !expired && walletId > 0 && amount > 0 && !overLimit && cashbackOk;
 
   const go = () => {
     if (!qr) return;
-    savePending(newPending({ walletId, merchantId: qr.merchantId, qrToken: token, amount: qr.amount }));
+    savePending(newPending({ walletId, qrToken: token, cashbackUsed }));
     router.push("/pin?next=/pay/receipt");
   };
 
@@ -118,10 +123,32 @@ export default function ScanPage() {
               </div>
             </section>
 
+            <section className="card">
+              <label className="block">
+                <span className="label">캐시백 사용 (비우면 사용 안 함)</span>
+                <div className="flex gap-2">
+                  <input
+                    className="field tabular-nums"
+                    inputMode="numeric"
+                    value={cashbackInput}
+                    onChange={(e) => setCashbackInput(e.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder="0"
+                    aria-invalid={!cashbackOk}
+                  />
+                  <button type="button" onClick={() => setCashbackInput(String(amount))} className="btn btn-outline btn-sm !w-auto shrink-0">전액</button>
+                  <button type="button" onClick={() => setCashbackInput("")} className="btn btn-outline btn-sm !w-auto shrink-0">지우기</button>
+                </div>
+              </label>
+              {!cashbackOk && <p role="alert" className="mt-2 text-[13px] font-medium text-red-600">캐시백 사용 금액은 결제금액({won(amount)}) 이하로 입력해 주세요</p>}
+              <p className="note mt-2">나머지 {won(devMoney)}은 데브머니로 결제돼요</p>
+            </section>
+
             <SignBoard
               label="결제 미리보기"
               rows={[
                 { label: "결제금액", value: won(amount) },
+                { label: "데브머니 사용", value: won(devMoney) },
+                { label: "캐시백 사용", value: won(cashbackOk ? cashbackUsed : 0) },
                 earning
                   ? { label: `예상 캐시백 (${p.rate.toFixed(1)}%)`, value: `+${p.expected.toLocaleString("ko-KR")}원`, tone: "pending" }
                   : { label: "이번 결제는 적립 없음", value: "0원" },
@@ -133,10 +160,10 @@ export default function ScanPage() {
                 <span className="text-[13px] font-bold text-slate-700">캐시백 미리보기</span>
                 <span className="badge">예상</span>
               </div>
-              {!earning && <p className="mt-1 text-[13px] text-slate-600">{REASON_TEXT[p.reason]}</p>}
+              {!earning && <p className="mt-1 text-[13px] text-slate-600">{devMoney === 0 && p.reason === "NONE" ? "캐시백으로만 결제하면 적립되지 않아요." : REASON_TEXT[p.reason]}</p>}
               <dl className="mt-2 space-y-1.5 text-[13px]">
                 <div className="flex justify-between"><dt className="text-slate-500">적용 요율 (접수 시각 기준)</dt><dd className="font-bold tabular-nums">{p.rate.toFixed(1)}%</dd></div>
-                {earning && <div className="flex justify-between"><dt className="text-slate-500">계산 근거</dt><dd className="font-medium tabular-nums">{amount.toLocaleString("ko-KR")} × {p.rate.toFixed(1)}% = {p.expected.toLocaleString("ko-KR")}원</dd></div>}
+                {earning && <div className="flex justify-between"><dt className="text-slate-500">계산 근거</dt><dd className="font-medium tabular-nums">{devMoney.toLocaleString("ko-KR")} × {p.rate.toFixed(1)}% = {p.expected.toLocaleString("ko-KR")}원</dd></div>}
                 <div className="flex justify-between"><dt className="text-slate-500">월 적립 한도 잔여</dt><dd className="font-medium tabular-nums">{won(p.monthlyRemaining)}{earning && ` → ${won(p.monthlyRemaining - p.expected)}`}</dd></div>
               </dl>
               <p className="note mt-2">예상 금액이며 소수점 이하는 버려요. 결제 접수 시각의 요율로 확정돼요.</p>
