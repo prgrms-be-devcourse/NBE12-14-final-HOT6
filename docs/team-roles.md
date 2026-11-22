@@ -41,7 +41,7 @@
 - **주요 테이블**: `cashback_annual_budget`, `cashback_monthly_budget`, `cashback_budget_transfer`, `cashback_policy`, `cashback_earning`
 
 ### C. 회원·지갑
-- **회원**: 가입(모의계좌 1개와 지갑 생성, 초기 잔액 100만원), 로그인, 내 정보, 탈퇴 정산
+- **회원**: 가입(모의계좌 1개와 지갑 생성, 초기 잔액 200만원), 로그인, 내 정보, 탈퇴 정산
 - **인증**: JWT, 권한(USER / OWNER / ADMIN), 간편 비밀번호 6자리 검증, 5회 실패 시 잠금, 잠금 해제
 - **지갑**: 조회(데브머니, 캐시백, 적립 예정 분리 표시), 충전, 환불(데브머니만), 거래 내역
 - **이용자 캐시백 조회**: 월 한도 조회, 적립 내역 조회(`CashbackQueryService` 사용)
