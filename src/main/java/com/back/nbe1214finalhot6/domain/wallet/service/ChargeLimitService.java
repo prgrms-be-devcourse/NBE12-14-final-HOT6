@@ -51,22 +51,44 @@ public class ChargeLimitService {
         walletRepository
             .findBalanceById(walletId)
             .orElseThrow(() -> new BusinessException(WalletErrorCode.WALLET_NOT_FOUND));
-    long holdingLimit = operatorSettingService.getLong(SettingKey.WALLET_HOLDING_LIMIT);
-    if (amount > holdingLimit - balance) {
+    if (amount > holdingLimit() - balance) {
       throw new BusinessException(WalletErrorCode.HOLDING_LIMIT_EXCEEDED);
     }
 
     // 월 충전 한도: 이번 달 CHARGE 합계만 봄. REFUND는 빼지 않으므로 환불해도 한도가 복원되지 않음
-    long monthlyLimit = operatorSettingService.getLong(SettingKey.WALLET_MONTHLY_CHARGE_LIMIT);
-    YearMonth month = YearMonth.from(now);
-    long charged =
-        walletTransactionRepository.sumAmount(
-            walletId,
-            WalletTransactionType.CHARGE,
-            month.atDay(1).atStartOfDay(),
-            month.plusMonths(1).atDay(1).atStartOfDay());
-    if (amount > monthlyLimit - charged) {
+    if (amount > monthlyChargeLimit() - chargedThisMonth(walletId, now)) {
       throw new BusinessException(WalletErrorCode.MONTHLY_CHARGE_LIMIT_EXCEEDED);
     }
+  }
+
+  /**
+   * 충전 한도 현황(한도 설정값과 이번 달 누적 충전액)을 한 번에 돌려줌. 지갑 조회 화면이 쓰며, 충전 검사와 같은 설정값·같은 계산으로 만들어서 화면 표시와 충전
+   * 검사가 어긋나지 않음. 지갑을 잠그지 않는 읽기임.
+   *
+   * @param walletId 조회할 지갑의 ID
+   * @param now 기준 시각. 이번 달은 이 시각이 속한 달(한국 시간 달력월)로 정함
+   */
+  public ChargeLimitUsage usage(Long walletId, LocalDateTime now) {
+    return new ChargeLimitUsage(holdingLimit(), monthlyChargeLimit(), chargedThisMonth(walletId, now));
+  }
+
+  // 보유 한도(운영자 설정). 운영자가 바꾼 적이 없으면 기본값
+  private long holdingLimit() {
+    return operatorSettingService.getLong(SettingKey.WALLET_HOLDING_LIMIT);
+  }
+
+  // 월 충전 한도(운영자 설정). 운영자가 바꾼 적이 없으면 기본값
+  private long monthlyChargeLimit() {
+    return operatorSettingService.getLong(SettingKey.WALLET_MONTHLY_CHARGE_LIMIT);
+  }
+
+  // 이번 달 누적 충전액. now가 속한 달의 지갑 원장 CHARGE 합계이며, REFUND는 빼지 않음
+  private long chargedThisMonth(Long walletId, LocalDateTime now) {
+    YearMonth month = YearMonth.from(now);
+    return walletTransactionRepository.sumAmount(
+        walletId,
+        WalletTransactionType.CHARGE,
+        month.atDay(1).atStartOfDay(),
+        month.plusMonths(1).atDay(1).atStartOfDay());
   }
 }
