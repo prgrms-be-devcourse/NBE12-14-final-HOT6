@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    # 기본 설정의 로컬용 비밀번호로 조용히 대체되지 않도록 기본값을 두지 않는다.
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      # TODO: 마이그레이션 도구(Flyway 등)를 도입하면 validate 로 변경한다.
+      ddl-auto: update
+
+server:
+  forward-headers-strategy: framework
+
+# 운영 환경에서는 API 명세를 공개하지 않는다. 로컬에서는 그대로 열린다.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

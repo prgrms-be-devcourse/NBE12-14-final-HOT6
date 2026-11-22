@@ -37,3 +37,10 @@ out/
 .vscode/
 
 .env
+
+### Terraform / AWS ###
+*.pem
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
