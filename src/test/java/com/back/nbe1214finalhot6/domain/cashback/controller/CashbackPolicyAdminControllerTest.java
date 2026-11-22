@@ -17,6 +17,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -38,44 +40,45 @@ class CashbackPolicyAdminControllerTest {
     return new PolicyResponse(1L, new BigDecimal("0.0300"), NOV_1, null, NOV_1.minusDays(1));
   }
 
-  // 목적: 정상 요청이 201 과 공통 응답 형식으로 내려가는지, 종료를 생략해도 되는지 확인한다.
+  private static final String BODY =
+      """
+      {"rate": 0.03, "effectiveAt": "2026-11-20T00:00:00"}
+      """;
+
+  // 목적: 인하 요청이 201 과 공통 응답 형식으로 내려가고 만들어진 구간이 담기는지 확인한다.
   @Test
-  @DisplayName("정상 요청이면 201 과 등록 결과를 반환한다")
-  void create_created() throws Exception {
-    given(policyService.create(any())).willReturn(sample());
+  @DisplayName("인하 요청이면 201 과 만들어진 구간을 반환한다")
+  void reduce_created() throws Exception {
+    given(policyService.reduceRate(any())).willReturn(sample());
 
     mockMvc
         .perform(
-            post("/api/admin/cashback/policies")
+            post("/api/admin/cashback/policies/reductions")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"rate": 0.03, "startsAt": "2026-11-01T00:00:00"}
-                    """))
+                .content(BODY))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.policyId").value(1))
-        .andExpect(jsonPath("$.data.rate").value(0.03))
-        .andExpect(jsonPath("$.data.endsAt").doesNotExist());
+        .andExpect(jsonPath("$.data.rate").value(0.03));
   }
 
-  // 목적: 필수값(요율, 시작 시각)이 빠지면 400 으로 걸러지는지 확인한다.
+  // 목적: 필수값(요율, 적용 시각)이 빠지면 400 으로 걸러지는지 확인한다.
   @Test
-  @DisplayName("요율이나 시작 시각이 없으면 400")
-  void create_missingRequired() throws Exception {
+  @DisplayName("요율이나 적용 시각이 없으면 400")
+  void reduce_missingRequired() throws Exception {
     mockMvc
         .perform(
-            post("/api/admin/cashback/policies")
+            post("/api/admin/cashback/policies/reductions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"startsAt": "2026-11-01T00:00:00"}
+                    {"effectiveAt": "2026-11-20T00:00:00"}
                     """))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false));
 
     mockMvc
         .perform(
-            post("/api/admin/cashback/policies")
+            post("/api/admin/cashback/policies/reductions")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"rate": 0.03}
@@ -83,42 +86,37 @@ class CashbackPolicyAdminControllerTest {
         .andExpect(status().isBadRequest());
   }
 
-  // 목적: 기간이 겹쳐 서비스가 예외를 던지면 409 와 CSH-002 로 변환되는지 확인한다.
-  @Test
-  @DisplayName("기간이 겹치면 409 와 CSH-002")
-  void create_overlap() throws Exception {
-    given(policyService.create(any()))
-        .willThrow(new BusinessException(CashbackErrorCode.POLICY_PERIOD_OVERLAP));
+  // 목적: 서비스가 던지는 도메인 예외가 각각 올바른 상태 코드와 에러 코드로 변환되는지 확인한다.
+  @ParameterizedTest
+  @CsvSource({
+    "INVALID_POLICY, 400, CSH-003",
+    "BUDGET_NOT_FOUND, 404, CSH-004",
+    "POLICY_PERIOD_OVERLAP, 409, CSH-002",
+    "RATE_REDUCTION_LIMIT_EXCEEDED, 409, CSH-009"
+  })
+  @DisplayName("인하 실패는 에러 코드에 맞는 상태로 변환된다")
+  void reduce_errors(CashbackErrorCode errorCode, int httpStatus, String code) throws Exception {
+    given(policyService.reduceRate(any())).willThrow(new BusinessException(errorCode));
 
     mockMvc
         .perform(
-            post("/api/admin/cashback/policies")
+            post("/api/admin/cashback/policies/reductions")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"rate": 0.03, "startsAt": "2026-11-01T00:00:00"}
-                    """))
-        .andExpect(status().isConflict())
-        .andExpect(jsonPath("$.code").value("CSH-002"));
+                .content(BODY))
+        .andExpect(status().is(httpStatus))
+        .andExpect(jsonPath("$.code").value(code));
   }
 
-  // 목적: 요율·기간 오류가 400 과 CSH-003 으로 변환되는지 확인한다.
+  // 목적: 구간을 직접 등록하던 POST 는 없어졌고(조회만 남음) 405 로 거절되는지 확인한다.
   @Test
-  @DisplayName("요율이나 기간이 올바르지 않으면 400 과 CSH-003")
-  void create_invalidPolicy() throws Exception {
-    given(policyService.create(any()))
-        .willThrow(new BusinessException(CashbackErrorCode.INVALID_POLICY));
-
+  @DisplayName("구간 직접 등록(POST /policies)은 지원하지 않는다")
+  void create_removed() throws Exception {
     mockMvc
         .perform(
             post("/api/admin/cashback/policies")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"rate": 2, "startsAt": "2026-11-01T00:00:00"}
-                    """))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("CSH-003"));
+                .content("{\"rate\": 0.03, \"startsAt\": \"2026-11-01T00:00:00\"}"))
+        .andExpect(status().isMethodNotAllowed());
   }
 
   // 목적: 목록 조회가 200 과 배열로 내려가는지 확인한다.

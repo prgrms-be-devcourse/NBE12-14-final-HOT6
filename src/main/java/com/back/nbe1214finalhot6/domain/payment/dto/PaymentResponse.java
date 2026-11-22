@@ -20,7 +20,10 @@ public record PaymentResponse(
     Long cashbackEarnedAmount, // 적립 캐시백 (소수점 이하 버림, 적립 없으면 0 또는 null)
     BigDecimal appliedRate, // 적용 요율 (적립 정책이 없으면 null)
     LocalDateTime cashbackPayableAt, // 캐시백 지급 예정 시각 (적립 없으면 null)
-    String cashbackExclusionReason // 적립 제외 사유 (적립됐으면 NONE, 결제 전이면 null)
+    String cashbackExclusionReason, // 적립 제외 사유 (적립됐으면 NONE, 결제 전이면 null)
+    String failureCode, // 결제실패코드
+    LocalDateTime requestedAt,  // 서버가 요청을 접수한 시각
+    LocalDateTime completedAt   // 결제 완료 시각 (완료 전/실패면 null)
     ) {
 
   public static PaymentResponse of(Payment payment) {
@@ -33,6 +36,10 @@ public record PaymentResponse(
         payment.getCashbackEarnedAmount(),
         payment.getAppliedRate(),
         payment.getCashbackPayableAt(),
-        payment.getCashbackExclusionReason());
+        payment.getCashbackExclusionReason(),
+        payment.getFailureCode(),
+        payment.getRequestedAt(),
+        payment.getCompletedAt()
+    );
   }
 }

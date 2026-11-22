@@ -17,13 +17,17 @@ public interface QrCodeRepository extends JpaRepository<QrCode, Long> {
   @Query(
       """
       update QrCode q
-         set q.status = com.back.nbe1214finalhot6.domain.qr.entity.QrStatus.USED
-       where q.id = :id
+         set q.status = com.back.nbe1214finalhot6.domain.qr.entity.QrStatus.USED,
+             q.usedAt = :usedAt
+       where q.token = :token
          and q.status = com.back.nbe1214finalhot6.domain.qr.entity.QrStatus.WAITING
-         and q.expiresAt > :now
+         and q.expiresAt > :requestedAt
       """)
-  int markUsedIfAvailable(@Param("id") Long id, @Param("now") LocalDateTime now);
+  int markUsedIfAvailable(
+      @Param("token") String token,
+      @Param("requestedAt") LocalDateTime requestedAt,
+      @Param("usedAt") LocalDateTime usedAt);
 
-  @Query("select q.status from QrCode q where q.id = :id")
-  Optional<QrStatus> findStatusById(@Param("id") Long id);
+  @Query("select q.status from QrCode q where q.token = :token")
+  Optional<QrStatus> findStatusByToken(@Param("token") String token);
 }

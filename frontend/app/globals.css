@@ -2,12 +2,66 @@
 
 :root {
   color-scheme: light;
+  --web-zoom: 1.12;
 }
 
-/* 회색 계열(zinc)을 약간 푸른 slate 톤으로 통일해서 전체 분위기를 맞춘다 */
+@theme {
+  --color-brand-50: #e7f2ec;
+  --color-brand-100: #cfe5d9;
+  --color-brand-200: #a6cfba;
+  --color-brand-600: #0b6b4a;
+  --color-brand-700: #095a3e;
+  --color-brand-900: #063a28;
+
+  --color-slate-50: #f4f6f3;
+  --color-slate-100: #eaeeeb;
+  --color-slate-200: #dde3de;
+  --color-slate-300: #c9d1cb;
+  --color-slate-400: #8e9a93;
+  --color-slate-500: #5c6962;
+  --color-slate-600: #46524b;
+  --color-slate-700: #34403a;
+  --color-slate-800: #232e28;
+  --color-slate-900: #16231d;
+
+  --color-blue-50: #ebf1fd;
+  --color-blue-100: #d6e3fa;
+  --color-blue-200: #b3cbf5;
+  --color-blue-300: #8aaeef;
+  --color-blue-500: #3f78e0;
+  --color-blue-600: #1d5fd1;
+  --color-blue-700: #174daa;
+  --color-blue-800: #123c85;
+  --color-blue-900: #0f2f70;
+
+  --color-emerald-50: #e8f5ef;
+  --color-emerald-100: #cdebdc;
+  --color-emerald-200: #a3d9bf;
+  --color-emerald-500: #1f9a70;
+  --color-emerald-600: #12805c;
+  --color-emerald-700: #0e6648;
+  --color-emerald-800: #0b4f38;
+  --color-emerald-900: #083a29;
+
+  --color-red-50: #fdecea;
+  --color-red-100: #fbd5d1;
+  --color-red-200: #f4aaa3;
+  --color-red-600: #d43b2f;
+  --color-red-700: #b02a20;
+  --color-red-800: #8a2018;
+
+  --color-amber-50: #fff8db;
+  --color-amber-100: #ffefb0;
+  --color-amber-200: #ffe27a;
+  --color-amber-500: #ffd84a;
+  --color-amber-600: #a67c00;
+  --color-amber-800: #7a5c00;
+  --color-amber-900: #5c4500;
+}
+
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-pretendard), -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
   --color-zinc-50: var(--color-slate-50);
   --color-zinc-100: var(--color-slate-100);
   --color-zinc-200: var(--color-slate-200);
@@ -21,48 +75,87 @@
 }
 
 /*
- * 색 규칙 (의미를 고정해서 정신없지 않게)
- *  파랑  = 브랜드 / 주요 버튼 / 입금·충전
- *  빨강  = 환불·출금·결제(돈이 나감) / 취소 / 경고
- *  초록  = 캐시백 / 완료·성공
- *  노랑  = 예정·예고·주의
- *  회색  = 나머지 전부
+ * 안내표지판 방향
+ *  표지판 녹색 = 앱 바 · 사이드바 · 분기 표지
+ *  파랑 = 충전·입금 / 빨강 = 결제·환불·경고 / 초록 = 캐시백 / 노랑 = 적립 예정·예고
+ *  주요 버튼은 잉크색(slate-900)
  */
 body {
-  background: #f3f5f9;
-  color: #1e293b;
-  font-family: var(--font-geist-sans), -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  background: var(--color-slate-50);
+  color: var(--color-slate-900);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 0;
+  -webkit-font-smoothing: antialiased;
 }
 
+::selection { background: var(--color-brand-100); color: var(--color-brand-900); }
+input, textarea { caret-color: var(--color-brand-600); }
+:focus-visible { outline: 2px solid var(--color-brand-600); outline-offset: 2px; }
+* { scrollbar-width: thin; scrollbar-color: var(--color-slate-300) transparent; }
+
 @layer components {
-  .card { @apply rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]; }
-  .card-gray { @apply rounded-xl border border-blue-100 bg-blue-50/70 p-4; }
+  .web-zoom { zoom: var(--web-zoom); }
+  .web-screen { min-height: calc(100vh / var(--web-zoom)); }
+
+  .card { @apply rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(22,35,29,0.06)]; }
+  .card-gray { @apply rounded-xl border border-brand-100 bg-brand-50/60 p-4; }
   .card-dash { @apply rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-600; }
 
-  .btn { @apply flex w-full items-center justify-center rounded-lg border border-transparent px-4 py-3 text-[15px] font-semibold transition active:scale-[0.99]; }
-  .btn-primary { @apply bg-blue-600 text-white hover:bg-blue-700; }
+  .btn { @apply flex w-full items-center justify-center rounded-lg border border-transparent px-4 py-3 text-[15px] font-bold transition active:scale-[0.99] disabled:cursor-not-allowed; }
+  .btn-primary { @apply bg-slate-900 text-white hover:bg-slate-700; }
+  .btn-brand { @apply bg-brand-600 text-white hover:bg-brand-700; }
   .btn-outline { @apply border-slate-300 bg-white text-slate-800 hover:bg-slate-50; }
-  .btn-danger { @apply border-red-200 bg-red-50 text-red-600 hover:bg-red-100; }
+  .btn-danger { @apply border-red-200 bg-white text-red-600 hover:bg-red-50; }
   .btn-sm { @apply px-3 py-2 text-[13px]; }
 
-  .field { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[15px] outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100; }
-  .label { @apply mb-1 block text-xs text-slate-500; }
+  .field { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-[15px] outline-none transition placeholder:text-slate-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100; }
+  .label { @apply mb-1 block text-xs font-medium text-slate-600; }
   .note { @apply text-xs leading-relaxed text-slate-500; }
 
-  .chip { @apply rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50; }
-  .chip-on { @apply border-blue-600 bg-blue-600 text-white hover:bg-blue-700; }
+  .chip { @apply rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[13px] font-medium text-slate-700 transition hover:bg-slate-50; }
+  .chip-on { @apply border-brand-600 bg-brand-600 font-bold text-white hover:bg-brand-700; }
 
-  .badge { @apply inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600; }
+  .badge { @apply inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600; }
   .badge-info { @apply bg-blue-50 text-blue-700; }
   .badge-ok { @apply bg-emerald-50 text-emerald-700; }
-  .badge-warn { @apply bg-amber-50 text-amber-700; }
-  .badge-bad { @apply bg-red-50 text-red-600; }
+  .badge-warn { @apply bg-amber-100 text-amber-800; }
+  .badge-bad { @apply bg-red-50 text-red-700; }
 
   .amt-in { @apply text-blue-600; }
   .amt-out { @apply text-red-600; }
   .amt-cb { @apply text-emerald-600; }
+  .amt-wait { @apply text-amber-800; }
 
-  .table { @apply w-full text-left text-sm; }
-  .table th { @apply border-b border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500; }
+  .table { @apply w-full text-left text-sm tabular-nums; }
+  .table th { @apply border-b border-slate-200 px-3 py-2 text-xs font-bold text-slate-500; }
   .table td { @apply border-b border-slate-100 px-3 py-2; }
+
+  .appbar { @apply sticky top-0 z-10 mb-4 flex items-center gap-1 bg-brand-600 px-4 py-3 text-white; }
+  .sign { @apply rounded-lg border-2 border-white bg-brand-600 px-3.5 py-1 text-white outline outline-2 outline-brand-600; }
+  .sign-row { @apply flex items-center justify-between gap-3 py-2 text-[14px] [&:not(:first-child)]:border-t [&:not(:first-child)]:border-white/25; }
+  .sign-row-wait { @apply text-amber-500; }
+  .tile { @apply rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(22,35,29,0.06)]; }
+}
+
+@keyframes demo-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes demo-pop { 0% { opacity: 0; transform: scale(0.8); } 60% { opacity: 1; transform: scale(1.06); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes demo-out { from { opacity: 1; } to { opacity: 0; visibility: hidden; } }
+@keyframes demo-scan { 0% { top: 14%; } 50% { top: 80%; } 100% { top: 14%; } }
+@keyframes demo-type { from { width: 0; } to { width: var(--w); } }
+@keyframes demo-fill { from { width: var(--from, 0%); } to { width: var(--to, 100%); } }
+@keyframes demo-press { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.96); } }
+
+.demo-a { animation: demo-fade-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0s); }
+.demo-pop { animation: demo-pop 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0s); }
+.demo-x { animation: demo-out 0.3s ease-out forwards; animation-delay: var(--d, 0s); }
+.demo-scan { animation: demo-scan 2.2s ease-in-out infinite; }
+.demo-type { display: inline-block; overflow: hidden; white-space: nowrap; vertical-align: bottom; animation: demo-type var(--t, 1s) steps(var(--n, 8), end) both; animation-delay: var(--d, 0s); }
+.demo-fill { animation: demo-fill var(--t, 1s) cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0s); }
+.demo-press { animation: demo-press 0.4s ease-in-out both; animation-delay: var(--d, 0s); }
+.demo-progress { animation: demo-fill 5.2s linear both; --from: 0%; --to: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-a, .demo-pop, .demo-type, .demo-fill, .demo-press, .demo-progress { animation: none; opacity: 1; transform: none; }
+  .demo-x { display: none; }
+  .demo-scan { animation: none; top: 50%; }
 }

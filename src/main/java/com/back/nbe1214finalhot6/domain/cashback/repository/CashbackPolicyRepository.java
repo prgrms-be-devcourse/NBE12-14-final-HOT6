@@ -41,4 +41,7 @@ public interface CashbackPolicyRepository extends JpaRepository<CashbackPolicy, 
   List<CashbackPolicy> findEffective(@Param("at") LocalDateTime at);
 
   List<CashbackPolicy> findAllByOrderByStartsAtDesc();
+
+  /** {@code [from, to)} 안에서 시작한 구간 수. 그 달의 요율 인하 횟수를 셀 때 쓴다. */
+  long countByStartsAtGreaterThanEqualAndStartsAtLessThan(LocalDateTime from, LocalDateTime to);
 }

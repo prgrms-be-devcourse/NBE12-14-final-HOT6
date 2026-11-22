@@ -1,8 +1,5 @@
 package com.back.nbe1214finalhot6.domain.payment.service;
 
-import static com.back.nbe1214finalhot6.common.response.CommonErrorCode.IDEMPOTENCY_IN_PROGRESS;
-import static com.back.nbe1214finalhot6.common.response.CommonErrorCode.IDEMPOTENCY_KEY_MISMATCH;
-
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
@@ -11,29 +8,40 @@ import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.repository.PaymentRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Objects;
+
+import com.back.nbe1214finalhot6.domain.qr.dto.QrPaymentTarget;
+import com.back.nbe1214finalhot6.domain.qr.service.QrService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import static com.back.nbe1214finalhot6.common.response.CommonErrorCode.*;
 
 @RequiredArgsConstructor
 @Service
 public class PaymentIdempotencyService {
 
   private final PaymentRepository paymentRepository;
+  private final QrService qrService;
   private final Clock clock; //수정 : 시간 기준을 Clock 으로 통일 (한국 시간, 테스트에서 고정 가능)
 
   // Transaction 1. 선점(claim) : (walletId, 멱등키) 복합 유니크 제약으로 중복 요청을 걸러낸다
   @Transactional
   public PaymentResponse claim(String key, PaymentRequest request) {
+    QrPaymentTarget target = qrService.getPaymentTarget(request.qrToken());
+    if(request.cashbackUsed() > target.amount()){
+      throw new BusinessException(INVALID_REQUEST,"캐시백 사용 금액은 결제 금액을 넘을 수 없습니다");
+    }
     Payment payment =
         Payment.builder()
             .walletId(request.walletId())
-            .merchantId(request.merchantId())
-            .qrId(request.qrId())
+            .qrToken(request.qrToken())
             .idempotencyKey(key)
-            .amount(request.amount())
-            .walletUsedAmount(0L)
-            .cashbackUsedAmount(0L)
+            .cashbackUsedAmount(request.cashbackUsed())
+            .merchantId(target.merchantId())
+            .amount(target.amount())
+            .walletUsedAmount(target.amount()-request.cashbackUsed())
             .status(PaymentStatus.PROCESSING)
             .requestedAt(LocalDateTime.now(clock)) // 서버 최초 접수 시각 //수정 : Clock 사용
             .build();
@@ -56,19 +64,12 @@ public class PaymentIdempotencyService {
     if (existing.getStatus() == PaymentStatus.PROCESSING) {
       throw new BusinessException(IDEMPOTENCY_IN_PROGRESS);
     }
-    // 3. 완료 / 취소: 저장된 결과를 그대로 반환 (FAILED 정책 확정 전까지는 임시로 그대로 반환)
+    // 3. 완료 / 취소 / 실패: 저장된 결과를 그대로 반환 (실패 건도 같은 키로는 재시도하지 않는다)
     return PaymentResponse.of(existing);
   }
 
-  @Transactional
-  public boolean reclaimFailed(Long paymentId) {
-    return paymentRepository.updateStatusIfCurrent(
-            paymentId, PaymentStatus.FAILED, PaymentStatus.PROCESSING) == 1;
-  }
-
   private boolean isSameRequest(Payment p, PaymentRequest r) {
-    return p.getMerchantId().equals(r.merchantId()) //가맹점주id ,금액, qr id
-        && p.getAmount().equals(r.amount())
-        && p.getQrId().equals(r.qrId());
+    return  p.getCashbackUsedAmount().equals(r.cashbackUsed())
+            && Objects.equals(p.getQrToken(), r.qrToken()); //null일수도 있어서 object로비교
   }
 }

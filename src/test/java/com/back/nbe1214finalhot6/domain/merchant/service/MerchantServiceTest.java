@@ -9,6 +9,8 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
+import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
+import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantWalletRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -34,6 +36,8 @@ class MerchantServiceTest {
 
   @Autowired private MerchantService merchantService;
   @Autowired private MerchantRepository merchantRepository;
+  @Autowired private MerchantWalletRepository merchantWalletRepository;
+  @Autowired private MerchantAccountRepository merchantAccountRepository;
   @PersistenceContext private EntityManager entityManager;
 
   @Test
@@ -48,6 +52,19 @@ class MerchantServiceTest {
     assertThat(saved.getOwnerId()).isEqualTo(1L);
     assertThat(saved.getName()).isEqualTo("테스트 가맹점");
     assertThat(saved.getAddress()).isEqualTo("인천광역시 남동구 어딘가 1");
+  }
+
+  @Test
+  @DisplayName("가맹점을 등록하면 잔액 0원의 지갑과 계좌가 함께 만들어진다")
+  void 가맹점등록시_지갑과계좌생성() {
+    MerchantRegisterResponse response =
+        merchantService.register(
+            new MerchantRegisterRequest(1L, "지갑 가맹점", "인천광역시 남동구 어딘가 3", null));
+
+    assertThat(merchantWalletRepository.findByMerchantId(response.merchantId()))
+        .hasValueSatisfying(wallet -> assertThat(wallet.getBalance()).isZero());
+    assertThat(merchantAccountRepository.findByMerchantId(response.merchantId()))
+        .hasValueSatisfying(account -> assertThat(account.getBalance()).isZero());
   }
 
   @Test

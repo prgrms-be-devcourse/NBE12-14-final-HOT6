@@ -53,7 +53,7 @@ export default function PinPad({ mode, doneHref, lockedHref = "/locked" }: Props
         {Array.from({ length: 6 }, (_, i) => (
           <span
             key={i}
-            className={`h-3.5 w-3.5 rounded-full border-2 border-blue-600 ${i < pin.length ? "bg-blue-600" : ""}`}
+            className={`h-3.5 w-3.5 rounded-full border-2 border-brand-600 ${i < pin.length ? "bg-brand-600" : ""}`}
           />
         ))}
       </div>
@@ -67,7 +67,7 @@ export default function PinPad({ mode, doneHref, lockedHref = "/locked" }: Props
             type="button"
             onClick={() => press(k)}
             disabled={!k}
-            className="rounded-xl border border-zinc-300 bg-white py-4 text-xl font-medium shadow-sm active:bg-blue-50 disabled:invisible"
+            className="rounded-xl border border-zinc-300 bg-white py-4 text-xl font-medium shadow-sm active:bg-brand-50 disabled:invisible"
           >
             {k}
           </button>

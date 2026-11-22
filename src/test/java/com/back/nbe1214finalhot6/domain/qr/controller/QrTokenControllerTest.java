@@ -31,18 +31,17 @@ class QrTokenControllerTest {
   @MockitoBean private QrService qrService;
 
   @Test
-  @DisplayName("스캔 조회 시 QR 식별자, 가맹점, 금액, 적립 대상 여부, 만료 시각을 반환한다")
+  @DisplayName("스캔 조회 시 가맹점, 금액, 적립 대상 여부, 만료 시각을 반환한다")
   void 스캔조회성공() throws Exception {
     given(qrService.scan("token-1"))
         .willReturn(
             new QrScanResponse(
-                7L, 3L, "테스트 가맹점", 5000L, true, LocalDateTime.of(2026, 11, 18, 9, 3)));
+                3L, "테스트 가맹점", 5000L, true, LocalDateTime.of(2026, 11, 18, 9, 3)));
 
     mockMvc
         .perform(get("/api/qr/{token}", "token-1"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
-        .andExpect(jsonPath("$.data.qrId").value(7))
         .andExpect(jsonPath("$.data.merchantId").value(3))
         .andExpect(jsonPath("$.data.merchantName").value("테스트 가맹점"))
         .andExpect(jsonPath("$.data.amount").value(5000))

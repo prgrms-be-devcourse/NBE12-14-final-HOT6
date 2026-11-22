@@ -103,4 +103,36 @@ class CashbackPolicyTest {
         .isInstanceOf(BusinessException.class)
         .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_POLICY);
   }
+
+  // 목적: 종료 시각을 앞당기면 바뀌고, 시작 이전·같음·기존 종료 이후·null 은 거부되며 값이 그대로인지 확인한다.
+  @Test
+  @DisplayName("종료 시각은 시작 이후이면서 기존 종료 이전으로만 앞당길 수 있다")
+  void shortenEnd() {
+    CashbackPolicy policy = CashbackPolicy.create(new BigDecimal("0.03"), START, END, NOW);
+    LocalDateTime mid = LocalDateTime.of(2026, 11, 15, 0, 0);
+
+    policy.shortenEnd(mid);
+    assertThat(policy.getEndsAt()).isEqualTo(mid);
+
+    for (LocalDateTime bad : new LocalDateTime[] {null, START, START.minusDays(1), END}) {
+      assertThatThrownBy(() -> policy.shortenEnd(bad))
+          .isInstanceOf(BusinessException.class)
+          .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_POLICY);
+    }
+    assertThat(policy.getEndsAt()).isEqualTo(mid);
+  }
+
+  // 목적: 무기한 구간도 종료 시각을 정해 줄일 수 있는지, 스냅샷이 이후 변경의 영향을 받지 않는지 확인한다.
+  @Test
+  @DisplayName("무기한 구간의 종료를 정할 수 있고 스냅샷은 변경 전 값을 유지한다")
+  void shortenEnd_openEndedAndSnapshot() {
+    CashbackPolicy policy = CashbackPolicy.create(new BigDecimal("0.03"), START, null, NOW);
+    CashbackPolicy snapshot = policy.snapshot();
+
+    policy.shortenEnd(END);
+
+    assertThat(policy.getEndsAt()).isEqualTo(END);
+    assertThat(snapshot.getEndsAt()).isNull();
+    assertThat(snapshot.getRate()).isEqualByComparingTo("0.03");
+  }
 }

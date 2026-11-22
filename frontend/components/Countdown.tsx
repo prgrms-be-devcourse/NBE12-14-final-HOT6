@@ -7,9 +7,14 @@ type Props = { seconds: number; className?: string; onExpire?: () => void };
 
 export default function Countdown({ seconds, className, onExpire }: Props) {
   const [left, setLeft] = useState(seconds);
+  const [base, setBase] = useState(seconds);
+
+  if (base !== seconds) {
+    setBase(seconds);
+    setLeft(seconds);
+  }
 
   useEffect(() => {
-    setLeft(seconds);
     const id = setInterval(() => setLeft((s) => Math.max(0, s - 1)), 1000);
     return () => clearInterval(id);
   }, [seconds]);

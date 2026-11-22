@@ -35,8 +35,9 @@ class QrServiceConcurrencyTest {
   @Test
   @DisplayName("같은 QR 을 동시에 사용 처리해도 한 번만 성공한다")
   void 동시에사용처리해도한번만성공() throws Exception {
-    Long qrId =
-        qrCodeRepository.save(QrCode.createDynamic(1L, 1000L, LocalDateTime.now(clock))).getId();
+    LocalDateTime now = LocalDateTime.now(clock);
+    QrCode qr = qrCodeRepository.save(QrCode.createDynamic(1L, 1000L, now));
+    Long qrId = qr.getId();
     ExecutorService executor = Executors.newFixedThreadPool(THREADS);
     CountDownLatch ready = new CountDownLatch(THREADS);
     CountDownLatch start = new CountDownLatch(1);
@@ -49,7 +50,7 @@ class QrServiceConcurrencyTest {
               ready.countDown();
               start.await();
               try {
-                qrService.markUsed(qrId);
+                qrService.markUsed(qr.getToken(), now);
                 return null;
               } catch (BusinessException e) {
                 return (QrErrorCode) e.getErrorCode();

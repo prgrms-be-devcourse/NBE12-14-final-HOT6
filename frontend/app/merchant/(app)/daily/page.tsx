@@ -20,7 +20,6 @@ export default function MerchantDailyPage() {
         </section>
         <h2 className="px-1.5 pt-2 text-base font-medium">최근 정산</h2>
         <ul>{dailySettles.slice(1, 5).map((d) => <li key={d.date} className="flex justify-between border-t border-zinc-200 px-1.5 py-2.5"><span>{d.date}</span><span className="font-medium">{won(d.net)}</span></li>)}</ul>
-        <div className="card-dash"><ul className="space-y-0.5"><li>• 같은 날짜 정산은 중복 생성 불가</li><li>• 이월 금액은 다음 정산에 합산</li></ul></div>
       </div>
     </>
   );
