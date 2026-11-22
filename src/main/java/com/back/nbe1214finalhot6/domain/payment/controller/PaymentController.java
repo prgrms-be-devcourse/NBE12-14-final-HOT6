@@ -4,6 +4,7 @@ import com.back.nbe1214finalhot6.common.idempotency.IdempotencyKeys;
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
+import com.back.nbe1214finalhot6.domain.payment.service.PaymentCancelService;
 import com.back.nbe1214finalhot6.domain.payment.service.PaymentFacade;
 import com.back.nbe1214finalhot6.domain.payment.service.PaymentQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +23,7 @@ public class PaymentController {
 
   private final PaymentFacade paymentFacade;
   private final PaymentQueryService paymentQueryService;
+  private final PaymentCancelService paymentCancelService;
 
   @Operation(summary = "QR 결제", description = "멱등키 헤더로 중복 결제를 방지하며 QR 결제를 요청한다")
   @PostMapping
@@ -48,5 +50,15 @@ public class PaymentController {
     String validKey = IdempotencyKeys.validate(key);
 
     return ApiResponse.ok(paymentQueryService.findByKey(walletId, validKey));
+  }
+
+  @Operation(summary = "결제 취소",
+             description = "가맹점주가 결제 완료된 결제 1건을 전액 취소한다. 이미 취소된 결제는 기존 결과를 그대로 반환한다. "
+                 + "COMPLETED 가 아닌 결제는 409(PAY-006), 다른 가맹점의 결제는 403(PAY-007)")
+  @PostMapping("/{id}/cancel")
+  public ApiResponse<PaymentResponse> cancel(
+      @PathVariable Long id,
+      @RequestParam Long merchantId) { // TODO: JWT 연동 후 토큰에서 추출
+    return ApiResponse.ok(paymentCancelService.cancel(merchantId, id));
   }
 }

@@ -14,6 +14,7 @@ import com.back.nbe1214finalhot6.common.idempotency.IdempotencyKeys;
 import com.back.nbe1214finalhot6.domain.payment.exception.PaymentErrorCode;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
+import com.back.nbe1214finalhot6.domain.payment.service.PaymentCancelService;
 import com.back.nbe1214finalhot6.domain.payment.service.PaymentFacade;
 import com.back.nbe1214finalhot6.domain.payment.service.PaymentQueryService;
 import java.math.BigDecimal;
@@ -35,6 +36,7 @@ class PaymentControllerTest {
   @Autowired private MockMvc mockMvc;
   @MockitoBean private PaymentFacade paymentFacade;
   @MockitoBean private PaymentQueryService paymentQueryService;
+  @MockitoBean private PaymentCancelService paymentCancelService;
 
   @Test
   @DisplayName("재조회 성공 시 200 과 영수증 필드(상태, 사용분, 적립액, 요율, 지급 예정 시각, 제외 사유, 실패 코드)를 반환한다")
@@ -54,7 +56,8 @@ class PaymentControllerTest {
             "NONE", // 적립 제외 사유
             null, // 실패 코드 (완료 건이라 없음)
             LocalDateTime.of(2026, 11, 20, 10, 0, 0), // 접수 시각
-            LocalDateTime.of(2026, 11, 20, 10, 0, 3)); // 완료 시각
+            LocalDateTime.of(2026, 11, 20, 10, 0, 3), // 완료 시각
+            null); // 취소 시각 (취소 전)
     given(paymentQueryService.findByKey(1L, key)).willReturn(response);
 
     // when & then : 멱등키는 경로, walletId 는 쿼리 파라미터로 보낸다 (GET 이라 본문 없음)
@@ -135,6 +138,7 @@ class PaymentControllerTest {
                 null,
                 null,
                 "NONE",
+                null,
                 null,
                 null,
                 null));
