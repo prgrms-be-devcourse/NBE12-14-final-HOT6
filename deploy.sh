@@ -16,4 +16,8 @@ $COMPOSE build backend
 $COMPOSE build frontend
 
 $COMPOSE up -d
+
+# nginx 설정 파일만 바뀐 경우에는 컨테이너가 다시 만들어지지 않으므로 설정을 다시 읽게 한다.
+$COMPOSE exec -T nginx nginx -s reload
+
 $COMPOSE ps
