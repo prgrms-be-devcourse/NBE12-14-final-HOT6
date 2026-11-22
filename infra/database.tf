@@ -6,7 +6,8 @@ resource "aws_db_subnet_group" "main" {
 }
 
 resource "aws_db_instance" "main" {
-  # RDS 식별자는 하이픈 두 개가 연속될 수 없어서 다른 리소스와 달리 하이픈을 하나만 쓴다.
+  # 다른 리소스는 이름 규칙(devcos-team06--종류)에 따라 하이픈을 두 개 쓰지만,
+  # RDS 식별자는 하이픈이 연속될 수 없어서 이 리소스만 하나만 쓴다.
   identifier     = "devcos-team06-db"
   engine         = "postgres"
   engine_version = "17"

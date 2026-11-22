@@ -4,7 +4,7 @@ EC2 1대에서 Docker로 nginx, 백엔드, 프론트엔드를 실행하고, DB�
 
 ```
 인터넷 → [탄력적 IP] → EC2 (nginx 80/443)
-                        ├─ /api, /swagger-ui, /v3/api-docs, /actuator/health → backend:8080 → RDS(5432)
+                        ├─ /api, /actuator/health → backend:8080 → RDS(5432)
                         └─ 그 외 → frontend:3000
 ```
 
@@ -129,7 +129,6 @@ docker compose -f docker-compose.prod.yml restart nginx
 | 확인 | 주소 | 기대 결과 |
 |---|---|---|
 | 헬스 체크 | `https://<도메인>/actuator/health` | `{"status":"UP"}` |
-| Swagger | `https://<도메인>/swagger-ui/index.html` | API 문서 화면 |
 | 프론트 | `https://<도메인>/` | 메인 화면, 주소창에 자물쇠 |
 | HTTP | `http://<도메인>/` | HTTPS로 자동 이동 |
 
@@ -154,5 +153,8 @@ docker compose -f docker-compose.prod.yml restart nginx
 ## 알려진 사항
 
 - `ddl-auto: update`를 서버에서 유지하고 있습니다. 마이그레이션 도구가 도입되면 `validate`로 바꿉니다.
-- `ProdSecurityConfig`는 Swagger와 헬스 체크를 열기 위한 임시 설정입니다. 인증 기능이 합쳐지면 `SecurityConfig`로 통합하고, Swagger 공개 여부를 정합니다.
+- **인증 없는 API가 외부에 열려 있습니다.** 기존 `SecurityConfig`가 가맹점, QR, 결제, 회원가입, 운영자 API를 인증 없이 허용하고, nginx가 `/api/`를 그대로 전달합니다. 인증 기능(COM-03)이 합쳐지기 전까지의 임시 상태이므로, 실제 개인정보나 계좌 정보를 입력하지 않습니다.
+- nginx에서 `/api/admin` 경로를 403으로 차단하고 있습니다. 인증 기능이 합쳐지면 이 차단을 제거합니다. 결제, 가맹점, QR은 화면이 사용하는 경로라서 nginx로 막지 않습니다.
+- 운영 환경에서는 Swagger(API 명세)를 끄고, 프론트의 개발용 화면(`/dev`)도 nginx에서 막습니다. API 명세는 로컬에서 앱을 실행해 `http://localhost:8080/swagger-ui/index.html`로 확인합니다.
+- `ProdSecurityConfig`는 헬스 체크를 열기 위한 임시 설정입니다. 인증 기능이 합쳐지면 `SecurityConfig`로 통합하고 삭제합니다.
 - 상태 파일은 로컬에 보관합니다. 팀 공유가 필요해지면 S3 버킷으로 옮깁니다.
