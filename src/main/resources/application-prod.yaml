@@ -10,6 +10,13 @@ spring:
 server:
   forward-headers-strategy: framework
 
+# 운영 환경에서는 API 명세를 공개하지 않는다. 로컬에서는 그대로 열린다.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 management:
   endpoints:
     web:
