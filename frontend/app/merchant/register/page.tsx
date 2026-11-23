@@ -1,17 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Header from "@/components/Header";
 import MapPicker, { type LatLng } from "@/components/MapPicker";
 import { ApiError } from "@/lib/api";
-import { loadCtx, saveCtx } from "@/lib/devContext";
+import { saveCtx } from "@/lib/devContext";
 import { CATEGORIES } from "@/lib/stores";
 import { registerMerchant } from "@/lib/endpoints";
 
 export default function MerchantRegisterPage() {
   const router = useRouter();
-  const [ownerId, setOwnerId] = useState(1);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -20,15 +19,12 @@ export default function MerchantRegisterPage() {
   const [pos, setPos] = useState<LatLng | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
-  useEffect(() => setOwnerId(loadCtx().ownerId), []);
-
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      const res = await registerMerchant({ ownerId, name: name.trim(), address: address.trim(), ...(proof ? { revenueProof: proof } : {}) });
+      const res = await registerMerchant({ name: name.trim(), address: address.trim(), ...(proof ? { revenueProof: proof } : {}) });
       saveCtx({ merchantId: res.merchantId, merchantName: res.name, category, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
       router.push("/merchant/edit");
     } catch (err) {
