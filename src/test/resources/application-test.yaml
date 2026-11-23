@@ -8,6 +8,10 @@ spring:
       ddl-auto: create-drop
     show-sql: false
 
+# 테스트 전용 JWT 서명 키(32바이트 이상). 운영 키와 무관하다.
+jwt:
+  secret: test-only-jwt-secret-key-0123456789-abcdef
+
 # 테스트에서는 스케줄러를 끄고 배치 메서드를 직접 호출한다.
 cashback:
   scheduler:
