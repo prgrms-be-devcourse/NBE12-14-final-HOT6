@@ -38,7 +38,7 @@ public class MonthlySettlementProcessor {
   public void withdrawAndComplete(Long settlementId) {
     MonthlySettlement settlement =
         settlementRepository
-            .findById(settlementId)
+            .findWithLockById(settlementId)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.INVALID_REQUEST));
     if (settlement.isPaid()) {
       return;
