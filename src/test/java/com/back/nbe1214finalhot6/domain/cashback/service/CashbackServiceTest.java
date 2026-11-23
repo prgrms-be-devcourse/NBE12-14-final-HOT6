@@ -1,7 +1,6 @@
 package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackExclusionReason;
@@ -235,16 +234,5 @@ class CashbackServiceTest {
 
     assertThat(result.exclusionReason()).isEqualTo(CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED);
     assertThat(result.monthlyLimitRemaining()).isZero();
-  }
-
-  @Test
-  @DisplayName("취소는 아직 아무 일도 하지 않고 여러 번 호출해도 예외가 없다")
-  void cancel_doesNothingYet() {
-    assertThatCode(
-            () -> {
-              service.cancel(1L);
-              service.cancel(1L);
-            })
-        .doesNotThrowAnyException();
   }
 }
