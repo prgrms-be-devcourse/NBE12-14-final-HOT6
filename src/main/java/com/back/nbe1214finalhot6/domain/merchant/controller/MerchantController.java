@@ -2,6 +2,8 @@ package com.back.nbe1214finalhot6.domain.merchant.controller;
 
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.common.security.OwnedResources;
+import com.back.nbe1214finalhot6.domain.auth.security.AuthUser;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
@@ -15,9 +17,9 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class MerchantController {
 
   private final MerchantService merchantService;
+  private final OwnedResources ownedResources;
 
   @Operation(
       summary = "가맹점 등록",
@@ -44,11 +47,13 @@ public class MerchantController {
 
   @Operation(
       summary = "가맹점 수정",
-      description = "이름, 주소 중 요청에 포함된 항목만 수정한다. 포함되지 않은 항목은 기존 값을 유지하며, 적립 대상 여부는 수정할 수 없다")
-  @PatchMapping("/{merchantId}")
+      description =
+          "로그인한 점주의 가맹점을 수정한다(가맹점 번호는 토큰의 회원으로 찾는다). "
+              + "이름, 주소 중 요청에 포함된 항목만 수정한다. 포함되지 않은 항목은 기존 값을 유지하며, 적립 대상 여부는 수정할 수 없다")
+  @PatchMapping("/me")
   public ApiResponse<MerchantResponse> update(
-      @PathVariable Long merchantId, @Valid @RequestBody MerchantUpdateRequest request) {
-    return ApiResponse.ok(merchantService.update(merchantId, request));
+      @AuthenticationPrincipal AuthUser user, @Valid @RequestBody MerchantUpdateRequest request) {
+    return ApiResponse.ok(merchantService.update(ownedResources.merchantIdOf(user), request));
   }
 
   @Operation(
