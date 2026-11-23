@@ -9,6 +9,8 @@ public enum ReconciliationType {
   CASHBACK_BALANCE,
   // 3번: 적립 건 상태와 원장의 적립·회수 기록 일치
   CASHBACK_EARNING,
+  // 3번: 캐시백 월·연 예산의 확보·지급 금액 = 적립 건 합계
+  CASHBACK_BUDGET,
   // 4번: 충전액 = 계좌 원장 차감액 = 지갑 원장 입금액
   CHARGE_TRANSFER,
   // 5번: 환불액 = 지갑 원장 차감액 = 계좌 원장 입금액
