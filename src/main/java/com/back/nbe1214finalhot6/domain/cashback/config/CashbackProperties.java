@@ -28,8 +28,10 @@ public record CashbackProperties(
   /**
    * @param enabled false 면 스케줄러가 돌지 않는다(테스트에서는 배치 메서드를 직접 호출한다)
    * @param payoutIntervalSeconds 지급 배치 실행 간격(초). 데모에서는 10초로 줄인다
+   * @param stopCheckIntervalSeconds 중단 예약 시각 도달 점검 간격(초)
    */
   public record Scheduler(
       @DefaultValue("true") boolean enabled,
-      @DefaultValue("3600") long payoutIntervalSeconds) {}
+      @DefaultValue("3600") long payoutIntervalSeconds,
+      @DefaultValue("60") long stopCheckIntervalSeconds) {}
 }

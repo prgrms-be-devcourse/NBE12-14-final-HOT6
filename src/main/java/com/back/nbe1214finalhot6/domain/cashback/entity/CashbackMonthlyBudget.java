@@ -13,6 +13,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -69,6 +70,10 @@ public class CashbackMonthlyBudget {
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
   private BudgetStatus status;
+
+  // 공지 후 중단 예약 시각. 공지({@code NOTICED}) 상태일 때만 있다
+  @Column(name = "stop_scheduled_at")
+  private LocalDateTime stopScheduledAt;
 
   private CashbackMonthlyBudget(
       int budgetYear,
