@@ -11,6 +11,7 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetResponse;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackNoticeRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ class CashbackBudgetReservationConcurrencyTest {
   @Autowired private CashbackBudgetService budgetService;
   @Autowired private CashbackAnnualBudgetRepository annualBudgetRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
+  @Autowired private CashbackNoticeRepository noticeRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
 
   // 연 예산 12,000,000 / 12월 배정 1,000,000
@@ -55,6 +57,7 @@ class CashbackBudgetReservationConcurrencyTest {
 
   @AfterEach
   void cleanUp() {
+    noticeRepository.deleteAll(); // 상태 전이·요율 인하가 남긴 공지가 다른 테스트에 섞이지 않게 한다
     monthlyBudgetRepository.deleteAll();
     annualBudgetRepository.deleteAll();
   }

@@ -9,6 +9,7 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackNoticeRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyHistoryRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
@@ -41,12 +42,14 @@ class CashbackPolicyReductionLockTest {
   @Autowired private CashbackPolicyRepository policyRepository;
   @Autowired private CashbackPolicyHistoryRepository historyRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
+  @Autowired private CashbackNoticeRepository noticeRepository;
   @Autowired private CashbackAnnualBudgetRepository annualBudgetRepository;
 
   @AfterEach
   void cleanUp() {
     historyRepository.deleteAll();
     policyRepository.deleteAll();
+    noticeRepository.deleteAll(); // 상태 전이·요율 인하가 남긴 공지가 다른 테스트에 섞이지 않게 한다
     monthlyBudgetRepository.deleteAll();
     annualBudgetRepository.deleteAll();
   }

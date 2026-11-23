@@ -135,7 +135,8 @@ public interface CashbackMonthlyBudgetRepository
       select m.id as id,
              m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
                     - m.reservedAmount - m.paidAmount as remaining,
-             m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount as total
+             m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount as total,
+             m.contingencyAmount as contingency
       from CashbackMonthlyBudget m where m.id = :id
       """)
   Optional<MonthlyBudgetSnapshot> findSnapshot(@Param("id") Long id);

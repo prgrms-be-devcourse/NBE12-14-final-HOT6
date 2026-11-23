@@ -93,6 +93,36 @@ public class CashbackNotice {
         NoticeType.POLICY_CHANGE, content, from, null, policy.getId(), createdAt);
   }
 
+  /**
+   * 소진 예고를 만든다. 남은 예산이 긴급선 비율 이하가 되거나 중단 예정일이 되면 적립이 멈출 수 있다는 안내이며, 시각은 쓰지 않고 날짜와 %만 쓴다.
+   *
+   * @param emergencyLineRate 긴급 중단선(전체 예산 대비, 소수 비율 0.05)
+   * @param noticeDays 공지 후 중단까지의 최대 일수
+   * @param stopAt 중단 예정일
+   */
+  public static CashbackNotice budgetNotice(
+      BigDecimal emergencyLineRate, int noticeDays, LocalDate stopAt, LocalDateTime createdAt) {
+    String content =
+        "남은 예산이 "
+            + percent(emergencyLineRate)
+            + "% 이하이거나 최대 "
+            + noticeDays
+            + "일 뒤 적립이 중단될 수 있어요. 예산이 더 빨리 소진되면 먼저 종료될 수 있어요. 결제는 정상 이용할 수 있어요";
+    return new CashbackNotice(
+        NoticeType.BUDGET_NOTICE, content, createdAt.toLocalDate(), stopAt, null, createdAt);
+  }
+
+  /** 긴급 중단을 만든다. 적립이 이미 중단됐다는 안내다. */
+  public static CashbackNotice emergencyStop(LocalDateTime createdAt) {
+    return new CashbackNotice(
+        NoticeType.EMERGENCY_STOP,
+        "적립이 중단되었어요. 결제는 정상 이용할 수 있어요",
+        createdAt.toLocalDate(),
+        null,
+        null,
+        createdAt);
+  }
+
   /** 소수 비율(0.05)을 퍼센트 문자열(5)로 바꾼다. 소수가 있으면 그대로 둔다(0.035 -> 3.5). */
   static String percent(BigDecimal rate) {
     return rate.movePointRight(2).stripTrailingZeros().toPlainString();

@@ -13,6 +13,7 @@ import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudget
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackBudgetTransferRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackBudgetStateLogRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackNoticeRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
 import java.math.BigDecimal;
@@ -47,6 +48,7 @@ class CashbackBudgetCloseServiceTest {
   @Autowired private CashbackBudgetTransferRepository transferRepository;
   @Autowired private CashbackBudgetStateLogRepository stateLogRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
+  @Autowired private CashbackNoticeRepository noticeRepository;
   @Autowired private CashbackAnnualBudgetRepository annualBudgetRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private Clock clock;
@@ -62,6 +64,7 @@ class CashbackBudgetCloseServiceTest {
   void cleanUp() {
     transferRepository.deleteAll();
     stateLogRepository.deleteAll(); // 마감이 남긴 상태 이력이 다른 테스트의 건수 검증에 섞이지 않게 한다
+    noticeRepository.deleteAll(); // 상태 전이·요율 인하가 남긴 공지가 다른 테스트에 섞이지 않게 한다
     monthlyBudgetRepository.deleteAll();
     annualBudgetRepository.deleteAll();
   }
