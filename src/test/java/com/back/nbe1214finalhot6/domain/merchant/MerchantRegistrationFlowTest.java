@@ -89,6 +89,31 @@ class MerchantRegistrationFlowTest {
   }
 
   @Test
+  @DisplayName("이미 가맹점을 등록한 회원이 다시 등록하면 409 MER-002 이다")
+  void secondRegistrationIsConflict() throws Exception {
+    signup();
+    String token = login();
+    String body = "{\"name\": \"가맹점\", \"address\": \"인천광역시 남동구 1\"}";
+
+    mockMvc
+        .perform(
+            post("/api/merchants")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isCreated());
+
+    mockMvc
+        .perform(
+            post("/api/merchants")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MER-002"));
+  }
+
+  @Test
   @DisplayName("로그인하지 않고 가맹점을 등록하면 401 이다")
   void anonymousCannotRegister() throws Exception {
     mockMvc

@@ -142,6 +142,21 @@ class MerchantControllerTest {
   }
 
   @Test
+  @DisplayName("이미 가맹점을 등록한 회원이면 409 MER-002 이다")
+  void 이미등록했으면409() throws Exception {
+    given(registrationFacade.register(any(), any()))
+        .willThrow(new BusinessException(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED));
+
+    mockMvc
+        .perform(
+            post("/api/merchants")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody("테스트 가맹점", "인천광역시 남동구 1")))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MER-002"));
+  }
+
+  @Test
   @DisplayName("이름이 100자면 201, 101자면 400")
   void 이름길이경계값() throws Exception {
     given(registrationFacade.register(any(), any()))
