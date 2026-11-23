@@ -1,6 +1,7 @@
 package com.back.nbe1214finalhot6.domain.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -122,7 +123,13 @@ class WithdrawalFlowTest {
     assertThat(jdbcTemplate.queryForObject("select count(*) from refund", Integer.class))
         .isEqualTo(1);
 
-    // 5) 탈퇴한 회원은 다시 로그인할 수 없다
+    // 5) 같은 토큰으로 다른 API 를 불러도 즉시 막힌다(토큰 만료를 기다리지 않음)
+    mockMvc
+        .perform(get("/api/merchants").param("name", "x").header("Authorization", "Bearer " + token))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("AUTH-004"));
+
+    // 6) 탈퇴한 회원은 다시 로그인할 수 없다
     login().andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("AUTH-004"));
   }
 }

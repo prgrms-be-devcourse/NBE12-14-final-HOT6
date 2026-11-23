@@ -17,6 +17,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   Optional<User> findByEmail(String email);
 
+  // 인증 필터가 매 요청 탈퇴 여부를 확인하는 데 쓴다. 객체를 읽지 않고 존재 여부만 가볍게 묻는다
+  boolean existsByIdAndStatus(Long id, UserStatus status);
+
   /**
    * 활동 중인 회원을 탈퇴로 바꾼다. 객체를 읽어 고쳐 저장하면 그 사이 다른 요청(예: PIN 실패 횟수)이 바꾼 값을 낡은 값으로 덮어쓸 수 있어서, 상태와 탈퇴 시각만
    * 조건부 UPDATE 로 바꾼다. 반영된 행이 0이면 이미 탈퇴한 것이다.
