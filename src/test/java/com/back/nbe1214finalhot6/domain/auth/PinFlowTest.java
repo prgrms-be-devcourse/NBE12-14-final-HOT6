@@ -10,6 +10,8 @@ import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
+import com.back.nbe1214finalhot6.support.MutableClock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -39,6 +41,7 @@ class PinFlowTest {
   @Autowired UserRepository userRepository;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired JdbcTemplate jdbcTemplate;
+  @Autowired MutableClock clock;
 
   private final List<Long> userIds = new ArrayList<>();
 
@@ -85,6 +88,25 @@ class PinFlowTest {
 
     verify(user, PIN).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("AUTH-006"));
     assertThat(failCount(user)).isEqualTo(5);
+  }
+
+  // 목적: 잠긴 지 30분이 지나면 실제 보안 설정과 DB 로도 풀려서 맞는 PIN 이 통과하는지 확인한다.
+  // (임시 방식. MVP 이후에는 이메일 인증으로 해제(U7)로 바꾼다)
+  @Test
+  @DisplayName("잠긴 지 30분이 지나면 풀려서 맞는 PIN 이 통과한다")
+  void unlocksAfterThirtyMinutes() throws Exception {
+    User user = save("pf6@devpay.com", "01044440006", UserRole.USER);
+    for (int i = 0; i < 5; i++) {
+      verify(user, "000000");
+    }
+    verify(user, PIN).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("AUTH-006"));
+
+    clock.advance(Duration.ofMinutes(29).plusSeconds(59));
+    verify(user, PIN).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("AUTH-006"));
+
+    clock.advance(Duration.ofSeconds(1));
+    verify(user, PIN).andExpect(status().isOk());
+    assertThat(failCount(user)).isZero();
   }
 
   // 목적: 한 번 틀린 뒤 맞으면 성공하고, 실패 횟수가 0으로 돌아가 다시 5번의 기회가 생기는지 확인한다.

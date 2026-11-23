@@ -30,6 +30,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
   int recordPinFailure(
       @Param("id") Long id, @Param("max") int max, @Param("now") LocalDateTime now);
 
+  /**
+   * 잠긴 지 오래돼서(잠금 시각이 threshold 이전) 잠금 시간이 지난 회원의 잠금과 실패 횟수를 초기화한다.
+   *
+   * <p>조건에 잠금 시각을 넣어서, 이미 다른 요청이 풀고 그 사이에 새로 틀려 올린 횟수를 되돌리지 않는다. 반영된 행이 0이면 풀 것이 없는 것이다.
+   */
+  @Modifying(clearAutomatically = true, flushAutomatically = true)
+  @Query(
+      "update User u set u.pinFailCount = 0, u.pinLockedAt = null "
+          + "where u.id = :id and u.pinLockedAt is not null and u.pinLockedAt <= :threshold")
+  int unlockPinIfExpired(@Param("id") Long id, @Param("threshold") LocalDateTime threshold);
+
   /** 맞는 PIN 이면 실패 횟수를 0으로 되돌린다. 잠긴 회원은 건드리지 않는다. */
   @Modifying(clearAutomatically = true, flushAutomatically = true)
   @Query(
