@@ -2,6 +2,7 @@ package com.back.nbe1214finalhot6.domain.cashback.controller;
 
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackSummaryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.EarningResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyLimitResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
@@ -31,6 +32,17 @@ public class CashbackQueryController {
   public ApiResponse<MonthlyLimitResponse> monthlyLimit(
       @RequestParam Long walletId) { // TODO: JWT 연동 후 토큰에서 추출
     return ApiResponse.ok(queryService.getMonthlyLimit(walletId));
+  }
+
+  @Operation(
+      summary = "이번 달 적립 요약",
+      description =
+          "이번 달(한국 시간, 결제 접수 시각 기준) 적립액·적립 예정·지급 완료 금액과 제외 건수를 돌려준다."
+              + " 취소·회수된 건은 금액에 넣지 않는다")
+  @GetMapping("/summary")
+  public ApiResponse<CashbackSummaryResponse> summary(
+      @RequestParam Long walletId) { // TODO: JWT 연동 후 토큰에서 추출
+    return ApiResponse.ok(queryService.getSummary(walletId));
   }
 
   @Operation(

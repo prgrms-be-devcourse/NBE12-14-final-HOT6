@@ -1,16 +1,19 @@
 package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackSummaryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.EarningResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyLimitResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackEarning;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyLimitRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.EarningStatusTotal;
 import com.back.nbe1214finalhot6.setting.SettingKey;
 import com.back.nbe1214finalhot6.setting.service.OperatorSettingService;
 import java.time.Clock;
 import java.time.YearMonth;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -43,6 +46,33 @@ public class CashbackQueryService {
     // 한도를 사용량보다 낮춘 경우처럼 음수가 되면 0 으로 돌려준다
     return new MonthlyLimitResponse(
         month.getYear(), month.getMonthValue(), limit, used, Math.max(0L, limit - used));
+  }
+
+  /**
+   * 이번 달(서버 시각, 한국 시간) 적립 요약. 월은 결제 접수 시각의 월이라 월 적립 한도와 같은 기준이다. 적립 예정과 지급 완료만 금액에 넣고,
+   * 취소·회수된 건은 넣지 않는다. 제외 건은 적립액이 0이라 건수만 센다. 적립이 없으면 모두 0이다.
+   */
+  public CashbackSummaryResponse getSummary(Long walletId) {
+    YearMonth month = YearMonth.now(clock);
+    List<EarningStatusTotal> totals =
+        earningRepository.summarizeByStatus(
+            walletId, month.atDay(1).atStartOfDay(), month.plusMonths(1).atDay(1).atStartOfDay());
+    long pending = amountOf(totals, EarningStatus.PENDING);
+    long paid = amountOf(totals, EarningStatus.PAID);
+    long excluded =
+        totals.stream()
+            .filter(total -> total.getStatus() == EarningStatus.EXCLUDED)
+            .mapToLong(EarningStatusTotal::getCount)
+            .sum();
+    return new CashbackSummaryResponse(
+        month.getYear(), month.getMonthValue(), pending + paid, pending, paid, excluded);
+  }
+
+  private static long amountOf(List<EarningStatusTotal> totals, EarningStatus status) {
+    return totals.stream()
+        .filter(total -> total.getStatus() == status)
+        .mapToLong(EarningStatusTotal::getAmount)
+        .sum();
   }
 
   /**

@@ -91,4 +91,19 @@ public interface CashbackEarningRepository extends JpaRepository<CashbackEarning
   /** 한 이용자의 적립 내역 중 해당 상태만. */
   Page<CashbackEarning> findByWalletIdAndStatus(
       Long walletId, EarningStatus status, Pageable pageable);
+
+  /**
+   * 한 이용자의 적립 건을 상태별로 묶어 건수와 금액 합계를 돌려준다. 접수 시각이 {@code from} 이상 {@code to} 미만인 건만 센다. 읽기만 한다.
+   */
+  @Query(
+      """
+      select e.status as status, count(e) as count, coalesce(sum(e.amount), 0L) as amount
+      from CashbackEarning e
+      where e.walletId = :walletId and e.requestedAt >= :from and e.requestedAt < :to
+      group by e.status
+      """)
+  List<EarningStatusTotal> summarizeByStatus(
+      @Param("walletId") Long walletId,
+      @Param("from") LocalDateTime from,
+      @Param("to") LocalDateTime to);
 }
