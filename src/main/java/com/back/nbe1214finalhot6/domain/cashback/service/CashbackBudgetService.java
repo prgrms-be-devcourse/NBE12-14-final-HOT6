@@ -181,6 +181,23 @@ public class CashbackBudgetService {
     }
   }
 
+  /**
+   * 확보했던 예산을 지급으로 옮긴다. 캐시백 도메인 내부 전용이며 지급 배치가 호출한다. 남은 예산은 변하지 않는다. 호출한 쪽의 트랜잭션에 참여하고, 연
+   * 예산, 월 예산 순서로 옮긴다.
+   *
+   * @throws BusinessException 금액이 0 이하이거나 월이 1~12 가 아닐 때, 확보한 금액보다 많이 옮기려 할 때(CSH-007). 예외가 나면 이미 옮긴
+   *     부분도 함께 롤백된다
+   */
+  @Transactional
+  public void settleBudget(int year, int month, long amount) {
+    validateReservation(month, amount);
+    if (annualBudgetRepository.settle(year, amount) == 0
+        || monthlyBudgetRepository.settle(year, month, amount) == 0) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_BUDGET, "확보한 금액보다 많이 지급으로 옮길 수 없습니다");
+    }
+  }
+
   private static void validateReservation(int month, long amount) {
     CashbackMonthlyBudget.validateMonth(month);
     if (amount <= 0) {

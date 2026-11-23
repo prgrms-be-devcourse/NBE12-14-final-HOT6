@@ -2,18 +2,22 @@ package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
-import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyLimitRepository;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Wallet;
+import com.back.nbe1214finalhot6.domain.wallet.repository.WalletRepository;
+import com.back.nbe1214finalhot6.domain.wallet.repository.WalletTransactionRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
+import com.back.nbe1214finalhot6.support.MutableClock;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -29,7 +33,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -51,7 +54,10 @@ class CashbackCancelConcurrencyTest {
   @Autowired private CashbackMonthlyLimitRepository limitRepository;
   @Autowired private CashbackAnnualBudgetRepository annualBudgetRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
-  @Autowired private JdbcTemplate jdbcTemplate;
+  @Autowired private CashbackPayoutProcessor payoutProcessor;
+  @Autowired private WalletRepository walletRepository;
+  @Autowired private WalletTransactionRepository walletTransactionRepository;
+  @Autowired private Clock clock;
   @Autowired private TransactionTemplate transactionTemplate;
 
   // 연 예산 12,000,000 / 11월 배정 1,000,000, 기본 요율 3%
@@ -65,6 +71,8 @@ class CashbackCancelConcurrencyTest {
   void cleanUp() {
     earningRepository.deleteAll();
     limitRepository.deleteAll();
+    walletTransactionRepository.deleteAll();
+    walletRepository.deleteAll();
     monthlyBudgetRepository.deleteAll();
     annualBudgetRepository.deleteAll();
   }
@@ -130,53 +138,51 @@ class CashbackCancelConcurrencyTest {
     assertThat(budgetService.getAnnual(2026).reservedAmount()).isEqualTo(300L);
   }
 
-  // 목적: 취소와 지급 전환이 동시에 와도 한쪽만 성공하는지 확인한다. 지급이 이기면 취소는 거절되고 예산·한도가 그대로이며, 취소가 이기면 지급
-  // 전환은 0건이라 모두 되돌아가 있어야 한다. 두 결과가 섞이면 안 된다.
+  // 목적: 취소와 지급 배치가 동시에 와도 한쪽만 이기고 돈이 어긋나지 않는지 확인한다. 취소가 먼저면 입금 없이 취소(예산 반환)로 끝나고, 지급이
+  // 먼저면 입금 뒤 회수(예산은 지급으로 옮겨진 채)로 끝난다. 어느 쪽이든 지갑 순잔액은 0, 월 한도는 돌아와 있어야 한다.
   @Test
-  @DisplayName("취소와 지급 전환이 동시에 와도 한쪽만 성공한다")
-  void cancelRacingPayout_onlyOneWins() throws Exception {
-    int paidWins = 0;
-    int cancelWins = 0;
+  @DisplayName("취소와 지급 배치가 동시에 와도 한쪽 결과로만 끝나고 순잔액은 0 이다")
+  void cancelRacingPayout_consistent() throws Exception {
+    Long walletId =
+        walletRepository.save(Wallet.create(System.nanoTime(), LocalDateTime.now(clock))).getId();
+    ((MutableClock) clock).advance(Duration.ofDays(5));
+    int cancelFirst = 0;
+    int payFirst = 0;
     for (long paymentId = 1; paymentId <= 20; paymentId++) {
-      reserve(paymentId, 10_000L);
+      service.reserve(new CashbackReserveRequest(paymentId, walletId, true, 10_000L, AT));
+      Long earningId = earningRepository.findByPaymentId(paymentId).orElseThrow().getId();
       long id = paymentId;
       List<Callable<String>> tasks =
           List.of(
               () -> {
-                try {
-                  service.cancel(id);
-                  return "CANCEL";
-                } catch (BusinessException e) {
-                  assertThat(e.getErrorCode()).isEqualTo(CashbackErrorCode.EARNING_ALREADY_PAID);
-                  return "REJECTED";
-                }
+                service.cancel(id);
+                return "CANCEL";
               },
-              () ->
-                  jdbcTemplate.update(
-                              "update cashback_earning set status = 'PAID'"
-                                  + " where payment_id = ? and status = 'PENDING'",
-                              id)
-                          == 1
-                      ? "PAID"
-                      : "PAYOUT_LOST");
+              () -> payoutProcessor.pay(earningId).name());
 
-      List<String> results = runConcurrently(tasks);
+      runConcurrently(tasks);
+      // 취소가 지급 전 상태만 보고 지나간 경우를 위해 한 번 더 호출해 최종 상태를 확정한다(두 번째 호출은 이미 처리된 건에 무변화)
+      service.cancel(id);
 
-      EarningStatus status = earningRepository.findByPaymentId(paymentId).orElseThrow().getStatus();
-      if (results.contains("PAID")) {
-        paidWins++;
-        assertThat(results).contains("REJECTED");
-        assertThat(status).isEqualTo(EarningStatus.PAID);
+      EarningStatus status = earningRepository.findById(earningId).orElseThrow().getStatus();
+      assertThat(status).isIn(EarningStatus.CANCELED, EarningStatus.CLAWED_BACK);
+      long ledgerRows =
+          walletTransactionRepository.findAll().stream()
+              .filter(tx -> earningId.equals(tx.getRefKey()))
+              .count();
+      if (status == EarningStatus.CANCELED) {
+        cancelFirst++;
+        assertThat(ledgerRows).isZero();
       } else {
-        cancelWins++;
-        assertThat(results).containsExactly("CANCEL", "PAYOUT_LOST");
-        assertThat(status).isEqualTo(EarningStatus.CANCELED);
+        payFirst++;
+        assertThat(ledgerRows).isEqualTo(2);
       }
-      // 이긴 쪽에 맞게, 지금까지 지급된 건만 한도와 예산에 남아 있다
-      assertThat(limitService.usedAmount(WALLET, NOV)).isEqualTo(300L * paidWins);
-      assertThat(monthlyReserved()).isEqualTo(300L * paidWins);
+      assertThat(walletRepository.findById(walletId).orElseThrow().getCashbackBalance()).isZero();
+      assertThat(limitService.usedAmount(walletId, NOV)).isZero();
+      assertThat(monthlyReserved()).isZero();
+      assertThat(budgetService.getMonthly(2026, 11).paidAmount()).isEqualTo(300L * payFirst);
     }
-    assertThat(paidWins + cancelWins).isEqualTo(20);
+    assertThat(cancelFirst + payFirst).isEqualTo(20);
   }
 
   // 목적: 취소를 호출한 트랜잭션이 롤백되면 적립 건 상태, 한도, 예산 복원이 모두 함께 롤백되는지 확인한다.

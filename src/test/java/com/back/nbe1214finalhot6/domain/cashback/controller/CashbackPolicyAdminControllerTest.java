@@ -2,6 +2,7 @@ package com.back.nbe1214finalhot6.domain.cashback.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,7 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyHistoryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PolicyHistoryAction;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackPolicyService;
 import java.math.BigDecimal;
@@ -148,5 +152,70 @@ class CashbackPolicyAdminControllerTest {
         .perform(get("/api/admin/cashback/policies/2"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.code").value("CSH-001"));
+  }
+
+  // 목적: 이력 조회가 단건 조회 경로(/{policyId})와 겹치지 않고 /history 로 가서 목록과 변경 전·후 값을 내려 주는지 확인한다.
+  @Test
+  @DisplayName("이력 조회는 /history 로 가서 변경 전후 값을 반환한다")
+  void history_ok() throws Exception {
+    PolicyHistoryResponse created =
+        new PolicyHistoryResponse(
+            2L,
+            7L,
+            PolicyHistoryAction.CREATE,
+            null,
+            LocalDateTime.of(2026, 11, 18, 9, 0),
+            null,
+            null,
+            null,
+            new BigDecimal("0.0200"),
+            LocalDateTime.of(2026, 11, 18, 12, 0),
+            LocalDateTime.of(2026, 12, 1, 0, 0));
+    given(policyService.findHistory(7L, 1, 5))
+        .willReturn(new PageResponse<>(List.of(created), 1, 5, 6L, 2));
+
+    mockMvc
+        .perform(
+            get("/api/admin/cashback/policies/history")
+                .param("policyId", "7")
+                .param("page", "1")
+                .param("size", "5"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.totalElements").value(6))
+        .andExpect(jsonPath("$.data.content[0].action").value("CREATE"))
+        .andExpect(jsonPath("$.data.content[0].policyId").value(7))
+        .andExpect(jsonPath("$.data.content[0].beforeRate").doesNotExist())
+        .andExpect(jsonPath("$.data.content[0].afterRate").value(0.02));
+  }
+
+  // 목적: 필터와 페이지를 생략하면 전체, 첫 페이지, 기본 크기 20 으로 조회하는지 확인한다.
+  @Test
+  @DisplayName("이력 조회는 파라미터를 생략하면 전체 첫 페이지를 기본 크기로 조회한다")
+  void history_defaults() throws Exception {
+    given(policyService.findHistory(null, 0, 20))
+        .willReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0));
+
+    mockMvc
+        .perform(get("/api/admin/cashback/policies/history"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.content").isEmpty());
+
+    verify(policyService).findHistory(null, 0, 20);
+  }
+
+  // 목적: 페이지 번호·크기가 범위를 벗어나거나 정책 ID 가 숫자가 아니면 400 으로 걸러지는지 확인한다.
+  @Test
+  @DisplayName("이력 조회의 잘못된 파라미터는 400")
+  void history_invalidParameters() throws Exception {
+    mockMvc
+        .perform(get("/api/admin/cashback/policies/history").param("page", "-1"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/admin/cashback/policies/history").param("size", "0"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get("/api/admin/cashback/policies/history").param("policyId", "abc"))
+        .andExpect(status().isBadRequest());
   }
 }
