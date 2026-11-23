@@ -1,6 +1,10 @@
 spring:
   application:
     name: NBE12-14-final-HOT6
+  config:
+    # 프로젝트 폴더의 .env(커밋하지 않는 파일)를 읽는다. 로컬에서 JWT_SECRET 같은 값을 한 번 적어 두면 되고,
+    # 파일이 없으면(운영 등) 건너뛰므로 운영은 환경 변수를 그대로 쓴다.
+    import: optional:file:.env[.properties]
   datasource:
     url: jdbc:postgresql://localhost:5432/devpay
     username: devpay
@@ -12,3 +16,10 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+# JWT. 서명 키는 기본값을 두지 않는다. 환경 변수 JWT_SECRET(32바이트 이상)이 없으면 시작할 때 실패한다.
+# 저장소에 공개된 기본 키가 있으면 설정을 빠뜨린 서버가 그 키로 서명한 토큰(예: 운영자)을 믿게 되기 때문이다.
+# 테스트용 키는 application-test.yaml 에 둔다.
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-minutes: 30

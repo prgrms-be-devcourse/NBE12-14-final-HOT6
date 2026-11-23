@@ -23,7 +23,8 @@ public record PaymentResponse(
     String cashbackExclusionReason, // 적립 제외 사유 (적립됐으면 NONE, 결제 전이면 null)
     String failureCode, // 결제실패코드
     LocalDateTime requestedAt,  // 서버가 요청을 접수한 시각
-    LocalDateTime completedAt   // 결제 완료 시각 (완료 전/실패면 null)
+    LocalDateTime completedAt,  // 결제 완료 시각 (완료 전/실패면 null)
+    LocalDateTime canceledAt    // 결제 취소 시각 (취소 안 했으면 null, 취소해도 completedAt 은 그대로)
     ) {
 
   public static PaymentResponse of(Payment payment) {
@@ -39,7 +40,8 @@ public record PaymentResponse(
         payment.getCashbackExclusionReason(),
         payment.getFailureCode(),
         payment.getRequestedAt(),
-        payment.getCompletedAt()
+        payment.getCompletedAt(),
+        payment.getCanceledAt()
     );
   }
 }

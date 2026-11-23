@@ -47,7 +47,7 @@
 Controller → PaymentFacade (트랜잭션 없음)
   ├ PaymentIdempotencyService  T1: QR 조회(가맹점·금액) + 사용분 계산 → payment INSERT(PROCESSING) 후 즉시 커밋 (선점)
   ├ PaymentTxService T2: 결제 행 락 → QR 사용(markUsed) → 지갑 차감(debitPayment) → 적립 예약(reserve) → COMPLETED
-  │                      (락 순서 결제 → QR → 지갑 → 예산. 가맹점 매출 기록(D)은 호출이 필요한지 D에게 확인 중)
+  │                      (락 순서 결제 → QR → 지갑 → 예산. 가맹점 매출 기록 호출은 없음: 정산이 payment 를 직접 읽음)
   └ PaymentFailureService T3: T2 롤백 후 새 트랜잭션에서 FAILED + failure_code 기록
 ```
 - Facade에 트랜잭션을 두지 않는 이유: T1이 먼저 커밋되어 "이 키로 시도했다"는 기록이 남아야 하고, 유니크 위반 후에는 같은 트랜잭션을 쓸 수 없기 때문입니다.
@@ -93,6 +93,8 @@ Controller → PaymentFacade (트랜잭션 없음)
 | PAY-003 | 404 | 해당 멱등키로 접수된 결제 없음 | 구현·머지 (#83, 재조회 2-8절). 계속 404면 같은 키로 재결제해도 안전 |
 | PAY-004 | 408 | 처리 시간 초과 | **MVP 이후로 보류.** PROCESSING 정리 스케줄러가 FAILED로 바꿀 때 기록할 코드 (2-8절) |
 | PAY-005 | 503 | 락 대기 초과 | **MVP 이후로 보류.** T2 락 대기 상한(5초)을 넘었을 때 (2-8절) |
+| PAY-006 | 409 | 취소할 수 없는 결제 상태 | 구현 (#86). `COMPLETED`만 취소 가능. `PROCESSING`/`FAILED`는 거절, 이미 `CANCELED`는 에러 없이 기존 결과 반환 |
+| PAY-007 | 403 | 본인 가맹점의 결제가 아님 | 구현 (#86). 다른 가맹점이 취소하려 할 때 |
 
 - 다른 도메인이 던지는 실패는 그 도메인의 코드를 그대로 씁니다 (QR-001~004, 캐시백 CSH-xxx, 가맹점 MER-001 등). T3는 던져진 `BusinessException`의 코드를 `payment.failure_code`에 **그대로 기록**합니다.
 - 가맹점·금액은 요청으로 받지 않고 서버가 QR에서 읽으므로, 요청과 QR이 다를 때의 `QR-004`(불일치)는 없어졌습니다 (D의 이슈 #64 / PR #67).
@@ -221,7 +223,7 @@ PaymentRequest { walletId, qrToken, cashbackUsed=10,000 }
 | 결제 T2 | 결제 행 → QR(`markUsed`) → 지갑(`debitPayment`) → 예산(`reserve`) | 예산 행은 모든 결제가 같이 잡는 가장 붐비는 행이라 **맨 마지막**에 두어 락을 쥐는 시간을 줄인다 (캐시백 담당 요청) |
 | 결제 취소 | 결제 행 → 지갑(`creditPaymentCancel`) → 예산(`cancel`) | QR은 잡지 않음. 지갑 락을 예산보다 먼저 잡아야 같은 지갑의 결제와 취소가 순서대로 처리되고 교착이 없다 |
 
-- 가맹점 매출 기록(D의 `recordPayment`)은 D의 정산이 `payment`의 `completedAt`·`canceledAt`·`amount`를 직접 읽는 방식으로 정리되어 **호출이 필요한지 D에게 확인 중**이다. 필요하다면 지갑과 예산 사이에 넣고, `completedAt`을 변수로 먼저 만들어 같은 값을 넘긴다.
+- 가맹점 매출 기록(D의 `recordPayment`/`recordCancel`)은 **호출하지 않는다** (D 석경진 확정, 11/22). 정산이 `payment`의 `completedAt`·`canceledAt`·`amount`를 직접 읽는다. 대신 결제 쪽이 지킬 것: `completedAt`은 T2 완료 시점에 `Clock`(KST)으로 찍고(`requestedAt` 복사 금지), 취소는 `status=CANCELED` + `canceledAt`(`Clock`)을 채우되 `completedAt`은 지우지 않으며, 금액은 `amount`(전액 취소라 취소 금액도 같음).
 - 락 대기에는 지금 상한이 없다 (MVP 이후 `lock_timeout` 5초 < T2 타임아웃 10초 < 정리 스케줄러 60초로 도입 예정, 2-8절).
 
 **A(결제)가 바꾸는 것** (이슈 #55): `PaymentRequest`에 `cashbackUsed`, T1에서 `QrService.getPaymentTarget`으로 가맹점·금액을 읽고 사용분 계산·저장, T2에서 실제 `QrService.markUsed`와 `WalletService.debitPayment` 한 번(`reserve`에는 저장된 `wallet_used`), 취소는 저장된 두 값으로 `creditPaymentCancel` 한 번, `DebitResult`·`WalletMockService`·`QrMockService`·`WalletTxType`·`PAY-001`·`PAY-002` 삭제, 락 순서 문서 반영.
@@ -252,7 +254,7 @@ D의 일 정산(매일 00:10)과 사장님 결제 내역(PAY-04)이 결제의 �
 | 결제 본처리 T2 (#16) | 완료 (PR #39, dev 머지): `PaymentTxService`(락·차감·QR·적립 예약·완료), 가맹점 적립 대상 조회, 영수증 필드. 지갑·QR은 인터페이스 없이 `payment/mock`의 Mock 클래스로 연결 |
 | 캐시백 연동 서비스 (B, PR #23) | 완료. `CashbackMockService`를 삭제하고 실제 `CashbackService`로 교체함 (계약 타입은 #33에서 `CashbackReserveRequest/Response`로 이름 정리) |
 | 실패 처리 T3 (#16) | 구현 완료, PR #56 리뷰 대기 (`Closes #16`): `PaymentFailureService`, `Payment.failure`, Facade의 try/catch, `PaymentErrorCode`, `PaymentResponse.failureCode`, 통합 테스트 8건·단위 테스트 4건. **#39 리뷰 피드백 반영 포함**: QR 식별 `qrId` → `qrToken`, 지갑 차감 시그니처(`debit(walletId, amount, type, refKey, allowNegative)` → `DebitResult`), QR 사용 처리 시그니처(`markUsed(qrToken, merchantId, amount, requestedAt)`) |
-| 요청·T1·T2 변경과 Mock → 실제 교체 | 이슈 #55 (2-9절). 선행 머지 완료: D의 #67(`getPaymentTarget`, `markUsed`), C의 #84(`WalletService.debitPayment`, `creditPaymentCancel`)·#92(가입 시 지갑 생성). 구현·테스트 완료(11/21), PR 대기. 캐시백 `reserve`는 B의 #87 리뷰 중이라 스텁 유지(계약 동일). 가맹점 매출 기록(D)은 필요 여부 확인 중 |
+| 요청·T1·T2 변경과 Mock → 실제 교체 | 이슈 #55 (2-9절). 선행 머지 완료: D의 #67(`getPaymentTarget`, `markUsed`), C의 #84(`WalletService.debitPayment`, `creditPaymentCancel`)·#92(가입 시 지갑 생성). 구현·테스트 완료(11/21), PR 대기. 캐시백 `reserve`는 B의 #87 리뷰 중이라 스텁 유지(계약 동일). 가맹점 매출 기록(D) 호출은 필요 없음으로 확정(11/22) |
 | 재조회 (#59) | 완료 (PR #83, dev 머지): 컨트롤러·`PaymentQueryService`, 서버 보강 3가지(`no-store`, `requestedAt`/`completedAt`, `PAY-003`), 컨트롤러 5건·서비스 6건 테스트. PROCESSING 정체 해소는 MVP 이후로 분리 |
 | 취소 | 미착수 (이슈 #86, 11/22). 정산 입력 규칙은 2-10절 |
 | 사장님 결제 내역 | 11/23 마감 범위 제외 (11/25~26) |
@@ -298,7 +300,7 @@ D의 일 정산(매일 00:10)과 사장님 결제 내역(PAY-04)이 결제의 �
 | 6 | PROCESSING에서 멈춘 건(서버 중단, T2와 T3가 모두 실패한 경우)의 정리 정책. 지금은 같은 키로 재요청하면 계속 `COM-004`만 받고, 새 키로는 결제됨 (돈이 새지는 않음). 선택지: 일정 시간 뒤 스케줄러가 FAILED 처리 / 재요청 시점에 오래된 건 정리 / 만료 시각 컬럼 | 전원 |
 | 7 | 결제 요청의 `walletId`는 JWT 연동 전까지 본문으로 받음. 연동 후 토큰에서 추출 | C |
 | 8 | COM-005~008은 Security(JWT) 쪽에서 `AuthenticationEntryPoint`/`AccessDeniedHandler`로 매핑 필요. 임시 SecurityConfig에서 `/api/payments/**`가 인증을 요구해 수동 호출이 막힘 | C |
-| 9 | PAY 에러 코드: 결제가 직접 정하는 건 `PAY-003`(재조회 없음, 구현), `PAY-004`(처리 시간 초과)·`PAY-005`(락 대기 초과)(둘 다 MVP 이후)뿐. `PAY-001`·`PAY-002`는 삭제했고 지갑 `WAL-004`/`WAL-005`를 씀 (#55). 다른 도메인의 실패는 그 도메인 코드를 그대로 기록 (2-4절) | 전원 |
+| 9 | PAY 에러 코드: 결제가 직접 정하는 건 `PAY-003`(재조회 없음, 구현), `PAY-004`(처리 시간 초과)·`PAY-005`(락 대기 초과)(둘 다 MVP 이후, 코드값(enum)은 만들어 둠, 던지는 곳은 아직 없음), 취소용 `PAY-006`(취소 불가 상태)·`PAY-007`(본인 가맹점 아님)(#86)뿐. `PAY-001`·`PAY-002`는 삭제했고 지갑 `WAL-004`/`WAL-005`를 씀 (#55). 다른 도메인의 실패는 그 도메인 코드를 그대로 기록 (2-4절) | 전원 |
 | 10 | 월 예산 ID 위치: B 제안대로 `cashback_earning` 쪽에 두고 `payment`에는 추가하지 않는 방향 (A 스키마가 B에 의존하지 않도록). 이견 없으면 확정 | B |
 | 11 | 기획서·역할분담 문서와 현재 설정 불일치 정리 (DB: PostgreSQL 확정, 일정 4주/3주, 소수점 누적 정책 문구) | 전원 |
 | 12 | 금액 컬럼 타입: 캐시백 기획서는 `NUMERIC(15,4)` 유지, 결제는 `BIGINT`/`Long`(정수 원). `reserve` 계약이 `long`이므로 컬럼 타입을 맞출지 | B |
@@ -307,7 +309,7 @@ D의 일 정산(매일 00:10)과 사장님 결제 내역(PAY-04)이 결제의 �
 | 15 | `/api/payments/**` 인증: 임시 `SecurityConfig`에서 인증을 요구해 수동 호출·`@WebMvcTest`가 막힘. **11/23(월)까지** 임시 `permitAll` 추가 또는 JWT 연동, 연동 후 `walletId`를 토큰에서 추출 | C |
 | 16 | PROCESSING 정체 해소(2-8절 분석): T2 트랜잭션·락 타임아웃, 오래된 PROCESSING 정리 스케줄러. 합의 #6의 해결책. **MVP 범위 밖이라 중간보고(11/24) 이후로 보류.** 락 대기 상한은 T2 전체에 하나(5초)로 합의 | 전원 |
 | 17 | **정산 입력 규칙** (2-10절): 취소 시 `canceledAt`을 채우고 `completedAt`은 유지, 두 시각 모두 `Clock`(KST), 집계 기준은 결제 `completedAt`·취소 `canceledAt`, 지급 후 취소 허용. 정산 마감 시각(날짜 경계를 넘는 결제)을 정산 담당과 확인 | D |
-| 18 | 가맹점 매출 기록(D `recordPayment`/`recordCancel`)이 필요한지: D의 정산 문서에는 호출이 없고 `payment` 필드를 직접 읽는 것으로 보임. 필요 없으면 T2의 TODO와 락 순서 문구에서 제거 | D |
+| 18 | 가맹점 매출 기록(D `recordPayment`/`recordCancel`) 호출: **필요 없음, 확정(11/22)**. 정산이 `payment` 필드를 직접 읽으므로 T2·취소의 TODO와 락 순서 문구에서 제거함 | D |
 | 19 | QR 사용 이력에 결제 ID를 남길지: D의 이슈 #54에서 "사용 이력 저장 방식 확정 후 추가"로 미뤘고 현재 `markUsed(qrToken, requestedAt)`로 확정되어 결제 ID는 저장하지 않음. `payment`가 `qr_token`을 갖고 있어 대사는 역방향 연결이 가능함. 필요하면 `markUsed(qrToken, paymentId, requestedAt)` | D |
 | 20 | 적립 제외 사유 추가: 적립액이 내림으로 0원이면 `AMOUNT_TOO_SMALL`, 충전금 사용분이 0원(전액 캐시백)인 경우는 별도 사유 (이름은 B가 확정). `payment.cashback_exclusion_reason`은 문자열이라 스키마 변경 없음, 프론트 영수증 문구와 `Payment` 주석에 반영 | B |
 

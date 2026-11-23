@@ -5,6 +5,7 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -83,4 +84,11 @@ public interface CashbackEarningRepository extends JpaRepository<CashbackEarning
       @Param("now") LocalDateTime now,
       @Param("paid") EarningStatus paid,
       @Param("clawedBack") EarningStatus clawedBack);
+
+  /** 한 이용자(지갑)의 적립 내역. 정렬과 페이지는 호출한 쪽이 정한다. */
+  Page<CashbackEarning> findByWalletId(Long walletId, Pageable pageable);
+
+  /** 한 이용자의 적립 내역 중 해당 상태만. */
+  Page<CashbackEarning> findByWalletIdAndStatus(
+      Long walletId, EarningStatus status, Pageable pageable);
 }

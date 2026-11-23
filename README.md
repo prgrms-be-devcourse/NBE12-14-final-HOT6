@@ -63,18 +63,29 @@ cd NBE12-14-final-HOT6
 # 2. 데이터베이스 실행 (PostgreSQL)
 docker compose up -d
 
-# 3. 애플리케이션 실행
+# 3. .env 파일 만들기 (저장소에 올라가지 않음). 무작위 JWT 키를 만들어 한 줄로 넣는다.
+#    이미 .env 가 있으면 건드리지 말고 JWT_SECRET 줄만 추가한다.
+[ -f .env ] || echo "JWT_SECRET=$(openssl rand -base64 48)" > .env
+
+# 4. 애플리케이션 실행
 ./gradlew bootRun
 ```
 
 Windows Git Bash에서는 `./gradlew`, 명령 프롬프트에서는 `gradlew.bat`을 사용합니다.
-IntelliJ에서는 `Nbe1214FinalHot6Application`을 실행해도 됩니다.
+IntelliJ에서는 `Nbe1214FinalHot6Application`을 실행해도 됩니다(작업 디렉터리가 프로젝트 폴더여야 `.env`를 읽습니다).
 
 ### 환경 변수
 
 | 이름 | 설명 | 기본값 (로컬 개발용) |
 |---|---|---|
 | `DB_PASSWORD` | PostgreSQL 비밀번호 | `devpay1234` |
+| `JWT_SECRET` | JWT 서명 키(32바이트 이상) | 없음. 필수이며 없으면 시작할 때 실패합니다 |
+
+로컬에서는 프로젝트 폴더의 `.env` 파일에서 읽습니다(`KEY=값` 한 줄씩, 따옴표·공백 없이).
+```text
+JWT_SECRET=여기에_키
+```
+`JWT_SECRET`이 없으면 서버가 시작되지 않습니다.
 
 로컬 DB 기본 접속 정보: `localhost:5432` / DB `devpay` / 사용자 `devpay`.
 배포 환경의 비밀번호와 비밀키는 저장소에 커밋하지 않고 GitHub Secrets나 서버 환경변수로 관리합니다.

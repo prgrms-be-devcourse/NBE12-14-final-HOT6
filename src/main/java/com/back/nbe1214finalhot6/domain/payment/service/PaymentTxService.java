@@ -43,14 +43,13 @@ public class PaymentTxService {
     if (payment.getStatus() != PaymentStatus.PROCESSING) {
       throw new BusinessException(IDEMPOTENCY_IN_PROGRESS);   // 이미 다른 요청이 처리함 → 진행하지 않음
     }
-    // 큐알 > 지갑 > 매출기록 > 예산
+    // 락 순서: 결제 > 큐알 > 지갑 > 예산
     qrService.markUsed(payment.getQrToken(), payment.getRequestedAt());
 
     walletService.debitPayment(payment.getWalletId(), payment.getWalletUsedAmount(),
                                payment.getCashbackUsedAmount(), paymentId);
 
     boolean cashbackEligible = merchantService.isCashbackEligible(payment.getMerchantId());
-    // TODO 6. 가맹점 정산을 위한 매출 기록
     CashbackReserveResponse reserve = cashbackService.reserve(
       new CashbackReserveRequest(
               paymentId,
