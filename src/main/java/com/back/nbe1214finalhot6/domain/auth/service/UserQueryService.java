@@ -6,6 +6,8 @@ import com.back.nbe1214finalhot6.domain.auth.dto.MyInfoResponse;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserStatus;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserQueryService {
 
   private final UserRepository userRepository;
+  private final Clock clock;
 
   /**
    * 로그인한 회원의 정보를 DB의 현재 값으로 돌려준다.
@@ -28,7 +31,7 @@ public class UserQueryService {
     return userRepository
         .findById(userId)
         .filter(user -> user.getStatus() == UserStatus.ACTIVE)
-        .map(user -> MyInfoResponse.from(user, tokenRole))
+        .map(user -> MyInfoResponse.from(user, tokenRole, LocalDateTime.now(clock)))
         .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
   }
 }

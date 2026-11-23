@@ -11,12 +11,18 @@ import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
+import com.back.nbe1214finalhot6.support.MutableClock;
 import com.jayway.jsonpath.JsonPath;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +40,9 @@ class MyInfoFlowTest {
   @Autowired MockMvc mockMvc;
   @Autowired JwtProvider jwtProvider;
   @Autowired UserRepository userRepository;
+  @Autowired JdbcTemplate jdbcTemplate;
+  @PersistenceContext EntityManager entityManager;
+  @Autowired MutableClock clock;
 
   // 목적: 가입·로그인한 회원이 자기 정보를 조회하고, 비밀번호·PIN 같은 민감한 값은 응답에 없는지 확인한다.
   @Test
@@ -86,6 +95,31 @@ class MyInfoFlowTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.role").value("OWNER"))
         .andExpect(jsonPath("$.data.needsRelogin").value(false));
+  }
+
+  // 목적: PIN 이 잠기면 /me 의 pinLocked 가 true 이고, 잠긴 지 30분이 지나면 자동으로 풀려 false 가 되는지
+  // 실제 보안 설정과 DB 로 확인한다(임시 방식, MVP 이후 이메일 인증 해제(U7)로 대체).
+  @Test
+  @DisplayName("PIN 이 잠기면 pinLocked 가 true, 30분이 지나면 false 이다")
+  void pinLockedFollowsThirtyMinuteRule() throws Exception {
+    String token = signupAndLogin("me3@devpay.com", "01066660004");
+    long userId = jwtProvider.parse(token).userId();
+    jdbcTemplate.update(
+        "update users set pin_locked_at = ? where id = ?", LocalDateTime.now(clock), userId);
+    // 이 테스트는 전체가 한 트랜잭션이라 가입 때 읽은 회원 객체가 메모리에 남아 있다. SQL 로 바꾼 값을 DB 에서 다시 읽도록 비운다
+    entityManager.flush();
+    entityManager.clear();
+
+    mockMvc
+        .perform(get("/api/users/me").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pinLocked").value(true));
+
+    clock.advance(Duration.ofMinutes(30));
+    mockMvc
+        .perform(get("/api/users/me").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.pinLocked").value(false));
   }
 
   // 목적: 내 정보 조회는 공통 경로라 운영자(ADMIN)도 쓰고, 토큰이 없으면 401 인지 실제 보안 설정으로 확인한다.

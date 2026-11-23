@@ -10,6 +10,9 @@ import com.back.nbe1214finalhot6.domain.auth.entity.User;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
+import com.back.nbe1214finalhot6.support.MutableClock;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +28,7 @@ class UserQueryServiceTest {
   @Autowired UserQueryService userQueryService;
   @Autowired UserRepository userRepository;
   @Autowired JdbcTemplate jdbcTemplate;
+  @Autowired MutableClock clock;
 
   // 이 테스트가 만든 회원만 지운다(다른 테스트의 데이터를 건드리지 않음)
   private final List<Long> userIds = new ArrayList<>();
@@ -57,14 +61,35 @@ class UserQueryServiceTest {
     assertThat(info.needsRelogin()).isFalse();
   }
 
-  // 목적: PIN 잠금 시각이 있으면 pinLocked 가 true 인지 확인한다.
+  // 목적: 잠금 시각이 있고 30분이 지나지 않았으면 pinLocked 가 true 인지 확인한다.
   @Test
   @DisplayName("PIN 이 잠겨 있으면 pinLocked 가 true 이다")
   void pinLocked() {
     User user = save("q2@devpay.com", "01077770002");
-    jdbcTemplate.update("update users set pin_locked_at = now() where id = ?", user.getId());
+    lockNow(user);
 
     assertThat(userQueryService.getMyInfo(user.getId(), UserRole.USER).pinLocked()).isTrue();
+  }
+
+  // 목적: PIN 잠금은 잠긴 지 30분이 지나면 자동으로 풀리므로 /me 도 그 기준으로 보여 주는지 경계를 확인한다.
+  // (29분 59초는 잠김, 30분은 풀림. 임시 방식이며 MVP 이후 이메일 인증 해제(U7)로 대체된다)
+  @Test
+  @DisplayName("PIN 잠금은 잠긴 지 30분이 지나면 pinLocked 가 false 가 된다")
+  void pinLockedExpiresAfterThirtyMinutes() {
+    User user = save("q6@devpay.com", "01077770006");
+    lockNow(user);
+
+    clock.advance(Duration.ofMinutes(29).plusSeconds(59));
+    assertThat(userQueryService.getMyInfo(user.getId(), UserRole.USER).pinLocked()).isTrue();
+
+    clock.advance(Duration.ofSeconds(1)); // 정확히 30분
+    assertThat(userQueryService.getMyInfo(user.getId(), UserRole.USER).pinLocked()).isFalse();
+  }
+
+  // 시험용 시계의 지금 시각으로 PIN 이 잠긴 상태를 만든다
+  private void lockNow(User user) {
+    jdbcTemplate.update(
+        "update users set pin_locked_at = ? where id = ?", LocalDateTime.now(clock), user.getId());
   }
 
   // 목적: 역할은 토큰이 아니라 DB 의 현재 값이고, 토큰의 역할과 다르면 needsRelogin 이 true 인지 확인한다.
