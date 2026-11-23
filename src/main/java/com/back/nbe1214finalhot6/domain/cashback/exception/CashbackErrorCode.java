@@ -26,7 +26,10 @@ public enum CashbackErrorCode implements ErrorCode {
   BUDGET_IN_USE("CSH-008", HttpStatus.CONFLICT, "예약 또는 지급이 시작된 월 예산은 수정할 수 없습니다"),
 
   // 요율 인하
-  RATE_REDUCTION_LIMIT_EXCEEDED("CSH-009", HttpStatus.CONFLICT, "이번 달 요율 인하 횟수를 초과했습니다");
+  RATE_REDUCTION_LIMIT_EXCEEDED("CSH-009", HttpStatus.CONFLICT, "이번 달 요율 인하 횟수를 초과했습니다"),
+
+  // 적립 취소
+  EARNING_ALREADY_PAID("CSH-010", HttpStatus.CONFLICT, "이미 지급된 적립은 취소할 수 없습니다");
 
   private final String code;
   private final HttpStatus status;

@@ -11,7 +11,8 @@ export type MerchantResponse = MerchantRegisterResponse;
 export type MerchantUpdateRequest = { name?: string; address?: string };
 export type PageResponse<T> = { content: T[]; page: number; size: number; totalElements: number; totalPages: number };
 
-export type PaymentRequest = { walletId: number; merchantId: number; qrToken: string; amount: number };
+// 가맹점·결제금액은 서버가 QR 에서 읽는다. cashbackUsed 를 생략하면 0 (결제금액 전액을 데브머니로 낸다)
+export type PaymentRequest = { walletId: number; qrToken: string; cashbackUsed?: number };
 export type PaymentStatus = "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELED";
 export type PaymentResponse = {
   paymentId: number;
@@ -24,6 +25,9 @@ export type PaymentResponse = {
   cashbackPayableAt: string | null;
   cashbackExclusionReason: string | null;
   failureCode?: string | null;
+  requestedAt?: string | null; // 서버가 요청을 접수한 시각
+  completedAt?: string | null; // 결제 완료 시각 (취소해도 그대로)
+  canceledAt?: string | null; // 결제 취소 시각 (취소 전 null)
 };
 
 export type QrStatus = "WAITING" | "USED" | "EXPIRED";
