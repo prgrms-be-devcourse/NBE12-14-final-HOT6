@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.idempotency.IdempotencyKeys;
+import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.payment.exception.PaymentErrorCode;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
@@ -25,15 +26,18 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** 결제 컨트롤러 테스트. 재조회 API(`GET /api/payments/by-key/{key}`)의 요청·응답 형태를 검증한다. */
 @WebMvcTest(PaymentController.class)
 @Import(SecurityConfig.class)
+@WithMockUser(roles = "USER") // 보안 설정을 거쳐도 통과하도록 해당 경로의 허용 역할로 로그인한 상태로 호출한다
 class PaymentControllerTest {
 
   @Autowired private MockMvc mockMvc;
+  @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private PaymentFacade paymentFacade;
   @MockitoBean private PaymentQueryService paymentQueryService;
   @MockitoBean private PaymentCancelService paymentCancelService;

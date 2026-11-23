@@ -14,6 +14,7 @@ import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.auth.dto.LoginRequest;
 import com.back.nbe1214finalhot6.domain.auth.dto.LoginResponse;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
+import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.service.AuthService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-// 인증 없이 호출해서 보안 설정(로그인 경로 허용)도 함께 확인
+// 인증 없이 호출해서 보안 설정(열린 경로)도 함께 확인한다.
 @WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
 class AuthLoginControllerTest {
@@ -38,6 +39,7 @@ class AuthLoginControllerTest {
       """;
 
   @Autowired private MockMvc mockMvc;
+  @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private AuthService authService;
 
   @Test
@@ -64,7 +66,19 @@ class AuthLoginControllerTest {
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("AUTH-003"))
-        .andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 올바르지 않습니다"));
+        .andExpect(jsonPath("$.message").value(AuthErrorCode.LOGIN_FAILED.getMessage()));
+  }
+
+  @Test
+  @DisplayName("비밀번호가 맞은 탈퇴 계정은 401 과 AUTH-004 로 안내한다")
+  void login_withdrawn() throws Exception {
+    given(authService.login(any())).willThrow(new BusinessException(AuthErrorCode.WITHDRAWN_USER));
+
+    mockMvc
+        .perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("AUTH-004"))
+        .andExpect(jsonPath("$.message").value("탈퇴한 계정입니다. 다시 이용하려면 관리자에게 문의해 주세요."));
   }
 
   @Test

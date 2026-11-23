@@ -80,13 +80,26 @@ class AuthServiceLoginTest {
     verify(jwtProvider, never()).createAccessToken(any(), any());
   }
 
-  // 비밀번호가 맞아도 탈퇴한 회원이면 같은 에러로 거절되는지 확인
+  // 비밀번호가 맞은 본인에게만 탈퇴 안내를 하는지 확인
   @Test
-  @DisplayName("탈퇴한 회원은 비밀번호가 맞아도 LOGIN_FAILED 이다")
+  @DisplayName("탈퇴한 회원이 비밀번호까지 맞으면 WITHDRAWN_USER 로 안내한다")
   void login_withdrawnUser() {
     User user = user(7L, UserRole.USER, UserStatus.WITHDRAWN);
     given(userRepository.findByEmail("user@example.com")).willReturn(Optional.of(user));
     given(passwordEncoder.matches("Password1!", "hashed-pw")).willReturn(true);
+
+    assertLoginFailed(request, AuthErrorCode.WITHDRAWN_USER);
+
+    verify(jwtProvider, never()).createAccessToken(any(), any());
+  }
+
+  // 비밀번호를 모르는 사람이 탈퇴 여부를 알아내지 못하도록, 비밀번호가 틀리면 탈퇴 계정도 같은 에러다
+  @Test
+  @DisplayName("탈퇴한 회원이어도 비밀번호가 틀리면 LOGIN_FAILED 이다(탈퇴 여부를 알려 주지 않는다)")
+  void login_withdrawnUserWithWrongPassword() {
+    User user = user(7L, UserRole.USER, UserStatus.WITHDRAWN);
+    given(userRepository.findByEmail("user@example.com")).willReturn(Optional.of(user));
+    given(passwordEncoder.matches("Password1!", "hashed-pw")).willReturn(false);
 
     assertLoginFailed(request);
 
@@ -94,10 +107,13 @@ class AuthServiceLoginTest {
   }
 
   private void assertLoginFailed(LoginRequest loginRequest) {
+    assertLoginFailed(loginRequest, AuthErrorCode.LOGIN_FAILED);
+  }
+
+  private void assertLoginFailed(LoginRequest loginRequest, AuthErrorCode expected) {
     assertThatThrownBy(() -> authService.login(loginRequest))
         .isInstanceOfSatisfying(
-            BusinessException.class,
-            e -> assertThat(e.getErrorCode()).isEqualTo(AuthErrorCode.LOGIN_FAILED));
+            BusinessException.class, e -> assertThat(e.getErrorCode()).isEqualTo(expected));
   }
 
   private User user(Long id, UserRole role, UserStatus status) {
