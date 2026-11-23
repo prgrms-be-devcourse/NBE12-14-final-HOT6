@@ -1,12 +1,15 @@
 package com.back.nbe1214finalhot6.domain.cashback.controller;
 
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
+import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyHistoryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackPolicyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "캐시백 정책(운영자)", description = "캐시백 요율 인하와 정책(요율 구간) 조회 API")
@@ -43,6 +47,19 @@ public class CashbackPolicyAdminController {
   @GetMapping
   public ResponseEntity<ApiResponse<List<PolicyResponse>>> list() {
     return ResponseEntity.ok(ApiResponse.ok(policyService.findAll()));
+  }
+
+  @Operation(
+      summary = "정책 변경 이력 조회",
+      description =
+          "요율 구간을 만들거나 바꾼 이력을 최근 변경순으로 돌려준다. policyId 를 주면 그 구간의 이력만 본다."
+              + " 변경 종류 CREATE 는 구간 생성(변경 전 값 없음), UPDATE 는 기존 구간의 값(종료 시각 등) 변경이다")
+  @GetMapping("/history")
+  public ResponseEntity<ApiResponse<PageResponse<PolicyHistoryResponse>>> history(
+      @RequestParam(required = false) Long policyId,
+      @RequestParam(defaultValue = "0") @Min(0) int page,
+      @RequestParam(defaultValue = "20") @Min(1) int size) {
+    return ResponseEntity.ok(ApiResponse.ok(policyService.findHistory(policyId, page, size)));
   }
 
   @Operation(summary = "정책 단건 조회")

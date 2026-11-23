@@ -1,11 +1,15 @@
 package com.back.nbe1214finalhot6.domain.auth.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.domain.auth.dto.LoginRequest;
+import com.back.nbe1214finalhot6.domain.auth.dto.LoginResponse;
 import com.back.nbe1214finalhot6.domain.auth.dto.SignupRequest;
 import com.back.nbe1214finalhot6.domain.auth.dto.SignupResponse;
 import com.back.nbe1214finalhot6.domain.auth.entity.User;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
+import com.back.nbe1214finalhot6.domain.auth.entity.UserStatus;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
+import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
 import com.back.nbe1214finalhot6.domain.wallet.service.WalletOpeningService;
 import java.util.Locale;
@@ -20,9 +24,15 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
 
+  // 없는 이메일로 로그인해도 비밀번호 비교를 한 번 하도록 쓰는 BCrypt 해시(평문은 아무 값이나 해당 없음).
+  // 비교 시간이 같아야 응답 속도로 가입 여부를 알아내지 못한다.
+  private static final String DUMMY_PASSWORD_HASH =
+      "$2y$10$mPWVWlLpLgssl1EggKaYk.DpDfaw2noVJOG01Bjc6s/v4RKIUtb.C";
+
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final WalletOpeningService walletOpeningService;
+  private final JwtProvider jwtProvider;
 
   @Transactional
   public SignupResponse signup(SignupRequest request) {
@@ -48,6 +58,23 @@ public class AuthService {
     walletOpeningService.open(saved.getId());
 
     return SignupResponse.from(saved);
+  }
+
+  // 트랜잭션을 두지 않는다. 조회한 뒤에 하는 BCrypt 비교(느림) 동안 DB 연결을 잡고 있지 않기 위해서다.
+  public LoginResponse login(LoginRequest request) {
+    User user = userRepository.findByEmail(request.email()).orElse(null);
+
+    // 회원이 없어도 비밀번호 비교는 한다(응답 시간 차이 방지)
+    String hash = user == null ? DUMMY_PASSWORD_HASH : user.getPasswordHash();
+    boolean passwordMatches = passwordEncoder.matches(request.password(), hash);
+
+    // 이메일 없음, 비밀번호 불일치, 탈퇴 회원은 같은 에러로 거절한다
+    if (user == null || !passwordMatches || user.getStatus() != UserStatus.ACTIVE) {
+      throw new BusinessException(AuthErrorCode.LOGIN_FAILED);
+    }
+
+    String accessToken = jwtProvider.createAccessToken(user.getId(), user.getRole());
+    return LoginResponse.bearer(accessToken, jwtProvider.accessTokenExpiresInSeconds());
   }
 
   // 동시 가입으로 위의 중복 확인을 함께 통과한 요청은 DB unique 제약이 막는다. 이를 중복 에러로 바꾼다.
