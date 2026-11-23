@@ -131,4 +131,9 @@ public class Payment {
       this.cashbackExclusionReason = exclusionReason;
       this.completedAt = completedAt;
   }
+
+  public void cancel(LocalDateTime canceledAt) {
+    this.status = PaymentStatus.CANCELED;
+    this.canceledAt = canceledAt;
+  }
 }

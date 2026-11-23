@@ -22,6 +22,7 @@ public class SecurityConfig {
                     "/api/admin/cashback/**",
                     "/api/admin/settings/**",
                     "/api/cashback/**",
+                    "/api/auth/login",
                     "/api/merchants/**",
                     "/api/payments/**",
                     "/api/qr/**",
