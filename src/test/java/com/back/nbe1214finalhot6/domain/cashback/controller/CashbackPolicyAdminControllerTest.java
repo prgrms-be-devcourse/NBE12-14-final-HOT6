@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyHistoryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.PolicyHistoryAction;
@@ -27,17 +28,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-// 인증 없이(로그인·CSRF 토큰 없이) 호출해서 임시 보안 설정도 함께 확인한다.
+// 로그인한 사용자(허용 역할)로 호출해서 보안 설정을 거쳐도 통과하는지 함께 확인한다.
 @WebMvcTest(CashbackPolicyAdminController.class)
 @Import(SecurityConfig.class)
+@WithMockUser(roles = "ADMIN") // 보안 설정을 거쳐도 통과하도록 해당 경로의 허용 역할로 로그인한 상태로 호출한다
 class CashbackPolicyAdminControllerTest {
 
   private static final LocalDateTime NOV_1 = LocalDateTime.of(2026, 11, 1, 0, 0);
 
   @Autowired private MockMvc mockMvc;
+  @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private CashbackPolicyService policyService;
 
   private PolicyResponse sample() {

@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.settlement.dto.DailySettlementResponse;
 import com.back.nbe1214finalhot6.domain.settlement.exception.SettlementErrorCode;
@@ -18,17 +19,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(DailySettlementController.class)
 @Import(SecurityConfig.class)
+@WithMockUser(roles = "OWNER") // 보안 설정을 거쳐도 통과하도록 해당 경로의 허용 역할로 로그인한 상태로 호출한다
 class DailySettlementControllerTest {
 
   private static final LocalDate FROM = LocalDate.of(2026, 11, 15);
   private static final LocalDate TO = LocalDate.of(2026, 11, 17);
 
   @Autowired private MockMvc mockMvc;
+  @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private DailySettlementQueryService queryService;
 
   @Test

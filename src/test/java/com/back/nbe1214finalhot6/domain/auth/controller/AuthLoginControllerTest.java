@@ -14,6 +14,7 @@ import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.auth.dto.LoginRequest;
 import com.back.nbe1214finalhot6.domain.auth.dto.LoginResponse;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
+import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.service.AuthService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-// 인증 없이 호출해서 보안 설정(로그인 경로 허용)도 함께 확인
+// 인증 없이 호출해서 보안 설정(열린 경로)도 함께 확인한다.
 @WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
 class AuthLoginControllerTest {
@@ -38,6 +39,7 @@ class AuthLoginControllerTest {
       """;
 
   @Autowired private MockMvc mockMvc;
+  @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private AuthService authService;
 
   @Test
