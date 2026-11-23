@@ -26,7 +26,7 @@ export default function MerchantRegisterPage() {
     setBusy(true);
     try {
       const res = await registerMerchant({ name: name.trim(), address: address.trim(), ...(proof ? { revenueProof: proof } : {}) });
-      saveCtx({ merchantName: res.name, category, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
+      saveCtx({ merchantName: res.name, phone: phone.trim(), category, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
       setDone(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "알 수 없는 오류가 발생했습니다");

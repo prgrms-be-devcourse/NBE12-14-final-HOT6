@@ -13,10 +13,10 @@ export type Endpoint = {
 export const BASE_CATALOG: Endpoint[] = [
   {
     id: "POST /api/merchants", method: "POST", path: "/api/merchants", tag: "가맹점", summary: "가맹점 등록",
-    body: JSON.stringify({ ownerId: 1, name: "테스트카페", address: "서울 ○○구 ○○로 12", revenueProof: "revenue-proof.pdf" }, null, 2),
+    body: JSON.stringify({ name: "테스트카페", address: "서울 ○○구 ○○로 12", revenueProof: "revenue-proof.pdf" }, null, 2),
   },
   {
-    id: "PATCH /api/merchants/{merchantId}", method: "PATCH", path: "/api/merchants/1", tag: "가맹점", summary: "가맹점 수정 (이름·주소)",
+    id: "PATCH /api/merchants/me", method: "PATCH", path: "/api/merchants/me", tag: "가맹점", summary: "내 가맹점 수정 (이름·주소)",
     body: JSON.stringify({ name: "수정된카페", address: "서울 ○○구 ○○로 99" }, null, 2),
   },
   {
@@ -30,10 +30,10 @@ export const BASE_CATALOG: Endpoint[] = [
     id: "GET /api/payments/by-key/{key}", method: "GET", path: "/api/payments/by-key/{멱등키}", tag: "결제", summary: "응답 못 받은 결제 재조회",
   },
   {
-    id: "POST /api/payments/{id}/cancel", method: "POST", path: "/api/payments/1/cancel?merchantId=1", tag: "결제", summary: "결제 취소 (가맹점주 전액)",
+    id: "POST /api/payments/{id}/cancel", method: "POST", path: "/api/payments/1/cancel", tag: "결제", summary: "결제 취소 (가맹점주 전액)",
   },
   {
-    id: "POST /api/merchants/{merchantId}/qr/dynamic", method: "POST", path: "/api/merchants/1/qr/dynamic", tag: "QR", summary: "결제 QR 생성 (3분 만료)",
+    id: "POST /api/merchants/me/qr/dynamic", method: "POST", path: "/api/merchants/me/qr/dynamic", tag: "QR", summary: "결제 QR 생성 (3분 만료)",
     body: JSON.stringify({ amount: 12000 }, null, 2),
   },
   { id: "GET /api/qr/{token}", method: "GET", path: "/api/qr/{token}", tag: "QR", summary: "QR 스캔 조회" },

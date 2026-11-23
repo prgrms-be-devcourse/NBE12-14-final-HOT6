@@ -24,23 +24,27 @@ export default function MerchantPaidPage() {
   }, []);
 
   const status = res?.status;
+
+  // 대기 중일 때만 2초마다 확인하고, 결제완료나 만료가 되면 멈춘다
   useEffect(() => {
-    if (!token || status === "USED" || status === "EXPIRED") return;
+    if (!token) return;
     let alive = true;
     const check = () => {
       getQrStatus(token)
         .then((r) => {
-          if (alive) setRes(r);
+          if (!alive) return;
+          setRes(r);
+          if (r.status !== "WAITING") clearInterval(timer);
         })
         .catch(() => {});
     };
+    const timer = setInterval(check, POLL_MS);
     check();
-    const id = setInterval(check, POLL_MS);
     return () => {
       alive = false;
-      clearInterval(id);
+      clearInterval(timer);
     };
-  }, [token, status]);
+  }, [token]);
 
   return (
     <>

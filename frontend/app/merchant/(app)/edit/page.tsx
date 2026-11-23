@@ -15,6 +15,7 @@ export default function MerchantEditPage() {
   const [eligible, setEligible] = useState(true);
   const [pos, setPos] = useState<LatLng | null>(null);
   const [ready, setReady] = useState(false);
+  const [loaded, setLoaded] = useState(false); // 서버에서 내 가맹점을 읽었을 때만 수정할 수 있다
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -23,12 +24,14 @@ export default function MerchantEditPage() {
     let alive = true;
     const c = loadCtx();
     if (c.lat !== undefined && c.lng !== undefined) setPos({ lat: c.lat, lng: c.lng });
+    setF((x) => ({ ...x, phone: c.phone ?? "" }));
     setReady(true);
     getMyMerchant()
       .then((m) => {
         if (!alive) return;
         setF((x) => ({ ...x, name: m.name, address: m.address }));
         setEligible(m.cashbackEligible);
+        setLoaded(true);
       })
       .catch((err) => {
         if (alive) setMsg({ ok: false, text: err instanceof ApiError ? err.message : "가맹점 정보를 불러오지 못했어요" });
@@ -44,7 +47,7 @@ export default function MerchantEditPage() {
     setMsg(null);
     try {
       const res = await updateMerchant({ name: f.name.trim(), address: f.address.trim() });
-      saveCtx({ merchantName: res.name, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
+      saveCtx({ merchantName: res.name, merchantAddress: res.address, eligible: res.cashbackEligible, phone: f.phone.trim(), ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
       setF((x) => ({ ...x, name: res.name, address: res.address }));
       setEligible(res.cashbackEligible);
       setEditing(false);
@@ -80,7 +83,7 @@ export default function MerchantEditPage() {
         {msg && <p role={msg.ok ? "status" : "alert"} className={`rounded-lg px-3 py-2 text-[13px] font-medium ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-600"}`}>{msg.text}</p>}
         {editing
           ? <div className="flex gap-2.5"><button type="button" onClick={() => setEditing(false)} className="btn btn-outline">취소</button><button type="button" onClick={save} disabled={busy || !f.name.trim() || !f.address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "저장 중…" : "저장"}</button></div>
-          : <button type="button" onClick={() => setEditing(true)} className="btn btn-outline">수정</button>}
+          : <button type="button" onClick={() => setEditing(true)} disabled={!loaded} className="btn btn-outline disabled:opacity-40">수정</button>}
 
         <div>
           <span className="label">운영 상태</span>

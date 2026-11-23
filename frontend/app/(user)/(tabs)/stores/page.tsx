@@ -18,9 +18,11 @@ export default function StoresPage() {
   const [q, setQ] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
   const [more, setMore] = useState(false);
+  const [moreError, setMoreError] = useState("");
 
   // 이름 부분 일치 검색. page 가 0 이면 새로 검색하고, 1 이상이면 기존 결과 뒤에 이어 붙인다
   const search = async (query: string, page: number) => {
+    setMoreError("");
     if (page === 0) setState({ kind: "loading" });
     else setMore(true);
     try {
@@ -34,7 +36,10 @@ export default function StoresPage() {
         total: res.totalElements,
       }));
     } catch (e) {
-      setState({ kind: "error", message: e instanceof ApiError ? e.message : "가맹점을 찾지 못했어요" });
+      const message = e instanceof ApiError ? e.message : "가맹점을 찾지 못했어요";
+      // 이어 붙이다 실패하면 이미 받은 결과는 그대로 두고 아래에 오류만 보여 준다
+      if (page > 0) setMoreError(message);
+      else setState({ kind: "error", message });
     } finally {
       setMore(false);
     }
@@ -83,6 +88,7 @@ export default function StoresPage() {
             {state.page + 1 < state.totalPages && (
               <button type="button" disabled={more} onClick={() => search(state.query, state.page + 1)} className="btn btn-outline disabled:opacity-40">{more ? "불러오는 중…" : "더 보기"}</button>
             )}
+            {moreError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">{moreError}</p>}
             <p className="note text-center">지도와 업종으로 찾는 기능은 준비 중이에요.</p>
           </>
         )}
