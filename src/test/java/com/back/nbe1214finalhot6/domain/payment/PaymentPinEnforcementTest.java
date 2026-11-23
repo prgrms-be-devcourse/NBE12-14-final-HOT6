@@ -19,6 +19,8 @@ import com.back.nbe1214finalhot6.domain.payment.service.PaymentFacade;
 import com.back.nbe1214finalhot6.domain.wallet.entity.Wallet;
 import com.back.nbe1214finalhot6.domain.wallet.repository.WalletRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
+import com.back.nbe1214finalhot6.support.MutableClock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -52,6 +54,7 @@ class PaymentPinEnforcementTest {
   @Autowired WalletRepository walletRepository;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired JdbcTemplate jdbcTemplate;
+  @Autowired MutableClock clock;
   @MockitoBean PaymentFacade paymentFacade;
 
   private User user;
@@ -144,5 +147,23 @@ class PaymentPinEnforcementTest {
 
     verify(paymentFacade, never()).pay(any(), any());
     assertThat(failCount()).isEqualTo(5);
+  }
+
+  // 목적: 잠긴 지 30분이 지나면 다시 결제할 수 있는지 확인한다(임시 방식, MVP 이후 이메일 인증 해제(U7)로 대체).
+  @Test
+  @DisplayName("잠긴 지 30분이 지나면 맞는 PIN 으로 다시 결제할 수 있다")
+  void canPayAgainAfterLockExpires() throws Exception {
+    for (int i = 0; i < 5; i++) {
+      pay("{\"qrToken\": \"qr-1\", \"pin\": \"000000\"}");
+    }
+    pay("{\"qrToken\": \"qr-1\", \"pin\": \"" + PIN + "\"}").andExpect(status().isConflict());
+    verify(paymentFacade, never()).pay(any(), any());
+
+    clock.advance(Duration.ofMinutes(30));
+    pay("{\"qrToken\": \"qr-1\", \"cashbackUsed\": 0, \"pin\": \"" + PIN + "\"}")
+        .andExpect(status().isOk());
+
+    verify(paymentFacade).pay(any(), any());
+    assertThat(failCount()).isZero();
   }
 }
