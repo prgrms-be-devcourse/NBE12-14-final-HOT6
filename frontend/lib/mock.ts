@@ -38,23 +38,6 @@ export const payments: Payment[] = [
   { id: "p4", merchant: "◇◇분식", date: "11.12 12:10", amount: 6000, status: "완료", no: "PAY-0004" },
 ];
 
-export type Accrual = {
-  id: string;
-  merchant: string;
-  date: string;
-  desc: string;
-  amount: number;
-  status: "예정" | "지급완료" | "제외";
-};
-
-export const accruals: Accrual[] = [
-  { id: "a1", merchant: "○○카페", date: "11.17", desc: "결제 12,000원 × 10%", amount: 1200, status: "예정" },
-  { id: "a2", merchant: "△△마트", date: "11.16", desc: "결제 9,000원 × 10%", amount: 900, status: "예정" },
-  { id: "a3", merchant: "□□서점", date: "11.14", desc: "제외: 예산 소진", amount: 0, status: "제외" },
-  { id: "a4", merchant: "○○카페", date: "11.05", desc: "결제 12,000원 × 10%", amount: 1200, status: "지급완료" },
-  { id: "a5", merchant: "◇◇분식", date: "11.03", desc: "결제 6,000원 × 10%", amount: 600, status: "지급완료" },
-];
-
 export const user = { name: "홍길동", email: "hong@mail.com", maskedEmail: "ab***@gmail.com" };
 
 export const merchant = {
@@ -78,13 +61,6 @@ export const dailySettles = [
   { date: "11.14", net: 0, carry: 0 },
   { date: "11.13", net: 198000, carry: 0 },
   { date: "11.12", net: 356000, carry: 0 },
-];
-
-export const policyHistory = [
-  { date: "11.01", rate: "10% → 5%", period: "12.01 ~", note: "예고 발송" },
-  { date: "10.01", rate: "5% → 10%", period: "10.01 ~ 11.30", note: "시행" },
-  { date: "09.01", rate: "15% → 5%", period: "09.01 ~ 09.30", note: "시행" },
-  { date: "08.01", rate: "신규 15%", period: "08.01 ~ 08.31", note: "시행" },
 ];
 
 export const weekdays = ["월", "화", "수", "목", "금", "토", "일"];
