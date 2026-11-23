@@ -259,4 +259,13 @@ public interface CashbackMonthlyBudgetRepository
       from CashbackMonthlyBudget m where m.id = :id
       """)
   Optional<Long> findRemainingAmount(@Param("id") Long id);
+
+  /** 월 예산의 남은 예산(배정 + 이월 유입 - 이월 유출 - 예약 - 지급). 월 예산이 없으면 비어 있다. 읽기만 한다. */
+  @Query(
+      """
+      select m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
+             - m.reservedAmount - m.paidAmount
+      from CashbackMonthlyBudget m where m.budgetYear = :year and m.budgetMonth = :month
+      """)
+  Optional<Long> findRemainingAmount(@Param("year") int year, @Param("month") int month);
 }
