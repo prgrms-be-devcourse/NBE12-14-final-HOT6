@@ -27,10 +27,11 @@ export default function CashbackPage() {
       <Header title="내 캐시백" />
       <div className="space-y-3 px-5 pb-4">
         {notice && (
-          <div className="rounded-xl border border-amber-500 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+          <Link href="/cashback/notices" className="block rounded-xl border border-amber-500 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
             <span className="font-semibold">공지</span> · {notice.content}
             {notice.rate != null && notice.previousRate != null && ` (요율 ${pctText(notice.previousRate)} → ${pctText(notice.rate)})`}
-          </div>
+            <span className="ml-1 underline">전체 보기</span>
+          </Link>
         )}
         {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</p>}
         <section className="card">

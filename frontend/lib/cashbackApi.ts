@@ -40,3 +40,27 @@ export const EXCLUSION_TEXT: Record<ExclusionCode, string> = {
 };
 export const pctText = (rate: number | null | undefined) => (rate == null ? "" : `${Math.round(rate * 10000) / 100}%`);
 export const mmdd = (iso: string | null) => (iso ? `${iso.slice(5, 7)}.${iso.slice(8, 10)}` : "");
+
+// 결제 전 미리보기 (예상값). 확정은 결제 응답·영수증이 기준이다
+export type CashbackPreview = {
+  earnable: boolean; paused: boolean; appliedRate: number; expectedAmount: number; monthlyLimitRemaining: number; exclusionReason: ExclusionCode;
+};
+export const getCashbackPreview = (walletId: number, merchantId: number, walletUsedAmount: number) =>
+  api<CashbackPreview>(`/cashback/preview?walletId=${walletId}&merchantId=${merchantId}&walletUsedAmount=${walletUsedAmount}`);
+
+// 적립 제외 사유 안내 문구 (미리보기·영수증 공통)
+export const REASON_TEXT: Record<ExclusionCode, string> = {
+  NONE: "적립됩니다",
+  NOT_ELIGIBLE: "적립 대상 가맹점이 아니에요. 캐시백 잔액은 이 매장에서도 사용할 수 있어요.",
+  NO_WALLET_USAGE: "데브머니로 결제한 금액이 없어 적립되지 않아요.",
+  AMOUNT_TOO_SMALL: "적립액이 1원 미만이라 적립되지 않아요.",
+  MONTHLY_LIMIT_EXCEEDED: "이번 달 적립 한도를 넘어 적립되지 않아요.",
+  BUDGET_EXHAUSTED: "이번 달 캐시백 예산이 소진되었거나 적립이 중단되어 적립되지 않아요.",
+};
+
+// 곧 적용될 요율 인하 예고 (오늘 이후에 시작하는 가장 최근 POLICY_CHANGE 공지)
+export async function getUpcomingPolicyChange(): Promise<Notice | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const page = await getNotices("POLICY_CHANGE", 0, 5);
+  return page.content.find((n) => n.effectiveFrom > today) ?? null;
+}
