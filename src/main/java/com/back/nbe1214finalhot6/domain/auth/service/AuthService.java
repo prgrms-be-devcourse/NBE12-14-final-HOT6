@@ -68,9 +68,13 @@ public class AuthService {
     String hash = user == null ? DUMMY_PASSWORD_HASH : user.getPasswordHash();
     boolean passwordMatches = passwordEncoder.matches(request.password(), hash);
 
-    // 이메일 없음, 비밀번호 불일치, 탈퇴 회원은 같은 에러로 거절한다
-    if (user == null || !passwordMatches || user.getStatus() != UserStatus.ACTIVE) {
+    // 이메일 없음과 비밀번호 불일치는 같은 에러로 거절한다(어느 쪽인지 알려 주지 않는다)
+    if (user == null || !passwordMatches) {
       throw new BusinessException(AuthErrorCode.LOGIN_FAILED);
+    }
+    // 비밀번호까지 맞았는데 탈퇴한 계정이면 안내한다. 비밀번호를 모르는 사람은 이 응답에 닿지 못한다
+    if (user.getStatus() != UserStatus.ACTIVE) {
+      throw new BusinessException(AuthErrorCode.WITHDRAWN_USER);
     }
 
     String accessToken = jwtProvider.createAccessToken(user.getId(), user.getRole());

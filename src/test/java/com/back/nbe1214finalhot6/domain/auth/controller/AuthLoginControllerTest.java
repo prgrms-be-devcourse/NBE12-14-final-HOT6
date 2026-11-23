@@ -64,7 +64,19 @@ class AuthLoginControllerTest {
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("AUTH-003"))
-        .andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 올바르지 않습니다"));
+        .andExpect(jsonPath("$.message").value(AuthErrorCode.LOGIN_FAILED.getMessage()));
+  }
+
+  @Test
+  @DisplayName("비밀번호가 맞은 탈퇴 계정은 401 과 AUTH-004 로 안내한다")
+  void login_withdrawn() throws Exception {
+    given(authService.login(any())).willThrow(new BusinessException(AuthErrorCode.WITHDRAWN_USER));
+
+    mockMvc
+        .perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("AUTH-004"))
+        .andExpect(jsonPath("$.message").value("탈퇴한 계정입니다. 다시 이용하려면 관리자에게 문의해 주세요."));
   }
 
   @Test
