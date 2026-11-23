@@ -198,4 +198,33 @@ public interface CashbackMonthlyBudgetRepository
       @Param("now") LocalDateTime now,
       @Param("from") BudgetStatus from,
       @Param("to") BudgetStatus to);
+
+  /**
+   * 상태가 {@code from} 일 때만 {@code to} 로 바꾼다. 운영자 수동 중단에 쓴다. 바꾸면 1, 아니면 0 을 돌려준다. 영속성 컨텍스트를 비우지 않는다.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.status = :to
+      where m.budgetYear = :year and m.budgetMonth = :month and m.status = :from
+      """)
+  int changeStatus(
+      @Param("year") int year,
+      @Param("month") int month,
+      @Param("from") BudgetStatus from,
+      @Param("to") BudgetStatus to);
+
+  /** 상태가 {@code from} 일 때만 공지({@code to}) 상태로 바꾸고 중단 예약 시각을 정한다. 운영자 수동 공지에 쓴다. 바꾸면 1, 아니면 0 이다. */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.status = :to, m.stopScheduledAt = :scheduledAt
+      where m.budgetYear = :year and m.budgetMonth = :month and m.status = :from
+      """)
+  int changeStatusWithSchedule(
+      @Param("year") int year,
+      @Param("month") int month,
+      @Param("from") BudgetStatus from,
+      @Param("to") BudgetStatus to,
+      @Param("scheduledAt") LocalDateTime scheduledAt);
 }
