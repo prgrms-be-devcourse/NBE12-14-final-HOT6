@@ -14,6 +14,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param rateChangeNoticeDays 요율 인하 예고 일수. 적용 시각은 현재 분 + N일 이후여야 한다(0 이면 즉시 가능)
  * @param maxRateReductionsPerMonth 한 달에 요율을 인하할 수 있는 최대 횟수
  * @param scheduler 스케줄러 설정
+ * @param forecast 소진 예측 설정
  */
 @ConfigurationProperties(prefix = "cashback")
 public record CashbackProperties(
@@ -23,7 +24,8 @@ public record CashbackProperties(
     @DefaultValue("3") int payoutDelayDays,
     @DefaultValue("0") int rateChangeNoticeDays,
     @DefaultValue("1") int maxRateReductionsPerMonth,
-    @DefaultValue Scheduler scheduler) {
+    @DefaultValue Scheduler scheduler,
+    @DefaultValue Forecast forecast) {
 
   /**
    * @param enabled false 면 스케줄러가 돌지 않는다(테스트에서는 배치 메서드를 직접 호출한다)
@@ -36,4 +38,11 @@ public record CashbackProperties(
       @DefaultValue("3600") long payoutIntervalSeconds,
       @DefaultValue("200") int payoutBatchSize,
       @DefaultValue("60") long stopCheckIntervalSeconds) {}
+
+  /**
+   * @param demandMultiplier 수요 배율. 최근 7일 일평균에 곱한다(요율을 올릴 때 수요가 몇 배로 늘지에 대한 가정)
+   * @param rangeRatio 빠름·느림 범위 폭. 빠름 = 중앙 × (1 + 폭), 느림 = 중앙 × (1 − 폭)
+   */
+  public record Forecast(
+      @DefaultValue("1.0") BigDecimal demandMultiplier, @DefaultValue("0.3") BigDecimal rangeRatio) {}
 }
