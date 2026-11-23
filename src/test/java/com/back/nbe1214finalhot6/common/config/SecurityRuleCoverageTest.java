@@ -46,8 +46,8 @@ class SecurityRuleCoverageTest {
   private static final Set<String> PUBLIC_ENDPOINTS =
       Set.of("POST /api/auth/login", "POST /api/users/signup");
 
-  /** 역할 구분 없이 로그인만 하면 되는 경로. 지금은 없다. */
-  private static final Set<String> ANY_LOGGED_IN_ENDPOINTS = Set.of();
+  /** 역할 구분 없이 로그인만 하면 되는 경로. 의도한 공통 경로만 보안 검토 후 추가한다. */
+  private static final Set<String> ANY_LOGGED_IN_ENDPOINTS = Set.of("GET /api/users/me");
 
   @Autowired MockMvc mockMvc;
   @Autowired JwtProvider jwtProvider;
