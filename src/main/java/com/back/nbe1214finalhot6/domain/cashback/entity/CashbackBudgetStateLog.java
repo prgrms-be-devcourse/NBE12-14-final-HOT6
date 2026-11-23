@@ -75,6 +75,19 @@ public class CashbackBudgetStateLog {
     this.occurredAt = occurredAt;
   }
 
+  /** 운영자가 직접 바꾼 기록. 처리자는 인증이 머지되기 전까지 null 이다. */
+  public static CashbackBudgetStateLog byOperator(
+      Long monthlyBudgetId,
+      BudgetStatus fromStatus,
+      BudgetStatus toStatus,
+      StateChangeReason reason,
+      BigDecimal remainingRate,
+      Long operatorId,
+      LocalDateTime occurredAt) {
+    return new CashbackBudgetStateLog(
+        monthlyBudgetId, fromStatus, toStatus, reason, remainingRate, operatorId, occurredAt);
+  }
+
   /** 자동 판정이나 예약 시각 도달로 바뀐 기록. */
   public static CashbackBudgetStateLog automatic(
       Long monthlyBudgetId,

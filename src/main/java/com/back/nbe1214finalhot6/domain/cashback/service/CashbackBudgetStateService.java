@@ -1,10 +1,13 @@
 package com.back.nbe1214finalhot6.domain.cashback.service;
 
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.config.CashbackProperties;
 import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackBudgetStateLog;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
+import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.entity.StateChangeReason;
+import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackBudgetStateLogRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.MonthlyBudgetSnapshot;
@@ -86,6 +89,66 @@ public class CashbackBudgetStateService {
     return stopped;
   }
 
+  /**
+   * 운영자의 "공지 후 중단". 정상({@code ACTIVE})인 월 예산을 공지({@code NOTICED}) 상태로 바꾸고 중단 예약 시각을 판정일 + 공지 일수의 00:00 으로
+   * 정한다. 이미 공지 상태면 예약 시각을 바꾸지 않고 그대로 둔다(이력도 남기지 않는다). 자동 판정과 같은 조건부 UPDATE 와 이력을 쓰고 사유만 수동으로 남긴다.
+   *
+   * @throws BusinessException 월이 올바르지 않을 때(CSH-007), 월 예산이 없을 때(CSH-004), 이미 중단됐거나 마감된 달일 때(CSH-012)
+   */
+  @Transactional
+  public void noticeStopManually(int year, int month) {
+    CashbackMonthlyBudget.validateMonth(month);
+    BudgetStatus status = requireStatus(year, month);
+    if (status == BudgetStatus.NOTICED) {
+      return;
+    }
+    if (status != BudgetStatus.ACTIVE) {
+      throw new BusinessException(CashbackErrorCode.BUDGET_ALREADY_STOPPED);
+    }
+    LocalDateTime now = LocalDateTime.now(clock);
+    if (monthlyBudgetRepository.changeStatusWithSchedule(
+            year, month, BudgetStatus.ACTIVE, BudgetStatus.NOTICED, scheduledStopAt(now))
+        == 1) {
+      record(year, month, BudgetStatus.ACTIVE, BudgetStatus.NOTICED,
+          StateChangeReason.OPERATOR_NOTICE_STOP, now);
+      return;
+    }
+    // 읽은 뒤에 다른 요청이 상태를 바꿨다. 이미 공지 상태면 같은 결과이고, 중단·마감됐으면 거절한다
+    if (requireStatus(year, month) != BudgetStatus.NOTICED) {
+      throw new BusinessException(CashbackErrorCode.BUDGET_ALREADY_STOPPED);
+    }
+  }
+
+  /**
+   * 운영자의 "긴급 중단". 정상이나 공지 상태의 월 예산을 즉시 중단({@code STOPPED})으로 바꾼다. 확인(confirm)은 컨트롤러가 요청 본문에서 검증한다.
+   *
+   * @throws BusinessException 월이 올바르지 않을 때(CSH-007), 월 예산이 없을 때(CSH-004), 이미 중단됐거나 마감된 달일 때(CSH-012). 같은 요청을 반복하면
+   *     두 번째부터는 이 오류이며 이력은 한 번만 남는다
+   */
+  @Transactional
+  public void emergencyStopManually(int year, int month) {
+    CashbackMonthlyBudget.validateMonth(month);
+    BudgetStatus status = requireStatus(year, month);
+    if (status == BudgetStatus.STOPPED || status == BudgetStatus.CLOSED) {
+      throw new BusinessException(CashbackErrorCode.BUDGET_ALREADY_STOPPED);
+    }
+    LocalDateTime now = LocalDateTime.now(clock);
+    // 읽은 뒤에 자동 판정이 정상 -> 공지로 바꿨을 수 있어서 두 상태를 차례로 시도한다
+    for (BudgetStatus from : List.of(BudgetStatus.ACTIVE, BudgetStatus.NOTICED)) {
+      if (monthlyBudgetRepository.changeStatus(year, month, from, BudgetStatus.STOPPED) == 1) {
+        record(year, month, from, BudgetStatus.STOPPED, StateChangeReason.OPERATOR_EMERGENCY_STOP, now);
+        return;
+      }
+    }
+    throw new BusinessException(CashbackErrorCode.BUDGET_ALREADY_STOPPED);
+  }
+
+  private BudgetStatus requireStatus(int year, int month) {
+    return monthlyBudgetRepository
+        .findStatus(year, month)
+        .orElseThrow(() -> new BusinessException(CashbackErrorCode.BUDGET_NOT_FOUND));
+  }
+
   /** 중단 예약 시각 = 판정일 + 공지 일수의 00:00(KST). */
   private LocalDateTime scheduledStopAt(LocalDateTime now) {
     return now.toLocalDate().plusDays(properties.noticeDays()).atStartOfDay();
@@ -117,7 +180,13 @@ public class CashbackBudgetStateService {
                     BigDecimal.valueOf(snapshot.getTotal()),
                     CashbackPolicy.RATE_SCALE,
                     RoundingMode.HALF_UP);
+    boolean byOperator =
+        reason == StateChangeReason.OPERATOR_NOTICE_STOP
+            || reason == StateChangeReason.OPERATOR_EMERGENCY_STOP;
+    // 처리자는 인증이 머지되기 전까지 null 이다
     stateLogRepository.save(
-        CashbackBudgetStateLog.automatic(budgetId, from, to, reason, remainingRate, now));
+        byOperator
+            ? CashbackBudgetStateLog.byOperator(budgetId, from, to, reason, remainingRate, null, now)
+            : CashbackBudgetStateLog.automatic(budgetId, from, to, reason, remainingRate, now));
   }
 }
