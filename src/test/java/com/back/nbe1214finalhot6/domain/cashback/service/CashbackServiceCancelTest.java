@@ -2,16 +2,18 @@ package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackEarning;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
-import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Wallet;
+import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType;
+import com.back.nbe1214finalhot6.domain.wallet.repository.WalletRepository;
+import com.back.nbe1214finalhot6.domain.wallet.repository.WalletTransactionRepository;
+import com.back.nbe1214finalhot6.domain.wallet.service.WalletService;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
 import jakarta.persistence.EntityManager;
@@ -43,6 +45,10 @@ class CashbackServiceCancelTest {
   @Autowired private CashbackBudgetService budgetService;
   @Autowired private CashbackMonthlyLimitService limitService;
   @Autowired private CashbackEarningRepository earningRepository;
+  @Autowired private CashbackPayoutService payoutService;
+  @Autowired private WalletService walletService;
+  @Autowired private WalletRepository walletRepository;
+  @Autowired private WalletTransactionRepository walletTransactionRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private Clock clock;
   @PersistenceContext private EntityManager entityManager;
@@ -69,6 +75,35 @@ class CashbackServiceCancelTest {
     entityManager.flush();
     entityManager.clear();
     return budgetService.getMonthly(2026, month).reservedAmount();
+  }
+
+  private Long saveWallet() {
+    return walletRepository
+        .save(Wallet.create(System.nanoTime(), LocalDateTime.now(clock)))
+        .getId();
+  }
+
+  private void reserveFor(long paymentId, Long walletId, long walletUsed) {
+    service.reserve(new CashbackReserveRequest(paymentId, walletId, true, walletUsed, NOV_AT));
+  }
+
+  /** 12,000원 사용분 적립(360원)을 확보하고, 지급일이 지난 뒤 지급 배치로 지급 완료까지 만든다. 시계는 되돌려 둔다. */
+  private Long savePaidEarning(long paymentId) {
+    Long walletId = saveWallet();
+    reserveFor(paymentId, walletId, 12_000L);
+    ((MutableClock) clock).advance(Duration.ofDays(5));
+    payoutService.run();
+    ((MutableClock) clock).reset();
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(earning(paymentId).getStatus()).isEqualTo(EarningStatus.PAID);
+    return walletId;
+  }
+
+  private long cashbackBalance(Long walletId) {
+    entityManager.flush();
+    entityManager.clear();
+    return walletRepository.findById(walletId).orElseThrow().getCashbackBalance();
   }
 
   private CashbackEarning earning(long paymentId) {
@@ -148,34 +183,79 @@ class CashbackServiceCancelTest {
     assertThat(monthlyReserved(12)).isEqualTo(300L);
   }
 
-  // 목적: 이미 지급된 적립은 지급 후 회수가 구현되기 전까지 명시적으로 거절되고 아무것도 되돌리지 않는지 확인한다.
+  // 목적: 지급된 적립을 취소하면 지갑 캐시백 잔액에서 회수하고(원장에 적립 건 ID 로 남음), 회수로 바뀌며, 월 한도는 돌아오지만 이미 지급으로 옮긴
+  // 예산은 그대로인지 확인한다.
   @Test
-  @DisplayName("이미 지급된 적립은 거절하고 예산과 한도를 그대로 둔다")
-  void cancel_rejectsPaid() {
-    reserve(1L, 12_000L, NOV_AT);
-    jdbcTemplate.update("update cashback_earning set status = 'PAID' where payment_id = 1");
-    entityManager.clear();
+  @DisplayName("지급된 적립을 취소하면 지갑에서 회수하고 한도만 돌려주며 예산은 그대로 둔다")
+  void cancel_clawsBackPaid() {
+    Long walletId = savePaidEarning(1L);
 
-    assertThatThrownBy(() -> service.cancel(1L))
-        .isInstanceOf(BusinessException.class)
-        .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.EARNING_ALREADY_PAID);
+    service.cancel(1L);
 
-    assertThat(limitService.usedAmount(WALLET, NOV)).isEqualTo(360L);
-    assertThat(monthlyReserved(11)).isEqualTo(360L);
+    CashbackEarning result = earning(1L);
+    assertThat(result.getStatus()).isEqualTo(EarningStatus.CLAWED_BACK);
+    assertThat(result.getCanceledAt()).isNotNull();
+    assertThat(cashbackBalance(walletId)).isZero();
+    assertThat(
+            walletTransactionRepository
+                .findByTypeAndRefKey(WalletTransactionType.CASHBACK_CLAWBACK, result.getId())
+                .orElseThrow()
+                .getAmount())
+        .isEqualTo(-360L);
+    assertThat(limitService.usedAmount(walletId, NOV)).isZero();
+    assertThat(monthlyReserved(11)).isZero();
+    assertThat(budgetService.getMonthly(2026, 11).paidAmount()).isEqualTo(360L);
+    assertThat(annualReserved()).isZero();
   }
 
-  // 목적: 읽어 둔 뒤에 지급으로 바뀐 경우(낡은 엔티티는 PENDING)에도 조건부 전환이 0건이라 거절되는지 확인한다.
+  // 목적: 지급된 캐시백을 이미 써서 잔액이 모자라도 회수가 되어 잔액이 음수가 되는지(다음 적립에서 상계) 확인한다.
   @Test
-  @DisplayName("읽은 뒤 지급으로 바뀌었어도 취소하지 않고 거절한다")
-  void cancel_rejectsPaidAfterRead() {
-    reserve(1L, 12_000L, NOV_AT);
+  @DisplayName("이미 쓴 캐시백도 회수하며 잔액은 음수가 될 수 있다")
+  void cancel_clawBackCanGoNegative() {
+    Long walletId = savePaidEarning(1L);
+    walletService.debit(walletId, 360L, WalletTransactionType.PAYMENT_CASHBACK, 99L, false);
+
+    service.cancel(1L);
+
+    assertThat(cashbackBalance(walletId)).isEqualTo(-360L);
+    assertThat(earning(1L).getStatus()).isEqualTo(EarningStatus.CLAWED_BACK);
+  }
+
+  // 목적: 지급 후 취소를 여러 번 해도 회수와 한도 복원이 한 번만 일어나는지 확인한다.
+  @Test
+  @DisplayName("지급 후 취소를 여러 번 해도 한 번만 회수한다")
+  void cancel_clawBackIsIdempotent() {
+    Long walletId = savePaidEarning(1L);
+    reserveFor(2L, walletId, 10_000L);
+
+    service.cancel(1L);
+    service.cancel(1L);
+    entityManager.flush();
+    entityManager.clear();
+    service.cancel(1L);
+
+    assertThat(cashbackBalance(walletId)).isZero();
+    assertThat(limitService.usedAmount(walletId, NOV)).isEqualTo(300L);
+    assertThat(
+            walletTransactionRepository.findByTypeAndRefKey(
+                WalletTransactionType.CASHBACK_CLAWBACK, earning(1L).getId()))
+        .isPresent();
+  }
+
+  // 목적: 읽어 둔 뒤에 지급으로 바뀐 경우(낡은 엔티티는 PENDING)에도 거절하지 않고 회수로 이어지는지 확인한다.
+  @Test
+  @DisplayName("읽은 뒤 지급으로 바뀌었어도 회수로 이어진다")
+  void cancel_clawsBackWhenPaidAfterRead() {
+    Long walletId = saveWallet();
+    reserveFor(1L, walletId, 12_000L);
     entityManager.flush();
     jdbcTemplate.update("update cashback_earning set status = 'PAID' where payment_id = 1");
     // 컨텍스트를 비우지 않아 낡은 PENDING 엔티티가 남아 있다
 
-    assertThatThrownBy(() -> service.cancel(1L))
-        .isInstanceOf(BusinessException.class)
-        .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.EARNING_ALREADY_PAID);
-    assertThat(limitService.usedAmount(WALLET, NOV)).isEqualTo(360L);
+    service.cancel(1L);
+
+    assertThat(earning(1L).getStatus()).isEqualTo(EarningStatus.CLAWED_BACK);
+    assertThat(cashbackBalance(walletId)).isEqualTo(-360L);
+    assertThat(limitService.usedAmount(walletId, NOV)).isZero();
   }
 }

@@ -41,6 +41,19 @@ public interface CashbackAnnualBudgetRepository extends JpaRepository<CashbackAn
   int release(@Param("year") int year, @Param("amount") long amount);
 
   /**
+   * 확보했던 금액을 지급 금액으로 옮긴다(확보 - 금액, 지급 + 금액). 남은 예산은 변하지 않는다. 확보한 금액보다 많이 옮겨야 하면 0 을 돌려주고 바꾸지
+   * 않는다. 영속성 컨텍스트를 비우지 않는다(확보 쪽 설명 참고).
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackAnnualBudget a
+      set a.reservedAmount = a.reservedAmount - :amount, a.paidAmount = a.paidAmount + :amount
+      where a.budgetYear = :year and a.reservedAmount >= :amount
+      """)
+  int settle(@Param("year") int year, @Param("amount") long amount);
+
+  /**
    * 행을 잠그고 읽는다. 총액 변경이나 월 배정 합계 검증 중에 결제의 예약 금액 변경이 끼어들어 덮어써지지 않게 한다.
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
