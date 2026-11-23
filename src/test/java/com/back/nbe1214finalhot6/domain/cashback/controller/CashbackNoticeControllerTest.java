@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.NoticeType;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackNoticeService;
@@ -19,20 +20,23 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-// 인증 없이(로그인·CSRF 토큰 없이) 호출해서 임시 보안 설정(경로 허용)도 함께 확인한다.
+// 로그인한 사용자(허용 역할)로 호출해서 보안 설정을 거쳐도 통과하는지 함께 확인한다.
 @WebMvcTest(CashbackNoticeController.class)
 @Import(SecurityConfig.class)
+@WithMockUser(roles = "USER")
 class CashbackNoticeControllerTest {
 
   @Autowired private MockMvc mockMvc;
+  @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private CashbackNoticeService noticeService;
 
-  // 목적: 로그인 없이 조회되고 공지 종류·문구·적용 시작일·중단 예정일이 공통 응답 형식으로 내려가며 종류·페이지 파라미터가 서비스에 전달되는지 확인한다.
+  // 목적: 로그인한 사용자가 조회하고 공지 종류·문구·적용 시작일·중단 예정일이 공통 응답 형식으로 내려가며 종류·페이지 파라미터가 서비스에 전달되는지 확인한다.
   @Test
-  @DisplayName("공지 목록은 로그인 없이 조회되고 파라미터를 서비스에 넘긴다")
+  @DisplayName("공지 목록은 로그인한 사용자가 조회하고 파라미터를 서비스에 넘긴다")
   void list_ok() throws Exception {
     NoticeResponse notice =
         new NoticeResponse(

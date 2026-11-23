@@ -100,7 +100,8 @@ class CashbackBudgetReservationConcurrencyTest {
     List<BudgetReserveResult> results = runConcurrently(tasks);
 
     assertThat(results.stream().filter(BudgetReserveResult::isReserved).count()).isEqualTo(10);
-    assertThat(results.stream().filter(r -> r == BudgetReserveResult.INSUFFICIENT).count())
+    // 마지막으로 성공한 확보가 남은 예산을 0 으로 만들면서 달이 중단 상태가 되므로, 나머지는 모자람이 아니라 중단으로 거절된다
+    assertThat(results.stream().filter(r -> r == BudgetReserveResult.NOT_ACTIVE).count())
         .isEqualTo(20);
     assertThat(budgetService.getMonthly(YEAR, MONTH).reservedAmount()).isEqualTo(1_000_000L);
     assertThat(budgetService.getAnnual(YEAR).reservedAmount()).isEqualTo(1_000_000L);
