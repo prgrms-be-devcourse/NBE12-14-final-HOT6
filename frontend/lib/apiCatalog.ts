@@ -24,10 +24,10 @@ export const BASE_CATALOG: Endpoint[] = [
   },
   {
     id: "POST /api/payments", method: "POST", path: "/api/payments", tag: "결제", summary: "변동 QR 결제", idempotency: true,
-    body: JSON.stringify({ walletId: 1, qrToken: "QR 생성 응답의 token", cashbackUsed: 0 }, null, 2),
+    body: JSON.stringify({ qrToken: "QR 생성 응답의 token", cashbackUsed: 0 }, null, 2),
   },
   {
-    id: "GET /api/payments/by-key/{key}", method: "GET", path: "/api/payments/by-key/{멱등키}?walletId=1", tag: "결제", summary: "응답 못 받은 결제 재조회",
+    id: "GET /api/payments/by-key/{key}", method: "GET", path: "/api/payments/by-key/{멱등키}", tag: "결제", summary: "응답 못 받은 결제 재조회",
   },
   {
     id: "POST /api/payments/{id}/cancel", method: "POST", path: "/api/payments/1/cancel?merchantId=1", tag: "결제", summary: "결제 취소 (가맹점주 전액)",

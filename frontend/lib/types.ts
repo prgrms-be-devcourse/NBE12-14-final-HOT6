@@ -11,8 +11,19 @@ export type MerchantResponse = MerchantRegisterResponse;
 export type MerchantUpdateRequest = { name?: string; address?: string };
 export type PageResponse<T> = { content: T[]; page: number; size: number; totalElements: number; totalPages: number };
 
-// 가맹점·결제금액은 서버가 QR 에서 읽는다. cashbackUsed 를 생략하면 0 (결제금액 전액을 데브머니로 낸다)
-export type PaymentRequest = { walletId: number; qrToken: string; cashbackUsed?: number };
+// 가맹점·결제금액은 서버가 QR 에서, 지갑은 토큰에서 읽는다. cashbackUsed 를 생략하면 0 (결제금액 전액을 데브머니로 낸다)
+export type PaymentRequest = { qrToken: string; cashbackUsed?: number };
+
+// 내 지갑. availableCashback 은 결제에서 쓸 수 있는 캐시백(캐시백 잔액이 음수면 0)
+export type WalletResponse = {
+  devMoney: number;
+  cashbackBalance: number;
+  availableCashback: number;
+  holdingLimit: number;
+  monthlyChargeLimit: number;
+  chargedThisMonth: number;
+  chargeableAmount: number;
+};
 export type PaymentStatus = "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELED";
 export type PaymentResponse = {
   paymentId: number;
