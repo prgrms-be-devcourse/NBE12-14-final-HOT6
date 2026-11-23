@@ -106,8 +106,9 @@ class CashbackBudgetReservationTest {
     assertThat(budgetService.reserveBudget(YEAR, MONTH, 600_000L))
         .isEqualTo(BudgetReserveResult.RESERVED);
     assertThat(monthlyReserved()).isEqualTo(1_000_000L);
+    // 예산을 다 쓴 달은 긴급선 아래라 중단 상태가 되어, 모자란 것이 아니라 중단으로 거절된다
     assertThat(budgetService.reserveBudget(YEAR, MONTH, 1L))
-        .isEqualTo(BudgetReserveResult.INSUFFICIENT);
+        .isEqualTo(BudgetReserveResult.NOT_ACTIVE);
   }
 
   // 목적: 연 예산은 넉넉하지만 월 예산이 모자라면 실패하고, 먼저 늘렸던 연 예산 확보가 되돌려지는지 확인한다.
@@ -184,14 +185,15 @@ class CashbackBudgetReservationTest {
   @Test
   @DisplayName("복원하면 연·월 예산이 함께 줄고 다시 확보할 수 있다")
   void release_restoresBoth() {
-    budgetService.reserveBudget(YEAR, MONTH, 1_000_000L);
-    assertThat(budgetService.reserveBudget(YEAR, MONTH, 1L))
+    // 공지선(남은 예산 100,000) 위에 머물도록 800,000 만 확보한다
+    budgetService.reserveBudget(YEAR, MONTH, 800_000L);
+    assertThat(budgetService.reserveBudget(YEAR, MONTH, 200_001L))
         .isEqualTo(BudgetReserveResult.INSUFFICIENT);
 
     budgetService.releaseBudget(YEAR, MONTH, 400_000L);
 
-    assertThat(annualReserved()).isEqualTo(600_000L);
-    assertThat(monthlyReserved()).isEqualTo(600_000L);
+    assertThat(annualReserved()).isEqualTo(400_000L);
+    assertThat(monthlyReserved()).isEqualTo(400_000L);
     assertThat(budgetService.reserveBudget(YEAR, MONTH, 400_000L))
         .isEqualTo(BudgetReserveResult.RESERVED);
   }
