@@ -37,6 +37,13 @@ public class CashbackAnnualBudget {
   @Column(name = "total_amount", nullable = false)
   private long totalAmount;
 
+  // 다른 해에서 넘어온 금액과 다른 해로 넘긴 금액. 연말 이월(12월 -> 다음 해 1월)에서만 바뀐다. 기존 행은 0 으로 채운다
+  @Column(name = "carried_in_amount", nullable = false, columnDefinition = "bigint not null default 0")
+  private long carriedInAmount;
+
+  @Column(name = "carried_out_amount", nullable = false, columnDefinition = "bigint not null default 0")
+  private long carriedOutAmount;
+
   // 결제 시 확보(예약)해 둔 금액. 아직 지급 전
   @Column(name = "reserved_amount", nullable = false)
   private long reservedAmount;
@@ -71,7 +78,7 @@ public class CashbackAnnualBudget {
    */
   public void changeTotal(long totalAmount, long allocatedSum) {
     validateTotal(totalAmount);
-    if (totalAmount < reservedAmount + paidAmount) {
+    if (totalAmount + carriedInAmount - carriedOutAmount < reservedAmount + paidAmount) {
       throw new BusinessException(
           CashbackErrorCode.INVALID_BUDGET, "이미 확보하거나 지급한 금액보다 작게 줄일 수 없습니다");
     }
@@ -81,9 +88,9 @@ public class CashbackAnnualBudget {
     this.totalAmount = totalAmount;
   }
 
-  /** 아직 확보하지 않은 남은 예산. */
+  /** 아직 확보하지 않은 남은 예산(총액 + 이월 유입 - 이월 유출 - 예약 - 지급). */
   public long remainingAmount() {
-    return totalAmount - reservedAmount - paidAmount;
+    return totalAmount + carriedInAmount - carriedOutAmount - reservedAmount - paidAmount;
   }
 
   private static void validateTotal(long totalAmount) {
