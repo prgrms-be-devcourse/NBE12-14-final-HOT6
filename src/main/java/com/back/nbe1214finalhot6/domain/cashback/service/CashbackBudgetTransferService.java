@@ -3,6 +3,7 @@ package com.back.nbe1214finalhot6.domain.cashback.service;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.dto.BudgetTransferRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.BudgetTransferResponse;
+import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetTransferType;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackBudgetTransfer;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
@@ -62,23 +63,46 @@ public class CashbackBudgetTransferService {
       throw new BusinessException(CashbackErrorCode.BUDGET_NOT_FOUND, "이월을 받는 해의 연 예산이 없습니다");
     }
 
-    // 넘기는 쪽 먼저(연 -> 월), 받는 쪽 나중(연 -> 월)
-    if (crossYear && annualBudgetRepository.transferOut(year, amount) == 0) {
+    CashbackBudgetTransfer transfer = move(from, to, amount, BudgetTransferType.MANUAL);
+    return BudgetTransferResponse.of(transfer, from, to);
+  }
+
+  /**
+   * 월 마감에서 남은 예산을 다음 달로 자동 이월한다. 월 마감 처리({@code CashbackBudgetCloseProcessor})가 호출하며 그 트랜잭션에 참여한다. 받는 해의
+   * 연 예산과 받는 달의 월 예산이 있어야 한다.
+   *
+   * @throws BusinessException 남은 예산보다 많을 때(CSH-011). 마감 처리가 남은 예산을 확인한 뒤 호출하므로 정상 흐름에서는 나지 않는다
+   */
+  @Transactional
+  public void transferAutomatically(
+      CashbackMonthlyBudget from, CashbackMonthlyBudget to, long amount) {
+    move(from, to, amount, BudgetTransferType.AUTO);
+  }
+
+  /**
+   * 금액을 넘기는 달에서 받는 달로 옮기고 이력을 남긴다. 12월에서 다음 해 1월로 넘기면 연 예산도 맞춘다. 잠그는 순서는 넘기는 쪽(연 -> 월), 받는 쪽(연 ->
+   * 월)이다.
+   */
+  private CashbackBudgetTransfer move(
+      CashbackMonthlyBudget from, CashbackMonthlyBudget to, long amount, BudgetTransferType type) {
+    boolean crossYear = to.getBudgetYear() != from.getBudgetYear();
+    if (crossYear && annualBudgetRepository.transferOut(from.getBudgetYear(), amount) == 0) {
       throw new BusinessException(CashbackErrorCode.TRANSFER_EXCEEDS_REMAINING);
     }
-    if (monthlyBudgetRepository.transferOut(year, month, amount) == 0) {
+    if (monthlyBudgetRepository.transferOut(from.getBudgetYear(), from.getBudgetMonth(), amount)
+        == 0) {
       throw new BusinessException(CashbackErrorCode.TRANSFER_EXCEEDS_REMAINING);
     }
     if (crossYear) {
-      annualBudgetRepository.transferIn(next.getYear(), amount);
+      annualBudgetRepository.transferIn(to.getBudgetYear(), amount);
     }
-    monthlyBudgetRepository.transferIn(next.getYear(), next.getMonthValue(), amount);
+    monthlyBudgetRepository.transferIn(to.getBudgetYear(), to.getBudgetMonth(), amount);
 
-    CashbackBudgetTransfer transfer =
-        transferRepository.save(
-            CashbackBudgetTransfer.manual(
-                from.getId(), to.getId(), amount, LocalDateTime.now(clock)));
-    return BudgetTransferResponse.of(transfer, from, to);
+    LocalDateTime now = LocalDateTime.now(clock);
+    return transferRepository.save(
+        type == BudgetTransferType.AUTO
+            ? CashbackBudgetTransfer.automatic(from.getId(), to.getId(), amount, now)
+            : CashbackBudgetTransfer.manual(from.getId(), to.getId(), amount, now));
   }
 
   /** 해당 연도의 월에서 넘긴 이월 이력을 최근 이월순으로 돌려준다. */
