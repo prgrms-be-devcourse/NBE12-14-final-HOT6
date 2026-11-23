@@ -65,6 +65,13 @@ public class CashbackBudgetTransfer {
     this.createdAt = createdAt;
   }
 
+  /** 월 마감에서 시스템이 자동으로 이월한 기록. 처리자는 null 이다. */
+  public static CashbackBudgetTransfer automatic(
+      Long fromMonthlyBudgetId, Long toMonthlyBudgetId, long amount, LocalDateTime createdAt) {
+    return new CashbackBudgetTransfer(
+        fromMonthlyBudgetId, toMonthlyBudgetId, amount, BudgetTransferType.AUTO, null, createdAt);
+  }
+
   /** 운영자가 직접 이월한 기록. 처리자는 인증이 머지되기 전까지 null 이다. */
   public static CashbackBudgetTransfer manual(
       Long fromMonthlyBudgetId, Long toMonthlyBudgetId, long amount, LocalDateTime createdAt) {

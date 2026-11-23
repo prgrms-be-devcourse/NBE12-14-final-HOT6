@@ -11,6 +11,7 @@ import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackExclusionReason;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackSummaryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.EarningResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyLimitResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
@@ -118,5 +119,31 @@ class CashbackQueryControllerTest {
     mockMvc
         .perform(get("/api/cashback/earnings").param("walletId", "7").param("size", "0"))
         .andExpect(status().isBadRequest());
+  }
+
+  // 목적: 요약이 200 과 공통 응답 형식으로 연·월, 적립액, 예정·지급 완료 금액, 제외 건수를 내려 주는지 확인한다.
+  @Test
+  @DisplayName("이번 달 적립 요약은 200 과 합계를 반환한다")
+  void summary_ok() throws Exception {
+    given(queryService.getSummary(7L))
+        .willReturn(new CashbackSummaryResponse(2026, 11, 900L, 600L, 300L, 2L));
+
+    mockMvc
+        .perform(get("/api/cashback/summary").param("walletId", "7"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.year").value(2026))
+        .andExpect(jsonPath("$.data.month").value(11))
+        .andExpect(jsonPath("$.data.earnedAmount").value(900))
+        .andExpect(jsonPath("$.data.pendingAmount").value(600))
+        .andExpect(jsonPath("$.data.paidAmount").value(300))
+        .andExpect(jsonPath("$.data.excludedCount").value(2));
+  }
+
+  // 목적: 지갑 ID 가 없으면 400 으로 걸러지는지 확인한다.
+  @Test
+  @DisplayName("요약은 지갑 ID 가 없으면 400")
+  void summary_missingWallet() throws Exception {
+    mockMvc.perform(get("/api/cashback/summary")).andExpect(status().isBadRequest());
   }
 }
