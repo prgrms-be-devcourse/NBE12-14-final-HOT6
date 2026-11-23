@@ -10,6 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackEarning;
+import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackService;
 import com.back.nbe1214finalhot6.domain.payment.PaymentTestFixture;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
@@ -33,6 +36,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -54,6 +58,8 @@ class PaymentCancelServiceTest {
   @Autowired WalletTransactionRepository walletTransactionRepository;
   @Autowired PaymentTestFixture fixture;
   @Autowired MutableClock clock;
+  @Autowired CashbackEarningRepository earningRepository;
+  @Autowired JdbcTemplate jdbc;
 
   @MockitoBean QrService qrService; // QR 은 stub
   @MockitoSpyBean CashbackService cashbackService; // 호출 검증(verify) + 롤백 테스트용 예외
@@ -275,5 +281,25 @@ class PaymentCancelServiceTest {
     Payment saved = payment(paymentId);
     assertThat(saved.getCompletedAt().toLocalDate()).isEqualTo(LocalDate.of(2026, 10, 18));
     assertThat(saved.getCanceledAt().toLocalDate()).isEqualTo(LocalDate.of(2026, 11, 18));
+  }
+
+  @Test
+  @DisplayName("캐시백이 이미 지급된 결제도 취소된다 (임시: 지급 건은 cashbackService.cancel 을 건너뛴다)")
+  void 지급된_캐시백이_있어도_결제취소_성공() {
+    // given : 결제 완료 후, 그 결제의 적립 건이 지급(PAID)된 상태
+    Long paymentId = completedPayment();
+    CashbackEarning earning = earningRepository.findByPaymentId(paymentId).orElseThrow();
+    jdbc.update("update cashback_earning set status = 'PAID' where id = ?", earning.getId());
+    // when : 예외 없이 취소된다
+    PaymentResponse response = paymentCancelService.cancel(merchantId, paymentId);
+    // then 1 : 결제는 CANCELED, 지갑은 환급된다
+    assertThat(response.status()).isEqualTo(PaymentStatus.CANCELED);
+    assertThat(payment(paymentId).getStatus()).isEqualTo(PaymentStatus.CANCELED);
+    assertThat(wallet().getBalance()).isEqualTo(7_000L);
+    assertThat(wallet().getCashbackBalance()).isEqualTo(3_000L);
+    // then 2 : 지급된 적립은 건드리지 않는다 (회수는 지급 배치 이슈에서 구현)
+    verify(cashbackService, never()).cancel(any());
+    assertThat(earningRepository.findByPaymentId(paymentId).orElseThrow().getStatus())
+        .isEqualTo(EarningStatus.PAID);
   }
 }
