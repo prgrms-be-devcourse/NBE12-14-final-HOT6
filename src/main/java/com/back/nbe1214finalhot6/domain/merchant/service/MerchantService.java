@@ -50,6 +50,14 @@ public class MerchantService {
         .isCashbackEligible();
   }
 
+  @Transactional(readOnly = true)
+  public MerchantResponse get(Long merchantId) {
+    return merchantRepository
+        .findById(merchantId)
+        .map(MerchantResponse::from)
+        .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+  }
+
   @Transactional
   public MerchantResponse update(Long merchantId, MerchantUpdateRequest request) {
     Merchant merchant =

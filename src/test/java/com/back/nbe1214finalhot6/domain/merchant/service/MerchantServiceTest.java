@@ -128,6 +128,28 @@ class MerchantServiceTest {
   }
 
   @Test
+  @DisplayName("가맹점을 조회하면 저장된 이름, 주소, 적립 대상 여부를 반환한다")
+  void 가맹점조회() {
+    Long id = register("조회 가게", "서울시 종로구", true);
+
+    MerchantResponse result = merchantService.get(id);
+
+    assertThat(result.merchantId()).isEqualTo(id);
+    assertThat(result.name()).isEqualTo("조회 가게");
+    assertThat(result.address()).isEqualTo("서울시 종로구");
+    assertThat(result.cashbackEligible()).isTrue();
+  }
+
+  @Test
+  @DisplayName("존재하지 않는 가맹점을 조회하면 예외가 발생한다")
+  void 없는가맹점조회시예외() {
+    assertThatThrownBy(() -> merchantService.get(Long.MAX_VALUE))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_NOT_FOUND));
+  }
+
+  @Test
   @DisplayName("존재하지 않는 가맹점을 수정하면 예외가 발생한다")
   void 없는가맹점수정시예외() {
     assertThatThrownBy(
