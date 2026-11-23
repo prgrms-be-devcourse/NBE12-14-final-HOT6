@@ -4,6 +4,8 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackEarning;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -37,4 +39,11 @@ public interface CashbackEarningRepository extends JpaRepository<CashbackEarning
   /** 현재 상태. 엔티티가 아니라 값만 읽어서 컨텍스트에 남은 낡은 엔티티의 영향을 받지 않는다. */
   @Query("select e.status from CashbackEarning e where e.id = :id")
   Optional<EarningStatus> findStatus(@Param("id") Long id);
+
+  /** 한 이용자(지갑)의 적립 내역. 정렬과 페이지는 호출한 쪽이 정한다. */
+  Page<CashbackEarning> findByWalletId(Long walletId, Pageable pageable);
+
+  /** 한 이용자의 적립 내역 중 해당 상태만. */
+  Page<CashbackEarning> findByWalletIdAndStatus(
+      Long walletId, EarningStatus status, Pageable pageable);
 }
