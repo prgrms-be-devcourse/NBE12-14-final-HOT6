@@ -42,6 +42,7 @@ public class CashbackPolicyService {
   private final CashbackPolicyRepository policyRepository;
   private final CashbackPolicyHistoryRepository historyRepository;
   private final CashbackMonthlyBudgetRepository monthlyBudgetRepository;
+  private final CashbackNoticeService noticeService;
   private final CashbackProperties properties;
   private final Clock clock;
 
@@ -50,6 +51,8 @@ public class CashbackPolicyService {
    *
    * <p>그 달의 월 예산 행을 잠가서 같은 달의 인하를 한 번에 하나씩 처리한다. 횟수 검사와 구간 생성 사이에 다른 인하가 끼어들 수 없다. 연 예산은
    * 잠그지 않으므로 잠금 순서(연 -> 월)와 어긋나지 않는다. 이미 접수된 적립은 저장된 요율을 유지하므로 영향이 없다.
+   *
+   * <p>인하하면 이용자에게 보이는 정책 변경 예고 공지를 한 건 등록한다.
    *
    * @return 새로 만든 구간
    * @throws BusinessException 요율·시각이 올바르지 않거나 현재 요율보다 낮지 않을 때(CSH-003), 월 예산이 없을 때(CSH-004),
@@ -114,6 +117,8 @@ public class CashbackPolicyService {
       historyRepository.save(CashbackPolicyHistory.updated(before, covering, null, now));
     }
     historyRepository.save(CashbackPolicyHistory.created(successor, null, now));
+    // 이용자에게 보이는 정책 변경 예고. 같은 트랜잭션이라 인하가 롤백되면 공지도 롤백된다
+    noticeService.registerPolicyChange(successor, now);
     return PolicyResponse.from(successor);
   }
 

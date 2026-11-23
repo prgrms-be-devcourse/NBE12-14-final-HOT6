@@ -135,7 +135,8 @@ public interface CashbackMonthlyBudgetRepository
       select m.id as id,
              m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
                     - m.reservedAmount - m.paidAmount as remaining,
-             m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount as total
+             m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount as total,
+             m.contingencyAmount as contingency
       from CashbackMonthlyBudget m where m.id = :id
       """)
   Optional<MonthlyBudgetSnapshot> findSnapshot(@Param("id") Long id);
@@ -227,4 +228,45 @@ public interface CashbackMonthlyBudgetRepository
       @Param("from") BudgetStatus from,
       @Param("to") BudgetStatus to,
       @Param("scheduledAt") LocalDateTime scheduledAt);
+
+  /** 이미 지난 달 중 아직 마감하지 않은 월 예산의 ID 를 오래된 달부터 돌려준다. {@code year}·{@code month} 는 이번 달이다. */
+  @Query(
+      """
+      select m.id from CashbackMonthlyBudget m
+      where m.status <> :closed
+        and (m.budgetYear < :year or (m.budgetYear = :year and m.budgetMonth < :month))
+      order by m.budgetYear, m.budgetMonth
+      """)
+  List<Long> findClosableIds(
+      @Param("year") int year, @Param("month") int month, @Param("closed") BudgetStatus closed);
+
+  /**
+   * 아직 마감하지 않은 월 예산만 마감({@code CLOSED})으로 바꾼다. 바꾸면 1, 이미 마감됐으면 0 을 돌려준다. 상태를 확인하고 바꾸는 것이 한 문장이라
+   * 같은 달을 두 곳에서 마감해도 한쪽만 성공한다. 영속성 컨텍스트를 비우지 않는다.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.status = :closed
+      where m.id = :id and m.status <> :closed
+      """)
+  int closeIfOpen(@Param("id") Long id, @Param("closed") BudgetStatus closed);
+
+  /** 남은 예산(배정 + 이월 유입 - 이월 유출 - 예약 - 지급). 엔티티가 아니라 값만 읽어서 낡은 엔티티의 영향을 받지 않는다. */
+  @Query(
+      """
+      select m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
+             - m.reservedAmount - m.paidAmount
+      from CashbackMonthlyBudget m where m.id = :id
+      """)
+  Optional<Long> findRemainingAmount(@Param("id") Long id);
+
+  /** 월 예산의 남은 예산(배정 + 이월 유입 - 이월 유출 - 예약 - 지급). 월 예산이 없으면 비어 있다. 읽기만 한다. */
+  @Query(
+      """
+      select m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
+             - m.reservedAmount - m.paidAmount
+      from CashbackMonthlyBudget m where m.budgetYear = :year and m.budgetMonth = :month
+      """)
+  Optional<Long> findRemainingAmount(@Param("year") int year, @Param("month") int month);
 }

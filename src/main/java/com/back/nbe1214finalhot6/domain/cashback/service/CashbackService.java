@@ -2,6 +2,8 @@ package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import com.back.nbe1214finalhot6.domain.cashback.config.CashbackProperties;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackExclusionReason;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackPreviewRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackPreviewResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
@@ -64,29 +66,13 @@ public class CashbackService {
     YearMonth month = YearMonth.from(requestedAt);
     LocalDateTime now = LocalDateTime.now(clock);
 
-    if (!command.cashbackEligible()) {
-      return exclude(command, CashbackExclusionReason.NOT_ELIGIBLE, month, limit, now);
+    Quote quote = quote(command.cashbackEligible(), command.walletUsedAmount(), requestedAt);
+    if (quote.exclusionReason() != CashbackExclusionReason.NONE) {
+      return exclude(command, quote.exclusionReason(), month, limit, now);
     }
-    if (command.walletUsedAmount() <= 0) {
-      return exclude(command, CashbackExclusionReason.NO_WALLET_USAGE, month, limit, now);
-    }
-
-    // 달 중 인하 구간이 있으면 그 요율, 없으면 그 달 월 예산의 기본 요율이다. 둘 다 없으면 적립할 예산이 없는 달이다
-    Optional<PolicyResponse> segment = policyService.findEffective(requestedAt);
-    Optional<BigDecimal> rate =
-        segment.map(PolicyResponse::rate).or(() -> policyService.effectiveRate(requestedAt));
-    if (rate.isEmpty()) {
-      return exclude(command, CashbackExclusionReason.BUDGET_EXHAUSTED, month, limit, now);
-    }
-
-    long amount =
-        BigDecimal.valueOf(command.walletUsedAmount())
-            .multiply(rate.get())
-            .setScale(0, RoundingMode.DOWN)
-            .longValueExact();
-    if (amount <= 0) {
-      return exclude(command, CashbackExclusionReason.AMOUNT_TOO_SMALL, month, limit, now);
-    }
+    PolicyResponse segment = quote.segment();
+    BigDecimal rate = quote.rate();
+    long amount = quote.amount();
 
     if (!limitService.consume(command.walletId(), month, amount, limit)) {
       return exclude(command, CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED, month, limit, now);
@@ -108,8 +94,8 @@ public class CashbackService {
                 command.walletId(),
                 command.walletUsedAmount(),
                 requestedAt,
-                rate.get(),
-                segment.map(PolicyResponse::policyId).orElse(null),
+                rate,
+                segment == null ? null : segment.policyId(),
                 amount,
                 payableAt,
                 month.atDay(1),
@@ -121,6 +107,76 @@ public class CashbackService {
         payableAt,
         CashbackExclusionReason.NONE,
         remaining(command.walletId(), month, limit));
+  }
+
+  /**
+   * 결제 전에 받을 수 있는 캐시백을 미리 계산한다. 읽기만 하며 월 한도·예산·적립 건을 바꾸지 않는다. 결제 도메인이나 화면이 호출한다.
+   *
+   * <p>판정은 {@link #reserve} 와 같은 순서와 규칙이다: 적립 대상, 데브머니 사용분, 요율, 내림 계산, 월 한도, 예산. 지금(서버 시각) 기준의 예상 값이라
+   * 결제가 확정되는 사이에 예산·한도·요율이 바뀌면 실제 적립은 달라질 수 있다.
+   */
+  @Transactional(readOnly = true)
+  public CashbackPreviewResponse preview(CashbackPreviewRequest request) {
+    LocalDateTime now = LocalDateTime.now(clock);
+    YearMonth month = YearMonth.from(now);
+    long limit = settingService.getLong(SettingKey.CASHBACK_USER_MONTHLY_LIMIT);
+    long remaining = remaining(request.walletId(), month, limit);
+    boolean paused = budgetService.isPaused(month.getYear(), month.getMonthValue());
+
+    Quote quote = quote(request.cashbackEligible(), request.walletUsedAmount(), now);
+    CashbackExclusionReason reason = quote.exclusionReason();
+    if (reason == CashbackExclusionReason.NONE && quote.amount() > remaining) {
+      reason = CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED;
+    }
+    if (reason == CashbackExclusionReason.NONE
+        && !budgetService.canReserve(month.getYear(), month.getMonthValue(), quote.amount())) {
+      reason = CashbackExclusionReason.BUDGET_EXHAUSTED;
+    }
+    if (reason != CashbackExclusionReason.NONE) {
+      return new CashbackPreviewResponse(false, paused, BigDecimal.ZERO, 0L, remaining, reason);
+    }
+    return new CashbackPreviewResponse(
+        true, paused, quote.rate(), quote.amount(), remaining, CashbackExclusionReason.NONE);
+  }
+
+  /**
+   * 적립액 계산까지의 공통 판정(적립 대상, 데브머니 사용분, 요율, 내림 계산). {@code reserve} 와 {@code preview} 가 함께 쓴다. 월 한도와 예산은 확보하는
+   * 쪽과 읽기만 하는 쪽이 달라서 여기에 넣지 않는다. 제외면 사유만, 아니면 요율·정책·적립액을 채운다.
+   */
+  private Quote quote(boolean eligible, long walletUsedAmount, LocalDateTime at) {
+    if (!eligible) {
+      return Quote.excluded(CashbackExclusionReason.NOT_ELIGIBLE);
+    }
+    if (walletUsedAmount <= 0) {
+      return Quote.excluded(CashbackExclusionReason.NO_WALLET_USAGE);
+    }
+    // 달 중 인하 구간이 있으면 그 요율, 없으면 그 달 월 예산의 기본 요율이다. 둘 다 없으면 적립할 예산이 없는 달이다
+    Optional<PolicyResponse> segment = policyService.findEffective(at);
+    Optional<BigDecimal> rate =
+        segment.map(PolicyResponse::rate).or(() -> policyService.effectiveRate(at));
+    if (rate.isEmpty()) {
+      return Quote.excluded(CashbackExclusionReason.BUDGET_EXHAUSTED);
+    }
+    long amount =
+        BigDecimal.valueOf(walletUsedAmount)
+            .multiply(rate.get())
+            .setScale(0, RoundingMode.DOWN)
+            .longValueExact();
+    if (amount <= 0) {
+      return Quote.excluded(CashbackExclusionReason.AMOUNT_TOO_SMALL);
+    }
+    return new Quote(CashbackExclusionReason.NONE, rate.get(), segment.orElse(null), amount);
+  }
+
+  private record Quote(
+      CashbackExclusionReason exclusionReason,
+      BigDecimal rate,
+      PolicyResponse segment,
+      long amount) {
+
+    static Quote excluded(CashbackExclusionReason reason) {
+      return new Quote(reason, BigDecimal.ZERO, null, 0L);
+    }
   }
 
   /**

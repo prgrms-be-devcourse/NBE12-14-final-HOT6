@@ -2,8 +2,12 @@ package com.back.nbe1214finalhot6.domain.payment.controller;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,8 +15,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.idempotency.IdempotencyKeys;
+import com.back.nbe1214finalhot6.common.security.OwnedResources;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.payment.exception.PaymentErrorCode;
+import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.service.PaymentCancelService;
@@ -21,19 +27,23 @@ import com.back.nbe1214finalhot6.domain.payment.service.PaymentQueryService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
+import com.back.nbe1214finalhot6.support.WithAuthUser;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** 결제 컨트롤러 테스트. 재조회 API(`GET /api/payments/by-key/{key}`)의 요청·응답 형태를 검증한다. */
 @WebMvcTest(PaymentController.class)
 @Import(SecurityConfig.class)
-@WithMockUser(roles = "USER") // 보안 설정을 거쳐도 통과하도록 해당 경로의 허용 역할로 로그인한 상태로 호출한다
+@WithAuthUser(userId = 1L) // 로그인한 회원(AuthUser)으로 호출한다. 내 지갑은 setUp 에서 1번으로 정한다
 class PaymentControllerTest {
 
   @Autowired private MockMvc mockMvc;
@@ -41,6 +51,13 @@ class PaymentControllerTest {
   @MockitoBean private PaymentFacade paymentFacade;
   @MockitoBean private PaymentQueryService paymentQueryService;
   @MockitoBean private PaymentCancelService paymentCancelService;
+  @MockitoBean private OwnedResources ownedResources;
+
+  @BeforeEach
+  void setUp() {
+    // 로그인한 회원의 지갑은 1번이다
+    given(ownedResources.walletIdOf(any())).willReturn(1L);
+  }
 
   @Test
   @DisplayName("재조회 성공 시 200 과 영수증 필드(상태, 사용분, 적립액, 요율, 지급 예정 시각, 제외 사유, 실패 코드)를 반환한다")
@@ -64,9 +81,9 @@ class PaymentControllerTest {
             null); // 취소 시각 (취소 전)
     given(paymentQueryService.findByKey(1L, key)).willReturn(response);
 
-    // when & then : 멱등키는 경로, walletId 는 쿼리 파라미터로 보낸다 (GET 이라 본문 없음)
+    // when & then : 멱등키는 경로로 보낸다. walletId 는 보내지 않고 토큰의 회원으로 서버가 찾는다 (GET 이라 본문 없음)
     mockMvc
-        .perform(get("/api/payments/by-key/{key}", key).param("walletId", "1"))
+        .perform(get("/api/payments/by-key/{key}", key))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.paymentId").value(10))
@@ -91,20 +108,7 @@ class PaymentControllerTest {
 
     // when & then
     mockMvc
-            .perform(get("/api/payments/by-key/{key}", key).param("walletId", "1"))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.code").value("COM-001"));
-  }
-
-  @Test
-  @DisplayName("walletId 쿼리 파라미터가 없으면 400")
-  void walletId없음() throws Exception {
-    String key = UUID.randomUUID().toString();
-
-    // when & then
-    mockMvc
-            .perform(get("/api/payments/by-key/{key}", key).param("", "1"))
+            .perform(get("/api/payments/by-key/{key}", key))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("COM-001"));
@@ -120,7 +124,7 @@ class PaymentControllerTest {
 
     // when & then
     mockMvc
-            .perform(get("/api/payments/by-key/{key}", key).param("walletId", "1"))
+            .perform(get("/api/payments/by-key/{key}", key))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("PAY-003"));
@@ -148,9 +152,83 @@ class PaymentControllerTest {
                 null));
 
     mockMvc
-        .perform(get("/api/payments/by-key/{key}", key).param("walletId", "1"))
+        .perform(get("/api/payments/by-key/{key}", key))
         .andExpect(status().isOk())
             //헤더체크
         .andExpect(header().string("Cache-Control", containsString("no-store")));
+  }
+
+  @Test
+  @DisplayName("결제 요청 본문에 남의 walletId 를 넣어도 내 지갑(walletIdOf 결과)으로 결제한다")
+  void 결제_본문_walletId_무시() throws Exception {
+    // given : walletIdOf 는 setUp 에서 1L 을 돌려준다. 본문에는 남의 지갑 99L 을 넣는다
+    String key = UUID.randomUUID().toString();
+    String body =
+        """
+        {"walletId": 99, "qrToken": "qr-token-1", "cashbackUsed": 1000}
+        """;
+    // when : 결제 요청
+    mockMvc
+        .perform(
+            post("/api/payments")
+                .header("Idempotency-Key", key)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+    // then : 본문의 99 가 아니라 내 지갑 1 로 호출됐다
+    verify(paymentFacade).pay(key, new PaymentRequest(1L, "qr-token-1", 1000L));
+  }
+
+  @Test
+  @DisplayName("결제 요청의 cashbackUsed 가 그대로 전달된다")
+  void 결제_cashbackUsed_전달() throws Exception {
+    String key = UUID.randomUUID().toString();
+    String body =
+            """
+            {"qrToken": "qr-token-1", "cashbackUsed": 1000}
+            """;
+    // when : 결제 요청
+    mockMvc
+            .perform(
+                    post("/api/payments")
+                            .header("Idempotency-Key", key)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+            .andExpect(status().isOk());
+    // then : cashbackUsed 1000 이 0 으로 바뀌지 않고 그대로 전달됐다
+    verify(paymentFacade).pay(key, new PaymentRequest(1L, "qr-token-1", 1000L));
+  }
+
+
+  @Test
+  @WithAuthUser(userId = 2L, role = UserRole.OWNER)
+  @DisplayName("결제 취소는 로그인한 점주의 가맹점(merchantIdOf 결과)으로 취소한다")
+  void 취소_merchantIdOf_사용() throws Exception {
+    // given : 내 가맹점은 5번이다
+    Long paymentId = 10L;
+    given(ownedResources.merchantIdOf(any())).willReturn(5L);
+
+    // when : 결제 취소 요청 (merchantId 는 보내지 않는다)
+    mockMvc.perform(post("/api/payments/{id}/cancel", paymentId))
+            .andExpect(status().isOk());
+
+    // then : 내 가맹점 5번으로 취소가 호출됐다
+    verify(paymentCancelService).cancel(5L, paymentId);
+  }
+
+  @Test
+  @DisplayName("USER 역할은 결제를 취소할 수 없다 (403)")
+  void 취소_USER_역할_403() throws Exception {
+    // given : 클래스 기본 로그인은 USER 역할이다 (취소는 OWNER 만 가능하다)
+
+    // when : 결제 취소 요청
+    mockMvc.perform(post("/api/payments/{id}/cancel", 10L))
+            // then : 역할 부족으로 403 (COM-008)
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("COM-008"));
+
+    // 취소 서비스는 호출되지 않는다
+    verify(paymentCancelService, never()).cancel(any(), any());
   }
 }

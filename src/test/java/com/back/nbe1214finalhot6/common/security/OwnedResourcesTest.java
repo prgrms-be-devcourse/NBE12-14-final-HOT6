@@ -108,16 +108,6 @@ class OwnedResourcesTest {
     assertThat(ownedResources.merchantIdOf(user(USER_ID, UserRole.OWNER))).isEqualTo(mine);
   }
 
-  // 목적: 점주당 1개를 막는 제약이 생기기 전까지, 여러 개여도 가장 먼저 등록한 가맹점으로 항상 같은 값을 준다.
-  @Test
-  @DisplayName("가맹점이 여러 개면 가장 먼저 등록한 것을 돌려준다")
-  void merchantIdOf_earliest() {
-    Long first = saveMerchant(USER_ID, "첫 가게");
-    saveMerchant(USER_ID, "둘째 가게");
-
-    assertThat(ownedResources.merchantIdOf(user(USER_ID, UserRole.OWNER))).isEqualTo(first);
-  }
-
   // 목적: 가맹점이 없으면 404(MER-001)로 응답한다.
   @Test
   @DisplayName("가맹점이 없으면 MER-001 로 거절한다")

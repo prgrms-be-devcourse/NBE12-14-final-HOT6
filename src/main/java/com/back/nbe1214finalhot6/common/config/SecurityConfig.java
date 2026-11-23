@@ -67,7 +67,11 @@ public class SecurityConfig {
                     .hasRole("OWNER")
                     // 시민 기능(OWNER 도 쓴다, ADMIN 은 못 쓴다)
                     .requestMatchers(
-                        "/api/cashback/**", "/api/payments/**", "/api/qr/**", "/api/wallet/**")
+                        "/api/cashback/**",
+                        "/api/notices/**",
+                        "/api/payments/**",
+                        "/api/qr/**",
+                        "/api/wallet/**")
                     .hasRole("USER")
                     // 나머지는 로그인만 하면 된다
                     .anyRequest()

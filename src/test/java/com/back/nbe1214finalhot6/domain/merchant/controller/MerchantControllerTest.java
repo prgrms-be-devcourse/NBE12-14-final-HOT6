@@ -16,14 +16,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.common.security.OwnedResources;
+import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
+import com.back.nbe1214finalhot6.domain.auth.security.AuthUser;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
+import com.back.nbe1214finalhot6.domain.merchant.service.MerchantRegistrationFacade;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
+import com.back.nbe1214finalhot6.support.WithAuthUser;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,7 +39,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.RequestBuilder;
@@ -41,17 +46,25 @@ import org.springframework.test.web.servlet.RequestBuilder;
 // 로그인한 사용자(허용 역할)로 호출해서 보안 설정을 거쳐도 통과하는지 함께 확인한다.
 @WebMvcTest(MerchantController.class)
 @Import(SecurityConfig.class)
-@WithMockUser(roles = "OWNER") // 보안 설정을 거쳐도 통과하도록 해당 경로의 허용 역할로 로그인한 상태로 호출한다
+@WithAuthUser(userId = 1L, role = UserRole.OWNER) // 허용 역할의 점주(1번 회원)로 로그인한 상태로 호출한다
 class MerchantControllerTest {
 
   @Autowired private MockMvc mockMvc;
   @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private MerchantService merchantService;
+  @MockitoBean private MerchantRegistrationFacade registrationFacade;
+  @MockitoBean private OwnedResources ownedResources;
+
+  // 로그인한 점주의 가맹점은 1번이다
+  @BeforeEach
+  void myMerchantIsOne() {
+    given(ownedResources.merchantIdOf(any())).willReturn(1L);
+  }
 
   @Test
   @DisplayName("정상 요청이면 201 과 등록 결과를 반환한다")
   void 가맹점등록성공() throws Exception {
-    given(merchantService.register(any()))
+    given(registrationFacade.register(any(), any()))
         .willReturn(new MerchantRegisterResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true));
 
     mockMvc
@@ -60,7 +73,7 @@ class MerchantControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"ownerId": 1, "name": "테스트 가맹점", "address": "인천광역시 남동구 1"}
+                    {"name": "테스트 가맹점", "address": "인천광역시 남동구 1"}
                     """))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
@@ -71,7 +84,7 @@ class MerchantControllerTest {
   @Test
   @DisplayName("증빙 서류를 보내면 서비스에 전달되고 적립 대상으로 판정된다")
   void 증빙서류바인딩() throws Exception {
-    given(merchantService.register(any()))
+    given(registrationFacade.register(any(), any()))
         .willReturn(new MerchantRegisterResponse(1L, "서류 가맹점", "인천광역시 남동구 1", true));
 
     mockMvc
@@ -80,7 +93,7 @@ class MerchantControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
-                    {"ownerId": 1, "name": "서류 가맹점", "address": "인천광역시 남동구 1",
+                    {"name": "서류 가맹점", "address": "인천광역시 남동구 1",
                      "revenueProof": "revenue.pdf"}
                     """))
         .andExpect(status().isCreated())
@@ -88,7 +101,7 @@ class MerchantControllerTest {
 
     ArgumentCaptor<MerchantRegisterRequest> captor =
         ArgumentCaptor.forClass(MerchantRegisterRequest.class);
-    verify(merchantService).register(captor.capture());
+    verify(registrationFacade).register(any(), captor.capture());
     assertThat(captor.getValue().revenueProof()).isEqualTo("revenue.pdf");
     assertThat(captor.getValue().resolveCashbackEligible()).isTrue();
   }
@@ -108,19 +121,45 @@ class MerchantControllerTest {
   }
 
   @Test
-  @DisplayName("ownerId 가 없으면 400")
-  void 사장님ID누락시400() throws Exception {
-    expectBadRequest(
-        """
-        {"name": "테스트 가맹점", "address": "인천광역시 남동구 1"}
-        """,
-        "ownerId");
+  @DisplayName("등록하는 회원은 요청이 아니라 로그인한 회원이다(요청에 ownerId 를 보내도 무시한다)")
+  void 등록회원은토큰의회원() throws Exception {
+    given(registrationFacade.register(any(), any()))
+        .willReturn(new MerchantRegisterResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true));
+
+    mockMvc
+        .perform(
+            post("/api/merchants")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"ownerId": 999, "name": "테스트 가맹점", "address": "인천광역시 남동구 1"}
+                    """))
+        .andExpect(status().isCreated());
+
+    ArgumentCaptor<AuthUser> userCaptor = ArgumentCaptor.forClass(AuthUser.class);
+    verify(registrationFacade).register(userCaptor.capture(), any());
+    assertThat(userCaptor.getValue()).isEqualTo(new AuthUser(1L, UserRole.OWNER));
+  }
+
+  @Test
+  @DisplayName("이미 가맹점을 등록한 회원이면 409 MER-002 이다")
+  void 이미등록했으면409() throws Exception {
+    given(registrationFacade.register(any(), any()))
+        .willThrow(new BusinessException(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED));
+
+    mockMvc
+        .perform(
+            post("/api/merchants")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody("테스트 가맹점", "인천광역시 남동구 1")))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MER-002"));
   }
 
   @Test
   @DisplayName("이름이 100자면 201, 101자면 400")
   void 이름길이경계값() throws Exception {
-    given(merchantService.register(any()))
+    given(registrationFacade.register(any(), any()))
         .willReturn(new MerchantRegisterResponse(1L, "가".repeat(100), "인천광역시 남동구 1", true));
 
     expectCreated(requestBody("가".repeat(100), "인천광역시 남동구 1"));
@@ -130,7 +169,7 @@ class MerchantControllerTest {
   @Test
   @DisplayName("주소가 200자면 201, 201자면 400")
   void 주소길이경계값() throws Exception {
-    given(merchantService.register(any()))
+    given(registrationFacade.register(any(), any()))
         .willReturn(new MerchantRegisterResponse(1L, "테스트 가맹점", "가".repeat(200), true));
 
     expectCreated(requestBody("테스트 가맹점", "가".repeat(200)));
@@ -145,7 +184,7 @@ class MerchantControllerTest {
 
     mockMvc
         .perform(
-            patch("/api/merchants/1")
+            patch("/api/merchants/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
@@ -165,7 +204,7 @@ class MerchantControllerTest {
 
     mockMvc
         .perform(
-            patch("/api/merchants/1")
+            patch("/api/merchants/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
@@ -184,12 +223,13 @@ class MerchantControllerTest {
   @Test
   @DisplayName("존재하지 않는 가맹점을 수정하면 404")
   void 없는가맹점수정시404() throws Exception {
+    given(ownedResources.merchantIdOf(any())).willReturn(999L);
     given(merchantService.update(eq(999L), any()))
         .willThrow(new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
 
     mockMvc
         .perform(
-            patch("/api/merchants/999")
+            patch("/api/merchants/me")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
@@ -284,7 +324,7 @@ class MerchantControllerTest {
   }
 
   private RequestBuilder patchRequest(String body) {
-    return patch("/api/merchants/1").contentType(MediaType.APPLICATION_JSON).content(body);
+    return patch("/api/merchants/me").contentType(MediaType.APPLICATION_JSON).content(body);
   }
 
   // 요청이 400(COM-001)으로 거절되고, 서비스가 새로 호출되지 않았는지 확인한다.
@@ -300,7 +340,7 @@ class MerchantControllerTest {
 
   private String requestBody(String name, String address) {
     return """
-        {"ownerId": 1, "name": "%s", "address": "%s"}
+        {"name": "%s", "address": "%s"}
         """
         .formatted(name, address);
   }
@@ -314,13 +354,13 @@ class MerchantControllerTest {
   // 검증 실패는 공통 응답 형식(COM-001)으로 내려가고, 메시지에 실패한 필드명이 들어간다.
   // 또한 이 요청 때문에 서비스가 새로 호출되지 않았는지도 확인한다.
   private void expectBadRequest(String body, String field) throws Exception {
-    int callsBefore = mockingDetails(merchantService).getInvocations().size();
+    int callsBefore = mockingDetails(registrationFacade).getInvocations().size();
     mockMvc
         .perform(post("/api/merchants").contentType(MediaType.APPLICATION_JSON).content(body))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("COM-001"))
         .andExpect(jsonPath("$.message").value(containsString(field + ":")));
-    assertThat(mockingDetails(merchantService).getInvocations()).hasSize(callsBefore);
+    assertThat(mockingDetails(registrationFacade).getInvocations()).hasSize(callsBefore);
   }
 }

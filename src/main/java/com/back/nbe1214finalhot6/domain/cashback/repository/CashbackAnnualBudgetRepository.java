@@ -79,4 +79,12 @@ public interface CashbackAnnualBudgetRepository extends JpaRepository<CashbackAn
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   Optional<CashbackAnnualBudget> findWithLockByBudgetYear(int budgetYear);
+
+  /** 남은 연 예산(총액 + 이월 유입 - 이월 유출 - 예약 - 지급). 예산이 없으면 비어 있다. 읽기만 한다. */
+  @Query(
+      """
+      select a.totalAmount + a.carriedInAmount - a.carriedOutAmount - a.reservedAmount - a.paidAmount
+      from CashbackAnnualBudget a where a.budgetYear = :year
+      """)
+  Optional<Long> findRemainingAmount(@Param("year") int year);
 }

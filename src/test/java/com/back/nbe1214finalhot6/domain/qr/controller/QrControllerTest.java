@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mockingDetails;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,12 +13,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.security.OwnedResources;
+import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateRequest;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateResponse;
 import com.back.nbe1214finalhot6.domain.qr.service.QrService;
+import com.back.nbe1214finalhot6.support.WithAuthUser;
 import java.time.LocalDateTime;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -27,19 +32,25 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.RequestBuilder;
 
 @WebMvcTest(QrController.class)
 @Import(SecurityConfig.class)
-@WithMockUser(roles = "OWNER") // 보안 설정을 거쳐도 통과하도록 해당 경로의 허용 역할로 로그인한 상태로 호출한다
+@WithAuthUser(role = UserRole.OWNER) // 허용 역할의 점주로 로그인한 상태로 호출한다(번호는 토큰의 회원으로 찾는다)
 class QrControllerTest {
 
   @Autowired private MockMvc mockMvc;
   @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private QrService qrService;
+  @MockitoBean private OwnedResources ownedResources;
+
+  // 로그인한 점주의 가맹점은 1번이다
+  @BeforeEach
+  void myMerchantIsOne() {
+    given(ownedResources.merchantIdOf(any())).willReturn(1L);
+  }
 
   @Test
   @DisplayName("정상 요청이면 201 과 토큰, 금액, 만료 시각을 반환한다")
@@ -48,7 +59,7 @@ class QrControllerTest {
         .willReturn(new QrCreateResponse("token-1", 5000L, LocalDateTime.of(2026, 11, 18, 9, 3)));
 
     mockMvc
-        .perform(createRequest(1L, "{\"amount\": 5000}"))
+        .perform(createRequest("{\"amount\": 5000}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.token").value("token-1"))
@@ -71,7 +82,7 @@ class QrControllerTest {
       })
   @DisplayName("금액이 없거나 1원 미만이거나 결제 한도(100만원)를 넘으면 400")
   void 금액이잘못되면400(String body) throws Exception {
-    expectInvalidRequest(createRequest(1L, body));
+    expectInvalidRequest(createRequest(body));
   }
 
   @ParameterizedTest
@@ -82,7 +93,7 @@ class QrControllerTest {
         .willReturn(new QrCreateResponse("token-1", amount, LocalDateTime.of(2026, 11, 18, 9, 3)));
 
     mockMvc
-        .perform(createRequest(1L, "{\"amount\": " + amount + "}"))
+        .perform(createRequest("{\"amount\": " + amount + "}"))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.data.amount").value(amount));
   }
@@ -90,24 +101,26 @@ class QrControllerTest {
   @Test
   @DisplayName("금액이 숫자가 아니면 400")
   void 금액이숫자가아니면400() throws Exception {
-    expectInvalidRequest(createRequest(1L, "{\"amount\": \"오천원\"}"));
+    expectInvalidRequest(createRequest("{\"amount\": \"오천원\"}"));
   }
 
+  // 목적: 로그인한 점주의 가맹점이 없으면(공용 도구가 MER-001) 404 로 응답하고 QR 을 만들지 않는지 확인한다.
   @Test
-  @DisplayName("존재하지 않는 가맹점이면 404")
-  void 없는가맹점이면404() throws Exception {
-    given(qrService.createDynamic(eq(999L), any()))
+  @DisplayName("내 가맹점이 없으면 404")
+  void 내가맹점이없으면404() throws Exception {
+    given(ownedResources.merchantIdOf(any()))
         .willThrow(new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
 
     mockMvc
-        .perform(createRequest(999L, "{\"amount\": 5000}"))
+        .perform(createRequest("{\"amount\": 5000}"))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.success").value(false))
         .andExpect(jsonPath("$.code").value("MER-001"));
+    verify(qrService, never()).createDynamic(any(), any());
   }
 
-  private RequestBuilder createRequest(Long merchantId, String body) {
-    return post("/api/merchants/{merchantId}/qr/dynamic", merchantId)
+  private RequestBuilder createRequest(String body) {
+    return post("/api/merchants/me/qr/dynamic")
         .contentType(MediaType.APPLICATION_JSON)
         .content(body);
   }
