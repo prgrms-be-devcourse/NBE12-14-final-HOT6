@@ -6,6 +6,8 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackNotice;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
 import com.back.nbe1214finalhot6.domain.cashback.entity.NoticeType;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackNoticeRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -36,6 +38,26 @@ public class CashbackNoticeService {
   @Transactional
   public void registerPolicyChange(CashbackPolicy policy, LocalDateTime now) {
     noticeRepository.save(CashbackNotice.policyChange(policy, now));
+  }
+
+  /**
+   * 월 예산이 공지({@code NOTICED}) 상태로 바뀌었을 때 소진 예고를 한 건 등록한다. 상태 전이가 한 번만 일어나므로 같은 달에 한 번만 불린다. 단순 INSERT
+   * 한 번이라 예산 확보 경로의 잠금을 늘리지 않는다.
+   *
+   * @param emergencyLineRate 긴급 중단선(전체 예산 대비, 소수 비율)
+   * @param noticeDays 공지 후 중단까지의 최대 일수
+   * @param stopAt 중단 예정일
+   */
+  @Transactional
+  public void registerBudgetNotice(
+      BigDecimal emergencyLineRate, int noticeDays, LocalDate stopAt, LocalDateTime now) {
+    noticeRepository.save(CashbackNotice.budgetNotice(emergencyLineRate, noticeDays, stopAt, now));
+  }
+
+  /** 월 예산이 긴급선에 닿거나 운영자가 긴급 중단해서 즉시 중단됐을 때 긴급 중단 공지를 한 건 등록한다. */
+  @Transactional
+  public void registerEmergencyStop(LocalDateTime now) {
+    noticeRepository.save(CashbackNotice.emergencyStop(now));
   }
 
   /**
