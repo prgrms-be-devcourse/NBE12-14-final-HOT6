@@ -13,8 +13,13 @@ public enum AuthErrorCode implements ErrorCode {
   DUPLICATE_EMAIL("AUTH-001", HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다"),
   DUPLICATE_PHONE("AUTH-002", HttpStatus.CONFLICT, "이미 사용 중인 전화번호입니다"),
 
-  // 로그인. 이메일 없음·비밀번호 불일치·탈퇴 회원을 구분하지 않고 같은 응답을 준다(회원 존재 여부 노출 방지)
-  LOGIN_FAILED("AUTH-003", HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다");
+  // 로그인. 이메일 없음과 비밀번호 불일치는 구분하지 않고 같은 응답을 준다(회원 존재 여부 노출 방지)
+  LOGIN_FAILED(
+      "AUTH-003",
+      HttpStatus.UNAUTHORIZED,
+      "이메일 또는 비밀번호가 올바르지 않습니다. 입력한 내용을 다시 확인해 주세요. 가입 전이라면 회원가입을 먼저 진행해 주세요."),
+  // 비밀번호까지 맞은 탈퇴 계정에만 쓴다. 비밀번호를 아는 본인에게만 닿는 응답이라 안내해도 안전하다
+  WITHDRAWN_USER("AUTH-004", HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다. 다시 이용하려면 관리자에게 문의해 주세요.");
 
   private final String code;
   private final HttpStatus status;
