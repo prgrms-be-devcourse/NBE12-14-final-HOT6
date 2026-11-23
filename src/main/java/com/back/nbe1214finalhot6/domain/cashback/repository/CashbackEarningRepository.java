@@ -92,6 +92,44 @@ public interface CashbackEarningRepository extends JpaRepository<CashbackEarning
   Page<CashbackEarning> findByWalletIdAndStatus(
       Long walletId, EarningStatus status, Pageable pageable);
 
+  /** 월마다 가장 늦은 지급·취소 시각. 시계열이 월 말 이후 어느 날짜까지 이어지는지 판단할 때 쓴다. */
+  @Query(
+      """
+      select e.limitMonth as limitMonth, max(e.paidAt) as lastPaidAt, max(e.canceledAt) as lastCanceledAt
+      from CashbackEarning e where e.limitMonth is not null
+      group by e.limitMonth
+      """)
+  List<EarningExtent> findExtents();
+
+  /** 한 달에 속한 적립(제외 건 제외)의 접수일별 금액 합. 확보 금액의 증가분이다. */
+  @Query(
+      """
+      select cast(e.requestedAt as LocalDate) as day, sum(e.amount) as amount
+      from CashbackEarning e where e.limitMonth = :month
+      group by cast(e.requestedAt as LocalDate)
+      """)
+  List<DailyAmount> sumReservedByDay(@Param("month") java.time.LocalDate month);
+
+  /** 한 달에 속한 적립의 지급일별 금액 합. 회수된 건도 지급일에 포함한다(회수해도 예산은 되돌리지 않는다). */
+  @Query(
+      """
+      select cast(e.paidAt as LocalDate) as day, sum(e.amount) as amount
+      from CashbackEarning e where e.limitMonth = :month and e.paidAt is not null
+      group by cast(e.paidAt as LocalDate)
+      """)
+  List<DailyAmount> sumPaidByDay(@Param("month") java.time.LocalDate month);
+
+  /** 한 달에 속한 지급 전 취소 건의 취소일별 금액 합. 확보 금액이 돌아온 만큼이다. */
+  @Query(
+      """
+      select cast(e.canceledAt as LocalDate) as day, sum(e.amount) as amount
+      from CashbackEarning e
+      where e.limitMonth = :month and e.status = :canceled and e.canceledAt is not null
+      group by cast(e.canceledAt as LocalDate)
+      """)
+  List<DailyAmount> sumCanceledByDay(
+      @Param("month") java.time.LocalDate month, @Param("canceled") EarningStatus canceled);
+
   /**
    * 한 이용자의 적립 건을 상태별로 묶어 건수와 금액 합계를 돌려준다. 접수 시각이 {@code from} 이상 {@code to} 미만인 건만 센다. 읽기만 한다.
    */

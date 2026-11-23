@@ -2,6 +2,8 @@ package com.back.nbe1214finalhot6.domain.payment.controller;
 
 import com.back.nbe1214finalhot6.common.idempotency.IdempotencyKeys;
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
+import com.back.nbe1214finalhot6.common.security.OwnedResources;
+import com.back.nbe1214finalhot6.domain.auth.security.AuthUser;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.service.PaymentCancelService;
@@ -12,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @Tag(name = "결제", description = "QR 결제 승인, 검증, 조회 및 취소 관련 API")
@@ -24,18 +27,20 @@ public class PaymentController {
   private final PaymentFacade paymentFacade;
   private final PaymentQueryService paymentQueryService;
   private final PaymentCancelService paymentCancelService;
+  private final OwnedResources ownedResources; //인증인가
 
   @Operation(summary = "QR 결제", description = "멱등키 헤더로 중복 결제를 방지하며 QR 결제를 요청한다")
   @PostMapping
-  public ApiResponse<PaymentResponse> pay(@RequestHeader("Idempotency-Key") String keyHeader,
-                                          @RequestBody @Valid PaymentRequest request) {
-    // 멱등키 정합성 체크
+  public ApiResponse<PaymentResponse> pay(
+          @RequestHeader("Idempotency-Key") String keyHeader,
+          @RequestBody @Valid PaymentRequest request,
+          @AuthenticationPrincipal AuthUser user) {
     String key = IdempotencyKeys.validate(keyHeader);
-    PaymentResponse paymentResponse = paymentFacade.pay(key,request);
-
-    return ApiResponse.ok(paymentResponse);
+    Long walletId = ownedResources.walletIdOf(user);
+    PaymentRequest trusted =
+            new PaymentRequest(walletId, request.qrToken(), request.cashbackUsed());
+    return ApiResponse.ok(paymentFacade.pay(key, trusted));
   }
-
   @Operation(
       summary = "응답 못 받은 QR 결제 재조회",
       description =
@@ -46,9 +51,9 @@ public class PaymentController {
   @GetMapping("/by-key/{key}")
   public ApiResponse<PaymentResponse> requery(
       @PathVariable String key,
-      @RequestParam Long walletId) { // TODO: JWT 연동 후 토큰에서 추출
+      @AuthenticationPrincipal AuthUser user) {
     String validKey = IdempotencyKeys.validate(key);
-
+    Long walletId = ownedResources.walletIdOf(user);
     return ApiResponse.ok(paymentQueryService.findByKey(walletId, validKey));
   }
 
@@ -58,7 +63,8 @@ public class PaymentController {
   @PostMapping("/{id}/cancel")
   public ApiResponse<PaymentResponse> cancel(
       @PathVariable Long id,
-      @RequestParam Long merchantId) { // TODO: JWT 연동 후 토큰에서 추출
+      @AuthenticationPrincipal AuthUser user) {
+    Long merchantId = ownedResources.merchantIdOf(user);
     return ApiResponse.ok(paymentCancelService.cancel(merchantId, id));
   }
 }
