@@ -34,7 +34,6 @@ public class QrService {
       throw new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND);
     }
 
-    // TODO: 인증(COM-03) 머지 후 로그인한 사장님의 ID 와 가맹점의 ownerId 를 비교해 본인 가맹점에서만 생성하도록 검사한다.
     QrCode qrCode =
         qrCodeRepository.save(
             QrCode.createDynamic(merchantId, request.amount(), LocalDateTime.now(clock)));
