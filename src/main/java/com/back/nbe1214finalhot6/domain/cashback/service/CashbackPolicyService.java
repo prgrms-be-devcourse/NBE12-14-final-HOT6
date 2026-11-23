@@ -2,6 +2,8 @@ package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.config.CashbackProperties;
+import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyHistoryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
@@ -18,6 +20,10 @@ import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class CashbackPolicyService {
+
+  static final int MAX_HISTORY_PAGE_SIZE = 100;
 
   private final CashbackPolicyRepository policyRepository;
   private final CashbackPolicyHistoryRepository historyRepository;
@@ -107,6 +115,27 @@ public class CashbackPolicyService {
     }
     historyRepository.save(CashbackPolicyHistory.created(successor, null, now));
     return PolicyResponse.from(successor);
+  }
+
+  /**
+   * 정책 변경 이력을 최근 변경순으로 돌려준다. 읽기만 하고 이력을 바꾸지 않는다.
+   *
+   * @param policyId 한 구간의 이력만 볼 때의 정책 ID. null 이면 전체. 없는 ID 면 빈 목록이다
+   * @param size 한 페이지 건수. {@value #MAX_HISTORY_PAGE_SIZE} 을 넘으면 그 값으로 줄인다
+   */
+  @Transactional(readOnly = true)
+  public PageResponse<PolicyHistoryResponse> findHistory(Long policyId, int page, int size) {
+    // 요율 인하 한 번이 "끝난 구간 UPDATE" 와 "새 구간 CREATE" 를 같은 시각에 남기므로 ID 로 순서를 확정한다
+    Pageable pageable =
+        PageRequest.of(
+            page,
+            Math.min(size, MAX_HISTORY_PAGE_SIZE),
+            Sort.by(Sort.Order.desc("changedAt"), Sort.Order.desc("id")));
+    Page<CashbackPolicyHistory> result =
+        policyId == null
+            ? historyRepository.findAll(pageable)
+            : historyRepository.findAllByPolicyId(policyId, pageable);
+    return PageResponse.from(result.map(PolicyHistoryResponse::from));
   }
 
   /** 시작이 늦은 순으로 돌려준다. */
