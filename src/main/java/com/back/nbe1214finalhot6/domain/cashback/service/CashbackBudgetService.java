@@ -117,7 +117,7 @@ public class CashbackBudgetService {
       budget.changeAllocated(
           request.allocatedAmount(), properties.contingencyRate(), request.baseRate());
     }
-    return MonthlyBudgetResponse.from(budget);
+    return MonthlyBudgetResponse.from(budget, properties.emergencyRatio());
   }
 
   /** 새로 만드는 달의 기본 요율. 입력이 없으면 가장 가까운 이전 달의 값을 이어받고, 이어받을 값이 없으면 거절한다. */
@@ -224,7 +224,7 @@ public class CashbackBudgetService {
   public MonthlyBudgetResponse getMonthly(int year, int month) {
     return monthlyBudgetRepository
         .findByBudgetYearAndBudgetMonth(year, month)
-        .map(MonthlyBudgetResponse::from)
+        .map(budget -> MonthlyBudgetResponse.from(budget, properties.emergencyRatio()))
         .orElseThrow(() -> new BusinessException(CashbackErrorCode.BUDGET_NOT_FOUND));
   }
 
@@ -232,7 +232,7 @@ public class CashbackBudgetService {
   @Transactional(readOnly = true)
   public List<MonthlyBudgetResponse> listMonthly(int year) {
     return monthlyBudgetRepository.findAllByBudgetYearOrderByBudgetMonth(year).stream()
-        .map(MonthlyBudgetResponse::from)
+        .map(budget -> MonthlyBudgetResponse.from(budget, properties.emergencyRatio()))
         .toList();
   }
 }

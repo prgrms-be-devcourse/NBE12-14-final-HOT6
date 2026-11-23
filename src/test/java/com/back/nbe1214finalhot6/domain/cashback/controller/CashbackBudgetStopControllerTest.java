@@ -10,6 +10,7 @@ import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
+import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetWarning;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackBudgetService;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackBudgetStateService;
@@ -36,7 +37,20 @@ class CashbackBudgetStopControllerTest {
 
   private MonthlyBudgetResponse monthly(BudgetStatus status) {
     return new MonthlyBudgetResponse(
-        2026, 11, 1_000_000L, 0L, 0L, 0L, 100_000L, 1_000_000L, new BigDecimal("0.0300"), status);
+        2026,
+        11,
+        1_000_000L,
+        0L,
+        0L,
+        0L,
+        0L,
+        100_000L,
+        1_000_000L,
+        BigDecimal.ZERO,
+        BigDecimal.ONE,
+        BudgetWarning.NONE,
+        new BigDecimal("0.0300"),
+        status);
   }
 
   // 목적: 공지 후 중단이 200 과 바뀐 월 예산(공지 상태)을 내려 주는지 확인한다.
