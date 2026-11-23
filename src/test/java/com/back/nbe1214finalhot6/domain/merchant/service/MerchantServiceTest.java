@@ -244,6 +244,35 @@ class MerchantServiceTest {
     assertThat(result.content().get(1).merchantId()).isEqualTo(secondSameName);
   }
 
+  @Test
+  @DisplayName("같은 점주가 두 번째 가맹점을 등록하면 MER-002 로 거절하고 첫 가맹점은 그대로다")
+  void 점주당가맹점하나() {
+    MerchantRegisterResponse first =
+        merchantService.register(
+            OWNER_ID, new MerchantRegisterRequest("첫 가맹점", "인천광역시 남동구 어딘가 1", null));
+
+    assertThatThrownBy(
+            () ->
+                merchantService.register(
+                    OWNER_ID, new MerchantRegisterRequest("둘째 가맹점", "인천광역시 남동구 어딘가 2", null)))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED));
+
+    assertThat(merchantRepository.findByOwnerId(OWNER_ID))
+        .hasValueSatisfying(m -> assertThat(m.getId()).isEqualTo(first.merchantId()));
+  }
+
+  @Test
+  @DisplayName("점주가 다르면 각자 가맹점을 등록할 수 있다")
+  void 점주가다르면각자등록() {
+    Long a = merchantService.register(OWNER_ID, new MerchantRegisterRequest("가게 A", "인천광역시 서구 1", null)).merchantId();
+    Long b = merchantService.register(OWNER_ID + 1, new MerchantRegisterRequest("가게 B", "인천광역시 서구 2", null)).merchantId();
+
+    assertThat(merchantRepository.findByOwnerId(OWNER_ID)).hasValueSatisfying(m -> assertThat(m.getId()).isEqualTo(a));
+    assertThat(merchantRepository.findByOwnerId(OWNER_ID + 1)).hasValueSatisfying(m -> assertThat(m.getId()).isEqualTo(b));
+  }
+
   private Long register(String name, String address, boolean cashbackEligible) {
     return merchantService
         .register(nextOwnerId++, new MerchantRegisterRequest(name, address, cashbackEligible ? "revenue.pdf" : null))

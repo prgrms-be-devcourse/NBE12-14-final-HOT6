@@ -101,8 +101,12 @@ class DailySettlementQueryServiceTest {
             BusinessException.class, e -> assertThat(e.getErrorCode()).isEqualTo(expected));
   }
 
+  // 다른 테스트가 쓰는 작은 점주 번호(1 등)와 겹치지 않게 큰 값에서 시작한다
+  private long nextOwnerId = 8_000L;
+
   private Long saveMerchant() {
-    return merchantRepository.save(Merchant.create(1L, "테스트 가맹점", "서울", true)).getId();
+    // 점주 한 명당 가맹점 하나이므로 가맹점마다 점주 번호를 달리한다
+    return merchantRepository.save(Merchant.create(nextOwnerId++, "테스트 가맹점", "서울", true)).getId();
   }
 
   private void saveSettlement(Long merchantId, LocalDate date) {
