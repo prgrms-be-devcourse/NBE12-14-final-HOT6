@@ -111,6 +111,8 @@ class SecurityConfigTest {
         Arguments.of("GET", "/api/merchants/me/settlements/daily", 401, 403, 200, 403),
         // 결제 취소는 점주만
         Arguments.of("POST", "/api/payments/1/cancel", 401, 403, 200, 403),
+        // PIN 검증은 이용자(OWNER 포함)만, 운영자는 못 쓴다
+        Arguments.of("POST", "/api/users/pin/verify", 401, 200, 200, 403),
         // 규칙에 없는 경로는 로그인만 하면 된다(ADMIN 포함)
         Arguments.of("GET", "/api/probe/other", 401, 200, 200, 200));
   }

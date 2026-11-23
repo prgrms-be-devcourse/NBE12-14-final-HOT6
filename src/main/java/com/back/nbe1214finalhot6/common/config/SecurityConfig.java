@@ -73,6 +73,9 @@ public class SecurityConfig {
                         "/api/qr/**",
                         "/api/wallet/**")
                     .hasRole("USER")
+                    // PIN 검증은 이용자(OWNER 포함)만 쓴다. 운영자는 못 쓴다
+                    .requestMatchers(HttpMethod.POST, "/api/users/pin/verify")
+                    .hasRole("USER")
                     // 나머지는 로그인만 하면 된다
                     .anyRequest()
                     .authenticated());
