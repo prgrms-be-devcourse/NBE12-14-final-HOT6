@@ -16,6 +16,7 @@ import com.back.nbe1214finalhot6.domain.auth.dto.SignupRequest;
 import com.back.nbe1214finalhot6.domain.auth.dto.SignupResponse;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
+import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.service.AuthService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-// 인증 없이(로그인·CSRF 토큰 없이) 호출해서 보안 설정(가입 경로 허용)도 함께 확인
+// 인증 없이 호출해서 보안 설정(열린 경로)도 함께 확인한다.
 @WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
 class AuthControllerTest {
@@ -41,6 +42,7 @@ class AuthControllerTest {
       """;
 
   @Autowired private MockMvc mockMvc;
+  @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private AuthService authService;
 
   // 정상 요청이 인증 없이도 201 과 공통 응답 형식으로 내려가고, 해시가 응답에 없는지 확인

@@ -11,6 +11,7 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetTransferType;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackBudgetTransfer;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackBudgetTransferRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackBudgetStateLogRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
@@ -44,6 +45,7 @@ class CashbackBudgetCloseServiceTest {
   @Autowired private CashbackBudgetCloseService closeService;
   @Autowired private CashbackBudgetService budgetService;
   @Autowired private CashbackBudgetTransferRepository transferRepository;
+  @Autowired private CashbackBudgetStateLogRepository stateLogRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   @Autowired private CashbackAnnualBudgetRepository annualBudgetRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
@@ -59,6 +61,7 @@ class CashbackBudgetCloseServiceTest {
   @AfterEach
   void cleanUp() {
     transferRepository.deleteAll();
+    stateLogRepository.deleteAll(); // 마감이 남긴 상태 이력이 다른 테스트의 건수 검증에 섞이지 않게 한다
     monthlyBudgetRepository.deleteAll();
     annualBudgetRepository.deleteAll();
   }

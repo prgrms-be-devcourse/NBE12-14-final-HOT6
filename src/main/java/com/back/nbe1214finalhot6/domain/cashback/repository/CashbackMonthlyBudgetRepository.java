@@ -3,6 +3,8 @@ package com.back.nbe1214finalhot6.domain.cashback.repository;
 import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import jakarta.persistence.LockModeType;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -120,6 +122,111 @@ public interface CashbackMonthlyBudgetRepository
       """)
   int transferIn(
       @Param("year") int year, @Param("month") int month, @Param("amount") long amount);
+
+  /** 월 예산의 ID. 없으면 비어 있다. */
+  @Query(
+      "select m.id from CashbackMonthlyBudget m"
+          + " where m.budgetYear = :year and m.budgetMonth = :month")
+  Optional<Long> findId(@Param("year") int year, @Param("month") int month);
+
+  /** 남은 예산과 전체 예산(배정 + 이월 유입 - 이월 유출). 엔티티가 아니라 값만 읽어서 컨텍스트에 남은 낡은 엔티티의 영향을 받지 않는다. */
+  @Query(
+      """
+      select m.id as id,
+             m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
+                    - m.reservedAmount - m.paidAmount as remaining,
+             m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount as total
+      from CashbackMonthlyBudget m where m.id = :id
+      """)
+  Optional<MonthlyBudgetSnapshot> findSnapshot(@Param("id") Long id);
+
+  /**
+   * 남은 예산이 대비금 × 긴급선 비율 이하일 때만 {@code from} 상태를 중단({@code STOPPED})으로 바꾼다. 바꾸면 1, 아니면 0 을 돌려준다. 상태와
+   * 조건을 확인하고 바꾸는 것이 한 문장이라 같은 판정이 동시에 와도 한 번만 전이한다. 영속성 컨텍스트를 비우지 않는다.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.status = :to
+      where m.budgetYear = :year and m.budgetMonth = :month and m.status = :from
+        and (m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
+             - m.reservedAmount - m.paidAmount)
+            <= m.contingencyAmount * cast(:ratio as BigDecimal)
+      """)
+  int stopIfBelowEmergency(
+      @Param("year") int year,
+      @Param("month") int month,
+      @Param("from") BudgetStatus from,
+      @Param("to") BudgetStatus to,
+      @Param("ratio") BigDecimal ratio);
+
+  /**
+   * 남은 예산이 대비금 이하일 때만 정상({@code from}) 상태를 공지({@code to})로 바꾸고 중단 예약 시각을 정한다. 바꾸면 1, 아니면 0 을 돌려준다.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.status = :to, m.stopScheduledAt = :scheduledAt
+      where m.budgetYear = :year and m.budgetMonth = :month and m.status = :from
+        and (m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
+             - m.reservedAmount - m.paidAmount)
+            <= m.contingencyAmount
+      """)
+  int noticeIfBelowNoticeLine(
+      @Param("year") int year,
+      @Param("month") int month,
+      @Param("from") BudgetStatus from,
+      @Param("to") BudgetStatus to,
+      @Param("scheduledAt") LocalDateTime scheduledAt);
+
+  /** 중단 예약 시각이 지난 공지 상태의 월 예산 ID. */
+  @Query(
+      "select m.id from CashbackMonthlyBudget m"
+          + " where m.status = :status and m.stopScheduledAt <= :now order by m.id")
+  List<Long> findDueForStop(
+      @Param("now") LocalDateTime now, @Param("status") BudgetStatus status);
+
+  /** 중단 예약 시각이 지난 공지 상태의 월 예산만 중단으로 바꾼다. 바꾸면 1, 아니면 0 을 돌려준다. */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.status = :to
+      where m.id = :id and m.status = :from and m.stopScheduledAt <= :now
+      """)
+  int stopIfScheduledTimeReached(
+      @Param("id") Long id,
+      @Param("now") LocalDateTime now,
+      @Param("from") BudgetStatus from,
+      @Param("to") BudgetStatus to);
+
+  /**
+   * 상태가 {@code from} 일 때만 {@code to} 로 바꾼다. 운영자 수동 중단에 쓴다. 바꾸면 1, 아니면 0 을 돌려준다. 영속성 컨텍스트를 비우지 않는다.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.status = :to
+      where m.budgetYear = :year and m.budgetMonth = :month and m.status = :from
+      """)
+  int changeStatus(
+      @Param("year") int year,
+      @Param("month") int month,
+      @Param("from") BudgetStatus from,
+      @Param("to") BudgetStatus to);
+
+  /** 상태가 {@code from} 일 때만 공지({@code to}) 상태로 바꾸고 중단 예약 시각을 정한다. 운영자 수동 공지에 쓴다. 바꾸면 1, 아니면 0 이다. */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.status = :to, m.stopScheduledAt = :scheduledAt
+      where m.budgetYear = :year and m.budgetMonth = :month and m.status = :from
+      """)
+  int changeStatusWithSchedule(
+      @Param("year") int year,
+      @Param("month") int month,
+      @Param("from") BudgetStatus from,
+      @Param("to") BudgetStatus to,
+      @Param("scheduledAt") LocalDateTime scheduledAt);
 
   /** 이미 지난 달 중 아직 마감하지 않은 월 예산의 ID 를 오래된 달부터 돌려준다. {@code year}·{@code month} 는 이번 달이다. */
   @Query(

@@ -34,6 +34,7 @@ public class CashbackBudgetService {
   private final CashbackAnnualBudgetRepository annualBudgetRepository;
   private final CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   private final CashbackProperties properties;
+  private final CashbackBudgetStateService stateService;
   private final Clock clock;
 
   /**
@@ -138,7 +139,7 @@ public class CashbackBudgetService {
    * 호출한다.
    *
    * <p>연 예산, 월 예산 순서로 조건부 UPDATE 를 실행하며, 한 문장 안에서 남은 예산을 확인하고 늘리므로 동시에 확보해도 예산을 넘지 않는다.
-   * 호출한 쪽의 트랜잭션에 참여한다.
+   * 호출한 쪽의 트랜잭션에 참여한다. 확보가 성공하면 직후에 적립 중단 상태를 판정한다({@link CashbackBudgetStateService}).
    *
    * <p>영속성 컨텍스트를 비우지 않으므로 결제 트랜잭션이 읽어 둔 엔티티가 분리되지 않는다. 같은 트랜잭션에서 예산 엔티티를 미리 읽어 두면 갱신 전 값일 수
    * 있어서, 확보 결과는 반환값으로 판단한다.
@@ -161,6 +162,8 @@ public class CashbackBudgetService {
       annualBudgetRepository.release(year, amount);
       return monthlyFailure(year, month);
     }
+    // 확보한 직후, 같은 트랜잭션에서 남은 예산이 공지선·긴급선 아래로 내려갔는지 판정한다
+    stateService.evaluateAfterReserve(year, month);
     return BudgetReserveResult.RESERVED;
   }
 

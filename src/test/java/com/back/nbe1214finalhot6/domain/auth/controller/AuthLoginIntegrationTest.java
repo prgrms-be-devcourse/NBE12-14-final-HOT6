@@ -112,19 +112,22 @@ class AuthLoginIntegrationTest {
     login("  LOGIN@Devpay.COM ", PASSWORD).andExpect(status().isOk());
   }
 
-  // 실패 사유별 응답이 완전히 같아야 응답만 보고 가입 여부를 알 수 없다
+  // 이메일 없음과 비밀번호 틀림은 응답이 완전히 같아야 응답만 보고 가입 여부를 알 수 없다.
+  // 탈퇴한 계정도 비밀번호가 틀리면 같아야 하고, 비밀번호가 맞을 때만 탈퇴 안내(AUTH-004)가 나간다.
   @Test
-  @DisplayName("이메일 없음, 비밀번호 틀림, 탈퇴 회원은 모두 같은 401 응답이다")
+  @DisplayName("이메일 없음, 비밀번호 틀림, 탈퇴+비밀번호 틀림은 같은 응답이고, 탈퇴+비밀번호 맞음만 안내가 다르다")
   void login_failuresLookIdentical() throws Exception {
     String unknownEmail = failureBody("nobody@devpay.com", PASSWORD);
     String wrongPassword = failureBody(EMAIL, "WrongPass1!");
 
     jdbcTemplate.update("update users set status = 'WITHDRAWN' where email = ?", EMAIL);
-    String withdrawn = failureBody(EMAIL, PASSWORD);
+    String withdrawnWrongPassword = failureBody(EMAIL, "WrongPass1!");
+    String withdrawnRightPassword = failureBody(EMAIL, PASSWORD);
 
     assertThat(unknownEmail).contains("AUTH-003");
     assertThat(wrongPassword).isEqualTo(unknownEmail);
-    assertThat(withdrawn).isEqualTo(unknownEmail);
+    assertThat(withdrawnWrongPassword).isEqualTo(unknownEmail);
+    assertThat(withdrawnRightPassword).contains("AUTH-004").isNotEqualTo(unknownEmail);
   }
 
   @Test
