@@ -8,6 +8,7 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackBudgetStateLog;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackBudgetStateLogRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackNoticeRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.math.BigDecimal;
@@ -41,6 +42,7 @@ class CashbackBudgetStateConcurrencyTest {
   @Autowired private CashbackAnnualBudgetRepository annualBudgetRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   @Autowired private CashbackBudgetStateLogRepository stateLogRepository;
+  @Autowired private CashbackNoticeRepository noticeRepository;
 
   @BeforeEach
   void setUpBudget() {
@@ -52,6 +54,7 @@ class CashbackBudgetStateConcurrencyTest {
   @AfterEach
   void cleanUp() {
     stateLogRepository.deleteAll();
+    noticeRepository.deleteAll(); // 상태 전이가 남긴 공지가 다른 테스트에 섞이지 않게 한다
     monthlyBudgetRepository.deleteAll();
     annualBudgetRepository.deleteAll();
   }

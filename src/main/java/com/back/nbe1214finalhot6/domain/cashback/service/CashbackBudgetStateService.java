@@ -39,6 +39,7 @@ public class CashbackBudgetStateService {
 
   private final CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   private final CashbackBudgetStateLogRepository stateLogRepository;
+  private final CashbackNoticeService noticeService;
   private final CashbackProperties properties;
   private final Clock clock;
 
@@ -188,5 +189,32 @@ public class CashbackBudgetStateService {
         byOperator
             ? CashbackBudgetStateLog.byOperator(budgetId, from, to, reason, remainingRate, null, now)
             : CashbackBudgetStateLog.automatic(budgetId, from, to, reason, remainingRate, now));
+    registerNotice(snapshot, to, reason, now);
+  }
+
+  /**
+   * 전이에 맞는 공지를 같은 트랜잭션에서 등록한다. 공지 상태로 바뀌면 소진 예고, 중단으로 바뀌면 긴급 중단을 알린다. 공지 후 예약 시각이 되어 중단되는
+   * 전이는 이미 소진 예고로 알렸으므로 새 공지를 만들지 않는다.
+   */
+  private void registerNotice(
+      MonthlyBudgetSnapshot snapshot, BudgetStatus to, StateChangeReason reason, LocalDateTime now) {
+    if (to == BudgetStatus.NOTICED) {
+      BigDecimal emergencyLineRate =
+          snapshot.getTotal() <= 0
+              ? BigDecimal.ZERO
+              : BigDecimal.valueOf(snapshot.getContingency())
+                  .multiply(properties.emergencyRatio())
+                  .divide(
+                      BigDecimal.valueOf(snapshot.getTotal()),
+                      CashbackPolicy.RATE_SCALE,
+                      RoundingMode.HALF_UP);
+      noticeService.registerBudgetNotice(
+          emergencyLineRate,
+          properties.noticeDays(),
+          scheduledStopAt(now).toLocalDate(),
+          now);
+    } else if (to == BudgetStatus.STOPPED && reason != StateChangeReason.SCHEDULED_TIME) {
+      noticeService.registerEmergencyStop(now);
+    }
   }
 }

@@ -9,6 +9,7 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackBudgetStateLogRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackNoticeRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.math.BigDecimal;
@@ -42,6 +43,7 @@ class CashbackBudgetManualStopConcurrencyTest {
   @Autowired private CashbackAnnualBudgetRepository annualBudgetRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   @Autowired private CashbackBudgetStateLogRepository stateLogRepository;
+  @Autowired private CashbackNoticeRepository noticeRepository;
 
   @BeforeEach
   void setUpBudget() {
@@ -53,6 +55,7 @@ class CashbackBudgetManualStopConcurrencyTest {
   @AfterEach
   void cleanUp() {
     stateLogRepository.deleteAll();
+    noticeRepository.deleteAll(); // 상태 전이가 남긴 공지가 다른 테스트에 섞이지 않게 한다
     monthlyBudgetRepository.deleteAll();
     annualBudgetRepository.deleteAll();
   }
@@ -100,6 +103,7 @@ class CashbackBudgetManualStopConcurrencyTest {
     assertThat(results.stream().filter("REJECTED"::equals).count()).isEqualTo(9);
     assertThat(monthlyBudgetRepository.findStatus(YEAR, MONTH)).contains(BudgetStatus.STOPPED);
     assertThat(stateLogRepository.count()).isEqualTo(1);
+    assertThat(noticeRepository.count()).isEqualTo(1); // 공지도 전이와 같은 수만큼
   }
 
   // 목적: 공지 후 중단이 동시에 와도 모두 성공 응답(이미 공지면 그대로)이고 이력은 한 건뿐인지 확인한다.
@@ -111,5 +115,6 @@ class CashbackBudgetManualStopConcurrencyTest {
     assertThat(results).containsOnly("OK");
     assertThat(monthlyBudgetRepository.findStatus(YEAR, MONTH)).contains(BudgetStatus.NOTICED);
     assertThat(stateLogRepository.count()).isEqualTo(1);
+    assertThat(noticeRepository.count()).isEqualTo(1); // 공지도 전이와 같은 수만큼
   }
 }
