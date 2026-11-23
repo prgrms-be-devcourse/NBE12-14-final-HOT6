@@ -16,6 +16,14 @@ export const searchMerchants = (name: string, page = 0, size = 20) =>
 export const pay = (body: PaymentRequest, idempotencyKey: string) =>
   api<PaymentResponse>("/payments", { method: "POST", body, idempotencyKey });
 
+// 응답을 못 받은 결제를 같은 멱등키로 다시 조회한다 (새로 처리하지 않고 저장된 결과만 반환, 없으면 404 PAY-003)
+export const getPaymentByKey = (walletId: number, key: string) =>
+  api<PaymentResponse>(`/payments/by-key/${encodeURIComponent(key)}?walletId=${walletId}`);
+
+// 가맹점주 전액 취소. merchantId 는 인증 연동 전까지 임시로 쿼리 파라미터로 보낸다
+export const cancelPayment = (paymentId: number, merchantId: number) =>
+  api<PaymentResponse>(`/payments/${paymentId}/cancel?merchantId=${merchantId}`, { method: "POST" });
+
 export const createDynamicQr = (merchantId: number, amount: number) =>
   api<QrCreateResponse>(`/merchants/${merchantId}/qr/dynamic`, { method: "POST", body: { amount } });
 

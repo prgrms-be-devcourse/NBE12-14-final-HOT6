@@ -9,9 +9,7 @@ const FILTERS = ["전체", "완료", "취소"] as const;
 
 export default function PayHistoryPage() {
   const [f, setF] = useState<(typeof FILTERS)[number]>("전체");
-  const [canceled, setCanceled] = useState<string[]>([]);
-  const rows = payments.map((p) => (canceled.includes(p.id) ? { ...p, status: "취소" as const } : p));
-  const list = rows.filter((p) => f === "전체" || p.status === f);
+  const list = payments.filter((p) => f === "전체" || p.status === f);
 
   return (
     <>
@@ -35,11 +33,6 @@ export default function PayHistoryPage() {
                 <span className="note">{p.date} · 결제{p.status} · 결제번호 {p.no}</span>
                 <span className={`badge ${p.status === "완료" ? "badge-ok" : "badge-bad"}`}>{p.status}</span>
               </div>
-              {p.status === "완료" && (
-                <button type="button" onClick={() => setCanceled((c) => [...c, p.id])} className="btn btn-danger btn-sm mt-2.5">
-                  결제 취소
-                </button>
-              )}
             </li>
           ))}
         </ul>
