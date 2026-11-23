@@ -116,7 +116,7 @@ public class CashbackBudgetService {
       budget.changeAllocated(
           request.allocatedAmount(), properties.contingencyRate(), request.baseRate());
     }
-    return MonthlyBudgetResponse.from(budget);
+    return MonthlyBudgetResponse.from(budget, properties.emergencyRatio());
   }
 
   /** 새로 만드는 달의 기본 요율. 입력이 없으면 가장 가까운 이전 달의 값을 이어받고, 이어받을 값이 없으면 거절한다. */
@@ -181,6 +181,23 @@ public class CashbackBudgetService {
     }
   }
 
+  /**
+   * 확보했던 예산을 지급으로 옮긴다. 캐시백 도메인 내부 전용이며 지급 배치가 호출한다. 남은 예산은 변하지 않는다. 호출한 쪽의 트랜잭션에 참여하고, 연
+   * 예산, 월 예산 순서로 옮긴다.
+   *
+   * @throws BusinessException 금액이 0 이하이거나 월이 1~12 가 아닐 때, 확보한 금액보다 많이 옮기려 할 때(CSH-007). 예외가 나면 이미 옮긴
+   *     부분도 함께 롤백된다
+   */
+  @Transactional
+  public void settleBudget(int year, int month, long amount) {
+    validateReservation(month, amount);
+    if (annualBudgetRepository.settle(year, amount) == 0
+        || monthlyBudgetRepository.settle(year, month, amount) == 0) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_BUDGET, "확보한 금액보다 많이 지급으로 옮길 수 없습니다");
+    }
+  }
+
   private static void validateReservation(int month, long amount) {
     CashbackMonthlyBudget.validateMonth(month);
     if (amount <= 0) {
@@ -204,7 +221,7 @@ public class CashbackBudgetService {
   public MonthlyBudgetResponse getMonthly(int year, int month) {
     return monthlyBudgetRepository
         .findByBudgetYearAndBudgetMonth(year, month)
-        .map(MonthlyBudgetResponse::from)
+        .map(budget -> MonthlyBudgetResponse.from(budget, properties.emergencyRatio()))
         .orElseThrow(() -> new BusinessException(CashbackErrorCode.BUDGET_NOT_FOUND));
   }
 
@@ -212,7 +229,7 @@ public class CashbackBudgetService {
   @Transactional(readOnly = true)
   public List<MonthlyBudgetResponse> listMonthly(int year) {
     return monthlyBudgetRepository.findAllByBudgetYearOrderByBudgetMonth(year).stream()
-        .map(MonthlyBudgetResponse::from)
+        .map(budget -> MonthlyBudgetResponse.from(budget, properties.emergencyRatio()))
         .toList();
   }
 }

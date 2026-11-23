@@ -13,6 +13,7 @@ import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
+import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetWarning;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackBudgetService;
 import java.util.List;
@@ -132,6 +133,9 @@ class CashbackBudgetAdminControllerTest {
         0L,
         100_000L,
         1_000_000L,
+        new java.math.BigDecimal("0.2500"),
+        new java.math.BigDecimal("0.7500"),
+        BudgetWarning.NONE,
         new java.math.BigDecimal("0.0300"),
         BudgetStatus.ACTIVE);
   }
@@ -206,7 +210,10 @@ class CashbackBudgetAdminControllerTest {
     mockMvc
         .perform(get("/api/admin/cashback/budget/monthly/2026/12"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.budgetMonth").value(12));
+        .andExpect(jsonPath("$.data.budgetMonth").value(12))
+        .andExpect(jsonPath("$.data.usedRate").value(0.25))
+        .andExpect(jsonPath("$.data.remainingRate").value(0.75))
+        .andExpect(jsonPath("$.data.warning").value("NONE"));
     mockMvc
         .perform(get("/api/admin/cashback/budget/monthly/2026/1"))
         .andExpect(status().isNotFound())
@@ -223,7 +230,9 @@ class CashbackBudgetAdminControllerTest {
         .perform(get("/api/admin/cashback/budget/monthly").param("year", "2026"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.length()").value(2))
-        .andExpect(jsonPath("$.data[0].budgetMonth").value(11));
+        .andExpect(jsonPath("$.data[0].budgetMonth").value(11))
+        .andExpect(jsonPath("$.data[0].warning").value("NONE"))
+        .andExpect(jsonPath("$.data[1].usedRate").value(0.25));
     mockMvc
         .perform(get("/api/admin/cashback/budget/monthly"))
         .andExpect(status().isBadRequest());

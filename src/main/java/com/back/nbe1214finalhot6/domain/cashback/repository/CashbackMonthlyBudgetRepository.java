@@ -56,6 +56,16 @@ public interface CashbackMonthlyBudgetRepository
   int release(
       @Param("year") int year, @Param("month") int month, @Param("amount") long amount);
 
+  /** 확보했던 금액을 지급 금액으로 옮긴다. 확보한 금액보다 많이 옮겨야 하면 0 을 돌려주고 바꾸지 않는다. */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m
+      set m.reservedAmount = m.reservedAmount - :amount, m.paidAmount = m.paidAmount + :amount
+      where m.budgetYear = :year and m.budgetMonth = :month and m.reservedAmount >= :amount
+      """)
+  int settle(@Param("year") int year, @Param("month") int month, @Param("amount") long amount);
+
   /** 월 예산의 현재 상태. 엔티티가 아니라 값만 읽어서 컨텍스트에 남은 낡은 엔티티의 영향을 받지 않는다. */
   @Query(
       "select m.status from CashbackMonthlyBudget m"
