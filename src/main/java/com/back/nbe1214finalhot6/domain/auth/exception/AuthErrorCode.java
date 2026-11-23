@@ -21,9 +21,10 @@ public enum AuthErrorCode implements ErrorCode {
   // 비밀번호까지 맞은 탈퇴 계정에만 쓴다. 비밀번호를 아는 본인에게만 닿는 응답이라 안내해도 안전하다
   WITHDRAWN_USER("AUTH-004", HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다. 다시 이용하려면 관리자에게 문의해 주세요."),
 
-  // PIN. 401 은 프론트가 "토큰 만료"로 처리하므로 쓰지 않는다. 불일치 메시지에는 남은 횟수를 직접 넣는다
+  // PIN. 401 은 프론트가 "토큰 만료"로 처리하므로 쓰지 않는다. 불일치 메시지에는 남은 횟수를 직접 넣는다.
+  // 잠금은 30분 뒤 자동으로 풀린다(임시 방식, MVP 이후 이메일 인증으로 해제(U7)로 대체 예정)
   PIN_MISMATCH("AUTH-005", HttpStatus.BAD_REQUEST, "PIN이 일치하지 않습니다"),
-  PIN_LOCKED("AUTH-006", HttpStatus.CONFLICT, "PIN이 5회 틀려 잠겼습니다. 잠금을 풀기 전에는 사용할 수 없습니다");
+  PIN_LOCKED("AUTH-006", HttpStatus.CONFLICT, "PIN이 5회 틀려 잠겼습니다. 잠긴 지 30분이 지나면 다시 시도할 수 있습니다");
 
   private final String code;
   private final HttpStatus status;

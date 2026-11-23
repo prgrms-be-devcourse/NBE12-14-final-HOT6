@@ -38,6 +38,12 @@ class PinAttemptRecorder {
         .orElseGet(Result::alreadyLocked);
   }
 
+  /** 잠금 시간이 지났으면 잠금과 실패 횟수를 초기화한다(새 트랜잭션). 이미 풀렸으면 아무 일도 없다. */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void unlockIfExpired(Long userId, LocalDateTime threshold) {
+    userRepository.unlockPinIfExpired(userId, threshold);
+  }
+
   /** 맞는 PIN 이면 실패 횟수를 0으로 되돌린다(새 트랜잭션). */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void reset(Long userId) {

@@ -3,8 +3,10 @@ package com.back.nbe1214finalhot6.domain.auth.entity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class UserTest {
 
@@ -40,5 +42,21 @@ class UserTest {
     assertThatThrownBy(admin::promoteToOwner).isInstanceOf(IllegalStateException.class);
 
     assertThat(admin.getRole()).isEqualTo(UserRole.ADMIN);
+  }
+
+  // 목적: PIN 잠금이 정확히 30분 동안만 유지되는지 경계를 확인한다(29분 59초는 잠김, 30분은 풀림, 잠근 적 없으면 안 잠김).
+  @Test
+  @DisplayName("PIN 잠금은 잠긴 지 30분 전까지만 유지된다")
+  void pinLockedOnlyForThirtyMinutes() {
+    User user = User.create("홍길동", "u@devpay.com", "01012340000", "pw", "pin", UserRole.USER);
+    LocalDateTime lockedAt = LocalDateTime.of(2026, 11, 24, 9, 0);
+
+    assertThat(user.isPinLocked(lockedAt)).isFalse(); // 잠근 적 없음
+
+    ReflectionTestUtils.setField(user, "pinLockedAt", lockedAt);
+    assertThat(user.isPinLocked(lockedAt)).isTrue();
+    assertThat(user.isPinLocked(lockedAt.plusMinutes(29).plusSeconds(59))).isTrue();
+    assertThat(user.isPinLocked(lockedAt.plusMinutes(30))).isFalse();
+    assertThat(user.isPinLocked(lockedAt.plusHours(2))).isFalse();
   }
 }
