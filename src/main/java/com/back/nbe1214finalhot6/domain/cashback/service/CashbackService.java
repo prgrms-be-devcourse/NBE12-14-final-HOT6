@@ -1,11 +1,14 @@
 package com.back.nbe1214finalhot6.domain.cashback.service;
 
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.config.CashbackProperties;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackExclusionReason;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackEarning;
+import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
+import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
 import com.back.nbe1214finalhot6.setting.SettingKey;
 import com.back.nbe1214finalhot6.setting.service.OperatorSettingService;
@@ -22,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 결제 도메인이 쓰는 캐시백 창구. 결제 트랜잭션 안에서 호출하며, 결제가 롤백되면 예산·한도 확보와 적립 건도 함께 롤백된다.
  *
- * <p>취소({@link #cancel})는 아직 구현하지 않았다. 메서드 시그니처와 반환 타입은 바꾸지 않는다.
+ * <p>메서드 시그니처와 반환 타입은 바꾸지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -120,12 +123,47 @@ public class CashbackService {
   }
 
   /**
-   * 결제 취소에 따라 적립을 되돌린다. 지급 전이면 확보한 예산을 반환하고, 지급 후면 회수한다.
+   * 결제 취소에 따라 지급 전 적립을 되돌린다. 적립 예정 건을 취소로 바꾸고, 확보했던 이용자 월 한도와 예산(연 -> 월)을 돌려준다. 호출한 쪽(결제
+   * 취소)의 트랜잭션에 참여하므로 취소가 롤백되면 복원도 함께 롤백된다.
    *
-   * <p>같은 결제를 여러 번 취소해도 한 번만 처리한다.
+   * <p>같은 결제를 여러 번 취소해도 한 번만 처리하고, 적립 건이 없거나 제외 건이거나 이미 취소된 경우에는 아무것도 하지 않는다. 한도는 결제한 달에서
+   * 되돌리며 이번 달 한도는 늘리지 않는다. 상태 전환이 조건부 UPDATE 한 문장이라 지급 배치와 동시에 와도 한쪽만 성공한다.
+   *
+   * <p>지급 후 회수는 지갑 연동이 필요해서 아직 구현하지 않았다. 지급된 건은 명시적으로 거절한다.
+   *
+   * @throws BusinessException 이미 지급된 적립일 때(CSH-010). 호출한 쪽 트랜잭션이 롤백된다
    */
+  @Transactional
   public void cancel(Long paymentId) {
-    // 아직 확보한 것이 없으므로 되돌릴 것도 없다.
+    CashbackEarning earning = earningRepository.findByPaymentId(paymentId).orElse(null);
+    if (earning == null || earning.getStatus() != EarningStatus.PENDING) {
+      rejectIfPaid(earning);
+      return;
+    }
+    // 읽어 둔 엔티티는 낡았을 수 있어서, 전환 결과와 그 뒤의 상태는 UPDATE 결과와 값 조회로 판단한다
+    int changed =
+        earningRepository.cancelIfPending(
+            earning.getId(),
+            LocalDateTime.now(clock),
+            EarningStatus.PENDING,
+            EarningStatus.CANCELED);
+    if (changed == 0) {
+      // 그 사이 다른 취소나 지급이 먼저 처리됐다
+      if (earningRepository.findStatus(earning.getId()).orElse(null) == EarningStatus.PAID) {
+        throw new BusinessException(CashbackErrorCode.EARNING_ALREADY_PAID);
+      }
+      return;
+    }
+    // 예산은 결제 트랜잭션에서 경합이 가장 큰 자원이라 마지막에 되돌린다
+    YearMonth month = YearMonth.from(earning.getLimitMonth());
+    limitService.release(earning.getWalletId(), month, earning.getAmount());
+    budgetService.releaseBudget(month.getYear(), month.getMonthValue(), earning.getAmount());
+  }
+
+  private static void rejectIfPaid(CashbackEarning earning) {
+    if (earning != null && earning.getStatus() == EarningStatus.PAID) {
+      throw new BusinessException(CashbackErrorCode.EARNING_ALREADY_PAID);
+    }
   }
 
   private CashbackReserveResponse exclude(
