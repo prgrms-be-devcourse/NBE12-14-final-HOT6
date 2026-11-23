@@ -3,6 +3,7 @@ package com.back.nbe1214finalhot6.domain.cashback.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.BudgetTransferRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackBudgetStateLog;
@@ -38,6 +39,7 @@ class CashbackBudgetStateServiceTest {
 
   @Autowired private CashbackBudgetService budgetService;
   @Autowired private CashbackBudgetStateService stateService;
+  @Autowired private CashbackBudgetTransferService transferService;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   @Autowired private CashbackBudgetStateLogRepository stateLogRepository;
   @Autowired private Clock clock;
@@ -183,5 +185,36 @@ class CashbackBudgetStateServiceTest {
     assertThat(logs.get(1).getToStatus()).isEqualTo(BudgetStatus.STOPPED);
     assertThat(logs.get(1).getReason()).isEqualTo(StateChangeReason.SCHEDULED_TIME);
     assertThat(logs.get(1).getRemainingRate()).isEqualByComparingTo("0.1");
+  }
+
+  // 목적: 다음 달로 넘긴 금액(이월 유출)이 남은 예산에서 빠진 채로 공지선을 판정하는지 확인한다. 배정 1,000,000 에서 850,000 을 넘기면 남은 예산은
+  // 150,000 이고, 50,000 을 확보하면 100,000 이 되어 딱 공지선(대비금)이다. 이월 유출을 모르면 남은 예산을 950,000 으로 보고 전이하지 않는다. 이력의
+  // 남은 비율도 전체 예산(150,000)에 대한 비율(0.6667)이어야 한다.
+  @Test
+  @DisplayName("이월로 넘긴 금액을 뺀 남은 예산으로 공지선을 판정한다")
+  void noticeLine_respectsCarriedOut() {
+    transferService.transfer(new BudgetTransferRequest(YEAR, MONTH, 850_000L));
+    assertThat(status(MONTH)).isEqualTo(BudgetStatus.ACTIVE);
+
+    budgetService.reserveBudget(YEAR, MONTH, 50_000L);
+
+    assertThat(status(MONTH)).isEqualTo(BudgetStatus.NOTICED);
+    List<CashbackBudgetStateLog> logs = logs(MONTH);
+    assertThat(logs).hasSize(1);
+    assertThat(logs.get(0).getReason()).isEqualTo(StateChangeReason.AUTO_NOTICE_LINE);
+    assertThat(logs.get(0).getRemainingRate()).isEqualByComparingTo("0.6667");
+  }
+
+  // 목적: 이월로 남은 예산이 긴급선 아래로 내려간 달은 다음 확보 때 공지를 건너뛰고 바로 중단되는지 확인한다(배정 1,000,000 에서 960,000 을 넘기면 남은
+  // 예산 40,000 이 긴급선 50,000 이하).
+  @Test
+  @DisplayName("이월로 남은 예산이 긴급선 아래가 된 달은 다음 확보에서 바로 중단된다")
+  void emergencyLine_respectsCarriedOut() {
+    transferService.transfer(new BudgetTransferRequest(YEAR, MONTH, 960_000L));
+
+    budgetService.reserveBudget(YEAR, MONTH, 1_000L);
+
+    assertThat(status(MONTH)).isEqualTo(BudgetStatus.STOPPED);
+    assertThat(logs(MONTH).get(0).getFromStatus()).isEqualTo(BudgetStatus.ACTIVE);
   }
 }

@@ -27,7 +27,8 @@ public interface CashbackAnnualBudgetRepository extends JpaRepository<CashbackAn
       """
       update CashbackAnnualBudget a set a.reservedAmount = a.reservedAmount + :amount
       where a.budgetYear = :year
-        and a.totalAmount - a.reservedAmount - a.paidAmount >= :amount
+        and a.totalAmount + a.carriedInAmount - a.carriedOutAmount - a.reservedAmount - a.paidAmount
+            >= :amount
       """)
   int reserve(@Param("year") int year, @Param("amount") long amount);
 
@@ -52,6 +53,26 @@ public interface CashbackAnnualBudgetRepository extends JpaRepository<CashbackAn
       where a.budgetYear = :year and a.reservedAmount >= :amount
       """)
   int settle(@Param("year") int year, @Param("amount") long amount);
+
+  /**
+   * 남은 예산이 금액 이상일 때만 다른 해로 넘긴 금액을 늘린다(연말 이월). 넘기면 1, 모자라거나 예산이 없으면 0 을 돌려준다. 영속성 컨텍스트를 비우지 않는다.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackAnnualBudget a set a.carriedOutAmount = a.carriedOutAmount + :amount
+      where a.budgetYear = :year
+        and a.totalAmount + a.carriedInAmount - a.carriedOutAmount - a.reservedAmount - a.paidAmount
+            >= :amount
+      """)
+  int transferOut(@Param("year") int year, @Param("amount") long amount);
+
+  /** 다른 해에서 넘어온 금액을 늘린다(연말 이월). 늘리면 1, 예산이 없으면 0 을 돌려준다. */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      "update CashbackAnnualBudget a set a.carriedInAmount = a.carriedInAmount + :amount"
+          + " where a.budgetYear = :year")
+  int transferIn(@Param("year") int year, @Param("amount") long amount);
 
   /**
    * 행을 잠그고 읽는다. 총액 변경이나 월 배정 합계 검증 중에 결제의 예약 금액 변경이 끼어들어 덮어써지지 않게 한다.
