@@ -1,17 +1,16 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import Header from "@/components/Header";
 import MapPicker, { type LatLng } from "@/components/MapPicker";
 import { ApiError } from "@/lib/api";
-import { loadCtx, saveCtx } from "@/lib/devContext";
+import { saveCtx } from "@/lib/devContext";
 import { CATEGORIES } from "@/lib/stores";
 import { registerMerchant } from "@/lib/endpoints";
 
 export default function MerchantRegisterPage() {
-  const router = useRouter();
-  const [ownerId, setOwnerId] = useState(1);
+  const [done, setDone] = useState(false);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -20,23 +19,37 @@ export default function MerchantRegisterPage() {
   const [pos, setPos] = useState<LatLng | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
-  useEffect(() => setOwnerId(loadCtx().ownerId), []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      const res = await registerMerchant({ ownerId, name: name.trim(), address: address.trim(), ...(proof ? { revenueProof: proof } : {}) });
-      saveCtx({ merchantId: res.merchantId, merchantName: res.name, category, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
-      router.push("/merchant/edit");
+      const res = await registerMerchant({ name: name.trim(), address: address.trim(), ...(proof ? { revenueProof: proof } : {}) });
+      saveCtx({ merchantName: res.name, category, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
+      setDone(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "알 수 없는 오류가 발생했습니다");
     } finally {
       setBusy(false);
     }
   };
+
+  // 등록하면 회원이 점주(OWNER)로 바뀌지만, 이미 받은 토큰은 옛 역할이라 다시 로그인해야 점주 기능을 쓸 수 있다
+  if (done) {
+    return (
+      <>
+        <Header title="가맹점 등록" back="/merchant/login" />
+        <div className="space-y-4 px-5 pb-5">
+          <section className="card text-center">
+            <div className="text-lg font-bold">가맹점이 등록되었어요</div>
+            <p className="note mt-2">등록한 회원은 점주가 돼요. QR 생성과 정산 조회 같은 점주 기능은 다시 로그인한 뒤부터 쓸 수 있어요.</p>
+          </section>
+          <Link href="/merchant/login" className="btn btn-primary">다시 로그인하기</Link>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

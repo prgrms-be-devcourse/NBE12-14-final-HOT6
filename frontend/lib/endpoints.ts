@@ -1,5 +1,7 @@
 import { api } from "@/lib/api";
 import type {
+  DailySettlementResponse, MerchantAccountResponse, MonthlySettlementResponse, MonthlySettlementRunResult,
+  ReconciliationResultResponse, SettlementRunResult,
   MerchantRegisterRequest, MerchantRegisterResponse, MerchantResponse, MerchantUpdateRequest, PageResponse, PaymentRequest, PaymentResponse,
   QrCreateResponse, QrScanResponse, QrStatusResponse, WalletResponse,
 } from "@/lib/types";
@@ -7,8 +9,10 @@ import type {
 export const registerMerchant = (body: MerchantRegisterRequest) =>
   api<MerchantRegisterResponse>("/merchants", { method: "POST", body });
 
-export const updateMerchant = (merchantId: number, body: MerchantUpdateRequest) =>
-  api<MerchantResponse>(`/merchants/${merchantId}`, { method: "PATCH", body });
+// 가맹점은 토큰의 회원으로 찾는다 (점주 기능은 /merchants/me 아래)
+export const getMyMerchant = () => api<MerchantResponse>("/merchants/me");
+
+export const updateMerchant = (body: MerchantUpdateRequest) => api<MerchantResponse>("/merchants/me", { method: "PATCH", body });
 
 export const searchMerchants = (name: string, page = 0, size = 20) =>
   api<PageResponse<MerchantResponse>>(`/merchants?name=${encodeURIComponent(name)}&page=${page}&size=${size}`);
@@ -22,12 +26,35 @@ export const getPaymentByKey = (key: string) => api<PaymentResponse>(`/payments/
 // 로그인한 회원의 지갑(데브머니, 결제 가능 캐시백, 한도). 지갑은 토큰으로 찾는다
 export const getMyWallet = () => api<WalletResponse>("/wallet");
 
-// 가맹점주 전액 취소. merchantId 는 인증 연동 전까지 임시로 쿼리 파라미터로 보낸다
-export const cancelPayment = (paymentId: number, merchantId: number) =>
-  api<PaymentResponse>(`/payments/${paymentId}/cancel?merchantId=${merchantId}`, { method: "POST" });
+// 가맹점주 전액 취소. 가맹점은 토큰의 회원으로 찾는다
+export const cancelPayment = (paymentId: number) => api<PaymentResponse>(`/payments/${paymentId}/cancel`, { method: "POST" });
 
-export const createDynamicQr = (merchantId: number, amount: number) =>
-  api<QrCreateResponse>(`/merchants/${merchantId}/qr/dynamic`, { method: "POST", body: { amount } });
+export const createDynamicQr = (amount: number) =>
+  api<QrCreateResponse>("/merchants/me/qr/dynamic", { method: "POST", body: { amount } });
+
+// 정산 조회 (점주). 일 정산은 최대 31일, 월 정산은 최대 12개월
+export const getDailySettlements = (from: string, to: string) =>
+  api<DailySettlementResponse[]>(`/merchants/me/settlements/daily?from=${from}&to=${to}`);
+
+export const getMonthlySettlements = (from: string, to: string) =>
+  api<MonthlySettlementResponse[]>(`/merchants/me/settlements/monthly?from=${from}&to=${to}`);
+
+export const getMyAccount = () => api<MerchantAccountResponse>("/merchants/me/account");
+
+// 정산·대사 수동 실행 (운영자). 날짜·월을 생략하면 서버가 어제·지난달로 실행한다
+const withParam = (path: string, key: string, value?: string) => (value ? `${path}?${key}=${value}` : path);
+
+export const runDailySettlement = (date?: string) =>
+  api<SettlementRunResult>(withParam("/admin/settlements/daily/run", "date", date), { method: "POST" });
+
+export const runMonthlySettlement = (month?: string) =>
+  api<MonthlySettlementRunResult>(withParam("/admin/settlements/monthly/run", "month", month), { method: "POST" });
+
+export const runReconciliation = (date?: string) =>
+  api<ReconciliationResultResponse[]>(withParam("/admin/settlements/reconciliation/run", "date", date), { method: "POST" });
+
+export const getReconciliations = (from: string, to: string) =>
+  api<ReconciliationResultResponse[]>(`/admin/settlements/reconciliation?from=${from}&to=${to}`);
 
 export const scanQr = (token: string) => api<QrScanResponse>(`/qr/${encodeURIComponent(token)}`);
 

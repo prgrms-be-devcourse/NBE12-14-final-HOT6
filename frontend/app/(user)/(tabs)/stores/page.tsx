@@ -1,103 +1,90 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import Header from "@/components/Header";
-import StoreMap from "@/components/StoreMap";
-import { loadCtx } from "@/lib/devContext";
-import { CATEGORIES, iconOf, STORES, type Category, type Store } from "@/lib/stores";
+import { ApiError } from "@/lib/api";
+import { searchMerchants } from "@/lib/endpoints";
+import type { MerchantResponse } from "@/lib/types";
+
+const PAGE_SIZE = 20;
+
+type State =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ok"; query: string; items: MerchantResponse[]; page: number; totalPages: number; total: number };
 
 export default function StoresPage() {
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState<Category | "전체">("전체");
-  const [onlyEligible, setOnlyEligible] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [mine, setMine] = useState<Store | null>(null);
+  const [state, setState] = useState<State>({ kind: "idle" });
+  const [more, setMore] = useState(false);
 
-  // 내가 등록한 가맹점(사장님 앱에서 등록)도 지도에 함께 표시
-  useEffect(() => {
-    const c = loadCtx();
-    if (c.merchantName && c.lat !== undefined && c.lng !== undefined) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
-      setMine({
-        id: "mine", name: c.merchantName, category: (c.category as Category) ?? "기타", address: c.merchantAddress ?? "",
-        lat: c.lat, lng: c.lng, eligible: c.eligible ?? true, open: true, mine: true,
-      });
+  // 이름 부분 일치 검색. page 가 0 이면 새로 검색하고, 1 이상이면 기존 결과 뒤에 이어 붙인다
+  const search = async (query: string, page: number) => {
+    if (page === 0) setState({ kind: "loading" });
+    else setMore(true);
+    try {
+      const res = await searchMerchants(query, page, PAGE_SIZE);
+      setState((prev) => ({
+        kind: "ok",
+        query,
+        items: page > 0 && prev.kind === "ok" ? [...prev.items, ...res.content] : res.content,
+        page: res.page,
+        totalPages: res.totalPages,
+        total: res.totalElements,
+      }));
+    } catch (e) {
+      setState({ kind: "error", message: e instanceof ApiError ? e.message : "가맹점을 찾지 못했어요" });
+    } finally {
+      setMore(false);
     }
-  }, []);
+  };
 
-  const all = useMemo(() => (mine ? [...STORES, mine] : STORES), [mine]);
-  const list = useMemo(() => {
-    const k = q.trim().toLowerCase();
-    return all.filter((s) =>
-      (cat === "전체" || s.category === cat) &&
-      (!onlyEligible || s.eligible) &&
-      (!k || s.name.toLowerCase().includes(k) || s.address.toLowerCase().includes(k)),
-    );
-  }, [all, q, cat, onlyEligible]);
-
-  const sel = list.find((s) => s.id === selected) ?? null;
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = q.trim();
+    if (query) search(query, 0);
+  };
 
   return (
     <>
       <Header title="가맹점 찾기" />
       <div className="space-y-3 px-5 pb-4">
-        <label className="block">
-          <span className="sr-only">매장명으로 찾기</span>
-          <input type="search" className="field" placeholder="매장명으로 찾기" value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
+        <form onSubmit={submit} className="flex gap-2">
+          <label className="block min-w-0 flex-1">
+            <span className="sr-only">매장명으로 찾기</span>
+            <input type="search" className="field" placeholder="매장명으로 찾기" value={q} onChange={(e) => setQ(e.target.value)} />
+          </label>
+          <button type="submit" disabled={!q.trim() || state.kind === "loading"} className="btn btn-outline btn-sm !w-auto shrink-0 disabled:opacity-40">검색</button>
+        </form>
 
-        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1" role="tablist" aria-label="업종">
-          {(["전체", ...CATEGORIES.map((c) => c.value)] as const).map((c) => (
-            <button key={c} type="button" role="tab" aria-selected={cat === c} onClick={() => setCat(c)} className={`chip shrink-0 ${cat === c ? "chip-on" : ""}`}>
-              {c !== "전체" && <span className="mr-1" aria-hidden>{iconOf(c)}</span>}{c}
-            </button>
-          ))}
-        </div>
+        {state.kind === "idle" && <p className="note text-center">가맹점 이름을 입력해 찾아보세요. 이름의 일부만 입력해도 돼요.</p>}
+        {state.kind === "loading" && <p role="status" className="note text-center">가맹점을 찾는 중이에요…</p>}
+        {state.kind === "error" && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">{state.message}</p>}
 
-        <StoreMap stores={list} selectedId={selected} onSelect={setSelected} height={280} />
-
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-          <span className="flex items-center gap-3">
-            <span className="flex items-center gap-1"><i className="inline-block h-3 w-3 rounded-full border-2 border-emerald-500 bg-white" />적립 가능</span>
-            <span className="flex items-center gap-1"><i className="inline-block h-3 w-3 rounded-full border-2 border-slate-400 bg-white" />적립 제외</span>
-          </span>
-          <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" className="h-3.5 w-3.5 accent-brand-600" checked={onlyEligible} onChange={(e) => setOnlyEligible(e.target.checked)} />적립 가능만 보기</label>
-        </div>
-
-        {sel && (
-          <section className="card border-blue-300 !p-3.5" aria-live="polite">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="flex items-center gap-2 font-semibold"><span aria-hidden>{iconOf(sel.category)}</span>{sel.name}{sel.mine && <span className="badge badge-info">내 가맹점</span>}</div>
-                <div className="note mt-0.5">{sel.category} · {sel.address || "주소 정보 없음"}</div>
-              </div>
-              <span className="badge badge-ok shrink-0">가맹점</span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <span className={`badge ${sel.eligible ? "badge-ok" : "badge-warn"}`}>{sel.eligible ? "캐시백 적립 가능" : "적립 제외 (캐시백 사용 가능)"}</span>
-              <span className={`badge ${sel.open ? "badge-info" : "badge-bad"}`}>{sel.open ? "운영중" : "운영 중지"}</span>
-            </div>
-          </section>
-        )}
-
-        <h2 className="px-1 pt-1 text-sm font-semibold">검색 결과 {list.length}곳</h2>
-        {list.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">찾으시는 가맹점이 없어요. 다른 이름이나 업종으로 찾아보세요.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-            {list.map((s) => (
-              <li key={s.id}>
-                <button type="button" onClick={() => setSelected(s.id)} className={`flex w-full items-center gap-3 px-3.5 py-3 text-left ${selected === s.id ? "bg-blue-50/60" : "hover:bg-slate-50"}`}>
-                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 bg-white text-base ${s.eligible ? "border-emerald-500" : "border-slate-400"}`} aria-hidden>{iconOf(s.category)}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{s.name}{s.mine && <span className="badge badge-info ml-1.5">내 가맹점</span>}</span>
-                    <span className="block truncate text-xs text-slate-500">{s.category} · {s.address}</span>
-                  </span>
-                  <span className={`badge shrink-0 ${s.eligible ? "badge-ok" : "badge-warn"}`}>{s.eligible ? "적립" : "제외"}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+        {state.kind === "ok" && (
+          <>
+            <h2 className="px-1 pt-1 text-sm font-semibold">&quot;{state.query}&quot; 검색 결과 {state.total}곳</h2>
+            {state.items.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">찾으시는 가맹점이 없어요. 다른 이름으로 찾아보세요.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+                {state.items.map((s) => (
+                  <li key={s.merchantId} className="flex items-center gap-3 px-3.5 py-3">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{s.name}</span>
+                      <span className="block truncate text-xs text-slate-500">{s.address || "주소 정보 없음"}</span>
+                    </span>
+                    <span className={`badge shrink-0 ${s.cashbackEligible ? "badge-ok" : "badge-warn"}`}>{s.cashbackEligible ? "적립 가능" : "적립 제외"}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {state.page + 1 < state.totalPages && (
+              <button type="button" disabled={more} onClick={() => search(state.query, state.page + 1)} className="btn btn-outline disabled:opacity-40">{more ? "불러오는 중…" : "더 보기"}</button>
+            )}
+            <p className="note text-center">지도와 업종으로 찾는 기능은 준비 중이에요.</p>
+          </>
         )}
       </div>
     </>

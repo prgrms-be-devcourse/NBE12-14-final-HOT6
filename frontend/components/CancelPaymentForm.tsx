@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ApiError } from "@/lib/api";
-import { loadCtx } from "@/lib/devContext";
 import { cancelPayment } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { paymentErrorText } from "@/lib/paymentErrors";
@@ -17,16 +16,10 @@ type State =
 
 const fmt = (iso?: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "-");
 
-// 가맹점주 결제 취소 (전액). 결제 목록 API 가 생기기 전까지는 영수증의 결제번호(숫자)를 입력해 취소한다
+// 가맹점주 결제 취소 (전액). 가맹점은 토큰의 회원으로 찾는다. 결제 목록 API 가 생기기 전까지는 영수증의 결제번호(숫자)를 입력해 취소한다
 export default function CancelPaymentForm() {
-  const [merchantId, setMerchantId] = useState(1);
   const [paymentId, setPaymentId] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
-    setMerchantId(loadCtx().merchantId);
-  }, []);
 
   const id = Number(paymentId);
   const validId = Number.isInteger(id) && id > 0;
@@ -34,7 +27,7 @@ export default function CancelPaymentForm() {
   const run = async () => {
     setState({ kind: "loading" });
     try {
-      setState({ kind: "ok", res: await cancelPayment(id, merchantId) });
+      setState({ kind: "ok", res: await cancelPayment(id) });
     } catch (e) {
       setState({ kind: "error", message: e instanceof ApiError ? paymentErrorText(e.code, e.message) : paymentErrorText() });
     }
