@@ -1,3 +1,5 @@
+import { audienceOfPath, clearSession, getSession, LOGIN_PATH } from "@/lib/auth";
+
 // 백엔드 공통 응답: { success, code, message, data }
 type ApiEnvelope<T> = { success: boolean; code: string | null; message: string | null; data: T | null };
 
@@ -17,6 +19,8 @@ export async function api<T>(path: string, { method = "GET", body, idempotencyKe
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
+  const session = getSession();
+  if (session) headers["Authorization"] = `Bearer ${session.accessToken}`;
 
   let res: Response;
   try {
@@ -32,10 +36,16 @@ export async function api<T>(path: string, { method = "GET", body, idempotencyKe
     /* JSON 이 아닌 응답 (401 빈 본문 등) */
   }
 
+  // 토큰이 없거나 만료·무효면 세션을 지우고 해당 앱의 로그인 화면으로 보낸다. 로그인 요청 자체의 401(자격 증명 오류)은 화면이 메시지로 보여 준다
+  if (res.status === 401 && path !== "/auth/login") {
+    clearSession();
+    if (typeof window !== "undefined") window.location.assign(LOGIN_PATH[audienceOfPath(window.location.pathname)]);
+  }
+
   if (!res.ok || !json?.success) {
     const fallback =
       res.status === 401 || res.status === 403
-        ? `접근이 거부되었습니다 (${res.status}) — 인증 연동 전이라 백엔드 SecurityConfig 에서 이 API 가 아직 열려 있지 않을 수 있습니다`
+        ? `접근이 거부되었습니다 (${res.status}) — 이 계정의 역할로는 사용할 수 없는 기능일 수 있습니다`
         : `요청에 실패했습니다 (${res.status})`;
     throw new ApiError(json?.message ?? fallback, res.status, json?.code);
   }

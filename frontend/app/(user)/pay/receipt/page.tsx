@@ -10,7 +10,7 @@ import { getPaymentByKey, pay } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { paymentErrorText } from "@/lib/paymentErrors";
 import { clearPending, loadPending, type PendingPayment } from "@/lib/pendingPayment";
-import { REASON_TEXT, type ExclusionReason } from "@/lib/cashbackPreview";
+import { REASON_TEXT, pctText, type ExclusionCode } from "@/lib/cashbackApi";
 import type { PaymentResponse } from "@/lib/types";
 
 type State =
@@ -133,13 +133,13 @@ function ReceiptBody() {
     );
 
   const rows: [string, string][] = [
-    ["적용요율", r.appliedRate != null ? `${r.appliedRate}%` : "-"],
-    ["계산식", r.appliedRate != null && r.cashbackEarnedAmount ? `${r.walletUsedAmount.toLocaleString("ko-KR")} × ${r.appliedRate}%` : "-"],
+    ["적용요율", r.appliedRate != null ? pctText(r.appliedRate) : "-"],
+    ["계산식", r.appliedRate != null && r.cashbackEarnedAmount ? `${r.walletUsedAmount.toLocaleString("ko-KR")} × ${pctText(r.appliedRate)}` : "-"],
     ["지급 예정일", r.cashbackPayableAt ? r.cashbackPayableAt.slice(0, 10) : "-"],
     ["결제 시각", fmt(r.completedAt)],
     ...(r.status === "CANCELED" ? ([["취소 시각", fmt(r.canceledAt)]] as [string, string][]) : []),
   ];
-  const reason = r.cashbackExclusionReason as ExclusionReason | null;
+  const reason = r.cashbackExclusionReason as ExclusionCode | null;
   const excluded = !!reason && reason !== "NONE";
 
   return (
@@ -158,7 +158,7 @@ function ReceiptBody() {
           ]}
         />
         <dl className="mt-1">{rows.map(([k, v]) => <div key={k} className="flex justify-between border-t border-zinc-100 py-2 text-sm"><dt className="text-zinc-500">{k}</dt><dd className="font-medium tabular-nums">{v}</dd></div>)}</dl>
-        {excluded && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">적립 제외 · {REASON_TEXT[reason as ExclusionReason] ?? reason}</p>}
+        {excluded && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">적립 제외 · {REASON_TEXT[reason as ExclusionCode] ?? reason}</p>}
         <p className="note mt-2">소수점 이하는 버림 · 접수 시각 기준 요율로 확정</p>
         <p className="note mt-1">결제번호 PAY-{String(r.paymentId).padStart(4, "0")}</p>
       </section>
