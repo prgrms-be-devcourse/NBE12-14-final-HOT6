@@ -69,6 +69,14 @@ public class User {
     this.status = UserStatus.ACTIVE;
   }
 
+  /** 가맹점을 등록한 회원을 점주로 올린다. 이미 점주면 그대로 두고, 운영자는 점주가 될 수 없다. */
+  public void promoteToOwner() {
+    if (role == UserRole.ADMIN) {
+      throw new IllegalStateException("운영자는 점주가 될 수 없음");
+    }
+    this.role = UserRole.OWNER;
+  }
+
   public static User create(
       String name, String email, String phone, String passwordHash, String pinHash, UserRole role) {
     return new User(name, email, phone, passwordHash, pinHash, role);

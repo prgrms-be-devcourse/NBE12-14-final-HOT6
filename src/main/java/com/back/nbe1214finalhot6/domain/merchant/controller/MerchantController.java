@@ -8,6 +8,7 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
+import com.back.nbe1214finalhot6.domain.merchant.service.MerchantRegistrationFacade;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,16 +34,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class MerchantController {
 
   private final MerchantService merchantService;
+  private final MerchantRegistrationFacade registrationFacade;
   private final OwnedResources ownedResources;
 
   @Operation(
       summary = "가맹점 등록",
-      description = "가맹점을 등록한다. 연매출 30억 미만 증빙 서류(revenueProof)를 첨부하면 적립 대상으로 자동 승인되고, 첨부하지 않으면 적립 대상에서 제외된다")
+      description =
+          "로그인한 회원의 가맹점을 등록한다. 연매출 30억 미만 증빙 서류(revenueProof)를 첨부하면 적립 대상으로 자동 승인되고, 첨부하지 않으면 적립 대상에서 제외된다. "
+              + "등록한 회원은 점주(OWNER)가 되며, 점주 기능은 새 토큰(재로그인 또는 재발급)을 받은 뒤에 쓸 수 있다. "
+              + "점주 한 명당 가맹점은 하나만 등록할 수 있다(이미 등록했으면 409)")
   @PostMapping
   public ResponseEntity<ApiResponse<MerchantRegisterResponse>> register(
-      @Valid @RequestBody MerchantRegisterRequest request) {
+      @AuthenticationPrincipal AuthUser user, @Valid @RequestBody MerchantRegisterRequest request) {
     return ResponseEntity.status(HttpStatus.CREATED)
-        .body(ApiResponse.ok(merchantService.register(request)));
+        .body(ApiResponse.ok(registrationFacade.register(user, request)));
   }
 
   @Operation(

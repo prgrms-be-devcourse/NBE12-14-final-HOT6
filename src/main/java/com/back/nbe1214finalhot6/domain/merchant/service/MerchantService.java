@@ -26,12 +26,13 @@ public class MerchantService {
   private final MerchantRepository merchantRepository;
   private final MerchantWalletService merchantWalletService;
 
+  /** 점주(ownerId)의 가맹점을 등록한다. 등록하는 회원은 요청이 아니라 로그인한 회원(토큰)이다. */
   @Transactional
-  public MerchantRegisterResponse register(MerchantRegisterRequest request) {
+  public MerchantRegisterResponse register(Long ownerId, MerchantRegisterRequest request) {
     Merchant merchant =
         merchantRepository.save(
             Merchant.create(
-                request.ownerId(),
+                ownerId,
                 request.name(),
                 request.address(),
                 request.resolveCashbackEligible()));
