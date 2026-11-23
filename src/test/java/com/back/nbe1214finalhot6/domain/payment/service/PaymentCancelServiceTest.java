@@ -13,6 +13,9 @@ import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackEarning;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
+import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetRequest;
+import com.back.nbe1214finalhot6.domain.cashback.service.CashbackBudgetService;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackService;
 import com.back.nbe1214finalhot6.domain.payment.PaymentTestFixture;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
@@ -28,6 +31,7 @@ import com.back.nbe1214finalhot6.domain.wallet.repository.WalletRepository;
 import com.back.nbe1214finalhot6.domain.wallet.repository.WalletTransactionRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -60,6 +64,7 @@ class PaymentCancelServiceTest {
   @Autowired MutableClock clock;
   @Autowired CashbackEarningRepository earningRepository;
   @Autowired JdbcTemplate jdbc;
+  @Autowired CashbackBudgetService budgetService;
 
   @MockitoBean QrService qrService; // QR 은 stub
   @MockitoSpyBean CashbackService cashbackService; // 호출 검증(verify) + 롤백 테스트용 예외
@@ -284,22 +289,32 @@ class PaymentCancelServiceTest {
   }
 
   @Test
-  @DisplayName("캐시백이 이미 지급된 결제도 취소된다 (임시: 지급 건은 cashbackService.cancel 을 건너뛴다)")
-  void 지급된_캐시백이_있어도_결제취소_성공() {
-    // given : 결제 완료 후, 그 결제의 적립 건이 지급(PAID)된 상태
+  @DisplayName("캐시백이 이미 지급된 결제를 취소하면 지급된 캐시백이 회수된다")
+  void 지급된_캐시백_회수() {
+    // given : 예산이 있어서 적립 예정(PENDING, 데브머니 7,000 x 3% = 210원)이 생기는 결제를 완료하고, 지급(PAID)된 상태로 만든다
+    budgetService.putAnnual(2026, new AnnualBudgetRequest(10_000_000L));
+    budgetService.putMonthly(
+        2026, 11, new MonthlyBudgetRequest(5_000_000L, new BigDecimal("0.03")));
     Long paymentId = completedPayment();
     CashbackEarning earning = earningRepository.findByPaymentId(paymentId).orElseThrow();
-    jdbc.update("update cashback_earning set status = 'PAID' where id = ?", earning.getId());
-    // when : 예외 없이 취소된다
+    assertThat(earning.getAmount()).isEqualTo(210L);
+    jdbc.update(
+        "update cashback_earning set status = 'PAID', paid_at = now() where id = ?",
+        earning.getId());
+    // when : 지급 후에 결제를 취소해도 예외 없이 취소된다
     PaymentResponse response = paymentCancelService.cancel(merchantId, paymentId);
-    // then 1 : 결제는 CANCELED, 지갑은 환급된다
+    // then 1 : 결제는 CANCELED, 사용한 데브머니·캐시백이 환급된다
     assertThat(response.status()).isEqualTo(PaymentStatus.CANCELED);
-    assertThat(payment(paymentId).getStatus()).isEqualTo(PaymentStatus.CANCELED);
     assertThat(wallet().getBalance()).isEqualTo(7_000L);
-    assertThat(wallet().getCashbackBalance()).isEqualTo(3_000L);
-    // then 2 : 지급된 적립은 건드리지 않는다 (회수는 지급 배치 이슈에서 구현)
-    verify(cashbackService, never()).cancel(any());
+    // then 2 : 지급받은 캐시백 210원은 회수되어, 환급된 캐시백 3,000원에서 빠진다
+    assertThat(wallet().getCashbackBalance()).isEqualTo(3_000L - 210L);
+    assertThat(
+            walletTransactionRepository.findByTypeAndRefKey(
+                WalletTransactionType.CASHBACK_CLAWBACK, earning.getId()))
+        .isPresent();
+    // then 3 : 적립 건은 회수 상태가 된다
     assertThat(earningRepository.findByPaymentId(paymentId).orElseThrow().getStatus())
-        .isEqualTo(EarningStatus.PAID);
+        .isEqualTo(EarningStatus.CLAWED_BACK);
+    verify(cashbackService).cancel(paymentId);
   }
 }
