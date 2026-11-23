@@ -168,6 +168,35 @@ public class CashbackBudgetService {
   }
 
   /**
+   * 지금 이 금액을 확보할 수 있는지 읽기만 해서 알려 준다. {@link #reserveBudget} 와 같은 조건(연 예산에 남은 금액이 충분하고, 월 예산이 적립을 받는
+   * 상태이며 남은 금액이 충분)이지만 아무것도 확보하지 않는다. 결제 전 미리보기가 쓴다.
+   */
+  @Transactional(readOnly = true)
+  public boolean canReserve(int year, int month, long amount) {
+    boolean annualEnough =
+        annualBudgetRepository.findRemainingAmount(year).map(r -> r >= amount).orElse(false);
+    if (!annualEnough) {
+      return false;
+    }
+    boolean receiving =
+        monthlyBudgetRepository.findStatus(year, month).map(RESERVABLE_STATUSES::contains).orElse(false);
+    return receiving
+        && monthlyBudgetRepository
+            .findRemainingAmount(year, month)
+            .map(r -> r >= amount)
+            .orElse(false);
+  }
+
+  /** 그 달 적립이 중단(중단·마감)됐는지. 월 예산이 없거나 공지 상태까지는 중단이 아니다. */
+  @Transactional(readOnly = true)
+  public boolean isPaused(int year, int month) {
+    return monthlyBudgetRepository
+        .findStatus(year, month)
+        .map(status -> !RESERVABLE_STATUSES.contains(status))
+        .orElse(false);
+  }
+
+  /**
    * 확보했던 예산을 되돌린다. 캐시백 도메인 내부 전용이며, 결제 도메인은 {@code CashbackService.cancel} 만
    * 호출한다. 호출한 쪽의 트랜잭션에 참여하고, 연 예산, 월 예산 순서로 되돌린다.
    *

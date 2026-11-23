@@ -41,7 +41,7 @@
 | 번호 | 기능 | 기획서 | API·형태 | 단계 | 메모 |
 |---|---|---|---|---|---|
 | C1 | 정책 관리 (월 기본 요율, 달 중 요율 인하) | CB-03 | `POST /api/admin/cashback/policies/reductions`, `GET /api/admin/cashback/policies`, `GET /api/admin/cashback/policies/{policyId}`. 월 기본 요율은 C9의 월 배정 PUT 으로 정한다 | 1 | 정책은 한 종류(기본 요율)다. 추가 요율(EXTRA)은 [8절](#8-제외후순위)의 MVP 이후 항목. 요율은 소수 비율(3% = 0.03), 요율 구간은 `[시작, 종료)` 반개구간이다. 구간을 직접 등록하는 `POST /policies`는 "인하만" 규칙을 우회하므로 없앴다(#49) |
-| C2 | 정책 변경 이력 (변경자·시각·변경 전후 값) | CB-03 | 이력 조회 (제안) | 1 | 조회만 가능. 입력값·근거까지 남길지는 [9절](#9-개발하면서-판단할-것) |
+| C2 | 정책 변경 이력 (변경자·시각·변경 전후 값) | CB-03 | `GET /api/admin/cashback/policies/history` | 1 | 조회만 가능. 입력값·근거까지 남길지는 [9절](#9-개발하면서-판단할-것) |
 | C3 | 적립 계산 (정수 버림, 월 한도 차감) | PAY-01 | `CashbackService.reserve` (A가 결제 트랜잭션에서 호출) | 1 | 적립 = `floor(데브머니 사용분 × 접수 시각 요율)`. 적립 대상 가맹점에서만 |
 | C4 | 예산 확보(예약) | PAY-01 | `CashbackService.reserve` | 1 | 조건부 UPDATE, 음수 불가. 연 예산과 월 예산을 함께 차감. 중단 판정과 같은 흐름 |
 | C5 | 적립 취소·회수 | PAY-03 | `CashbackService.cancel` (A가 취소 트랜잭션에서 호출) | 1 | 지급 전 취소는 확보 예산 반환, 지급 후는 회수(음수 가능, 예산 복구 안 함), 월 한도는 결제한 달에 한 번만 복구 |
@@ -54,10 +54,10 @@
 
 | 번호 | 기능 | 기획서 | API·형태 | 단계 | 메모 |
 |---|---|---|---|---|---|
-| O1 | 운영자 월 예산 현황 조회 | 3절 추가 기능 | `GET /api/admin/cashback/budget/monthly` (제안) | 2 | 월별 배정, 이월 유입, 집행, 예정, 잔여. 예산 3칸(완료·확보·남음), 대비금 경고 |
+| O1 | 운영자 월 예산 현황 조회 | 3절 추가 기능 | `GET /api/admin/cashback/budget/monthly`, `GET /api/admin/cashback/budget/monthly/{year}/{month}` | 2 | 월별 배정, 이월 유입, 집행, 예정, 잔여. 예산 3칸(완료·확보·남음), 대비금 경고 |
 | O2 | 적립 중단 상태 전이 | CB-06 | 결제 시 판정 + 스케줄러 | 2 | [3-1](#3-1-대비금과-적립-중단)절 |
-| O3 | 운영자 수동 공지 후 중단 / 긴급 중단 | CB-06 | `/api/admin/cashback/budget` 하위 | 2 | 긴급 중단은 확인 창을 거침 |
-| O4 | 예산 이월 | 3절 추가 기능 | 배정, `POST /api/admin/cashback/budget/transfers` (제안) | 2 | 다음 달로만. 이력 INSERT only(`cashback_budget_transfer`). 이월 시점과 마감 후 취소 규칙은 기획서 4절 |
+| O3 | 운영자 수동 공지 후 중단 / 긴급 중단 | CB-06 | `POST /api/admin/cashback/budget/monthly/{year}/{month}/notice-stop`, `.../emergency-stop` | 2 | 긴급 중단은 본문 `{"confirm": true}`가 있어야 실행한다. 같은 전이 로직과 이력(사유 `OPERATOR_*`)을 쓰고, 이미 중단·마감된 달은 CSH-012로 거절한다 |
+| O4 | 예산 이월 | 3절 추가 기능 | `POST·GET /api/admin/cashback/budget/transfers` | 2 | 다음 달로만. 이력 INSERT only(`cashback_budget_transfer`). 수동 이월은 부분 이월이 되고 금액은 0보다 크고 남은 예산 이하여야 한다(초과는 CSH-011). 12월은 다음 해 1월로 넘어가며 연 예산도 함께 맞춘다. 월 마감 시 자동 이월(`AUTO`)은 PR #136에서 구현 중이고, 마감 후 취소는 마감된 달에 남긴다(10절 11-23). 이월 시점과 마감 후 취소 규칙을 "기획서 4절"에 둔다고 적었으나 4절에는 그 내용이 없어서 이 문서 10절로 정정한다 |
 | O5 | 월 시작 시 대비금 확정 | CB-06 | 월 예산이 열릴 때 | 2 | 월 배정의 10% |
 | O6 | 운영자 한도 설정 | 3절 추가 기능 | `GET /api/admin/settings`, `PUT·DELETE /api/admin/settings/{key}` | 1 | 이용자 월 적립 한도(`CASHBACK_USER_MONTHLY_LIMIT`, 기본 50,000원)와 지갑 보유·월 충전 한도(적용은 C, 이슈 #69)를 운영자가 설정한다. 바꾸면 이후부터 적용하고 이미 기록된 적립·충전은 그대로. 변경 이력 `operator_setting_history`. 이슈 #71, #72 |
 
@@ -113,11 +113,12 @@
 | `NOTICED → STOPPED` | 예약한 날짜 00:00 또는 남은 예산 ≤ 대비금의 절반 | 적립 0원, 결제는 정상. 영수증에 사유 |
 | `ACTIVE → STOPPED` | 남은 예산 ≤ 대비금의 절반 (공지선을 건너뜀) | 즉시 중단, 긴급 중단 공지 |
 | 운영자 수동 | "공지 후 중단"(공지 + 3일 뒤 예약) / "긴급 중단"(즉시) | 위와 같은 상태 전이. 긴급 중단은 확인 창 |
-| `STOPPED → ACTIVE` | 새 월 예산 활성화 | 자동 복귀 |
+| `STOPPED → ACTIVE` | 새 월 예산 활성화 | 자동 복귀. 중단된 달의 상태를 되돌리지는 않고 다음 달 월 예산이 `ACTIVE`로 열리는 것이며 전이 이력은 남기지 않는다 |
 
 - 판정은 예산 확보(C4) 직후 같은 흐름에서 한다.
 - 공지 문구: "남은 예산이 N% 이하이거나 최대 3일 뒤 적립이 중단될 수 있어요. 예산이 더 빨리 소진되면 먼저 종료될 수 있어요. 결제는 정상 이용할 수 있어요". 시각은 쓰지 않는다.
 - 운영자와 이용자에게는 % 기준을 보여 주고 금액 계산은 내부에서만 쓴다.
+- 모든 전이는 `where status = <현재 상태>` 조건부 UPDATE 한 문장이라 같은 판정이 동시에 와도 한 번만 일어나고, 바뀐 행이 1건일 때만 이력(`cashback_budget_state_log`)을 남긴다. 한 번 올라간 단계를 되돌리는 전이(공지 후 `ACTIVE` 복귀)는 구현하지 않았다([9절](#9-개발하면서-판단할-것) 1번).
 - 예산이 빨리 줄면 이 단계에 닿기 전에 요율 인하를 먼저 쓴다([3-2](#3-2-적립-규칙)의 요율 운영).
 
 ### 3-2. 적립 규칙
@@ -158,6 +159,13 @@ B가 지급 대상을 고르고, 지갑 반영은 C의 API에 요청한다. 지�
 - **회수(지급 후 결제 취소)**: A의 취소 트랜잭션 안에서 `CashbackService.cancel`이 `debit(walletId, amount, CASHBACK_CLAWBACK, earningId, allowNegative=true)`를 호출한다. 데브머니와 캐시백 잔액은 분리한다(#27). 회수는 캐시백 잔액에서 차감하고 음수를 허용하며, 음수는 다음 캐시백 입금에서 상계된다. 데브머니와는 상계하지 않고, 탈퇴 시 남은 음수 캐시백도 상계하지 않고 감수한다. 지급 전 취소는 B 안에서 끝난다.
 - 메서드 이름·시그니처·type 이름은 C가 정하며, C에게 이슈로 요청했다.
 
+**구현 결과** (11-23 기준)
+
+- 스케줄러(`CashbackPayoutScheduler`)가 `cashback.scheduler.payout-interval-seconds`(기본 3600초, 데모 10초) 간격으로 `CashbackPayoutService`를 돌리고, 한 번에 `payout-batch-size`(기본 200)건을 읽는다. 건별 트랜잭션은 `CashbackPayoutProcessor`가 소유한다. 운영자 수동 실행은 `POST /api/admin/cashback/payouts/run`이며 지급·건너뜀·실패 건수를 돌려준다.
+- 잠금 순서는 지갑 → 적립 건 → 예산이다. 결제 취소의 회수는 결제 → 지갑 → 적립 건 순으로 잡아 서로 교착하지 않는다.
+- 지급 후 취소의 회수는 `CashbackService.cancel`이 `CASHBACK_CLAWBACK`으로 처리한다. 적립 건은 `CLAWED_BACK`이 되고 월 한도는 결제한 달에 되돌리며 예산은 되돌리지 않는다.
+- 탈퇴한 지갑으로의 입금은 지갑이 WAL-002로 거절하고 그 건은 `PENDING`으로 남아 매 주기 재시도된다. 탈퇴 정산이 적립 예정을 어떻게 처리할지는 C와 합의가 필요하다.
+
 ### 3-4. 확정 영수증
 
 결제금액, 적립 캐시백, 지급 예정일, 적용요율, 월 한도 차감, "소수점 이하는 버림" 문구. 계산식은 넣지 않는다. 결제 응답에는 `CashbackService.reserve`의 반환값(적립액, 요율, 지급 예정일, 제외 사유, 월 한도 상태)을 A가 담는다.
@@ -184,7 +192,7 @@ B가 지급 대상을 고르고, 지갑 반영은 C의 API에 요청한다. 지�
 |---|---|
 | A (결제) | `CashbackService.reserve / cancel` 호출(C3~C5). 영수증 필드를 결제 응답에 포함(T2). 월 예산 ID를 `payment`에 둘지 `cashback_earning`에 둘지 협의(A의 스키마가 B에 의존하지 않도록 `cashback_earning` 쪽을 제안) |
 | C (회원·지갑) | B가 C의 지갑 API(`credit`/`debit`)를 호출한다: 지급 배치(C8)와 지급 후 취소의 회수(C5), [3-3](#3-3-적립-지급-배치와-지갑-연동). 이용자 월 한도·적립 내역 조회(C6, C7)는 B가 `CashbackQueryService`와 컨트롤러까지 제공하고, 지갑 화면 합성은 프런트가 한다. C는 B를 호출하지 않는다(의존 한 방향). 탈퇴 시 남은 캐시백·적립 예정 처리는 B와 합동 |
-| D (가맹점·QR·정산·대사) | QR 스캔 조회에 요율·남은 한도(T1). 예산·적립 시계열 API(T6). 대사의 캐시백 잔액 대조에서 B의 적립 합계와 지갑 원장 비교. 수요 예측 차트의 분담 |
+| D (가맹점·QR·정산·대사) | QR 스캔 조회에 요율·남은 한도(T1). 예산·적립 시계열 API(T6). 대사의 캐시백 잔액 대조에서 B의 적립 합계와 지갑 원장 비교. 수요 예측 차트의 분담. **정산 합의(11-23)**: 가맹점 일·월 정산 지급은 결제 총액(`Payment.amount`) 기준이고 캐시백 사용분의 재원은 대사에서 확인한다. 이미 지급된 결제를 취소해 캐시백을 회수해도 가맹점 정산에는 영향이 없다(회수는 이용자 지갑 쪽). 운영자 대시보드는 B가 맡고 D의 가맹점 대시보드와 별개다 |
 
 ## 5. 데이터 모델
 
@@ -205,13 +213,13 @@ DB는 PostgreSQL 기준(11/16 결정, 기획서에는 아직 MySQL 표기)이고
 | `cashback_policy_history` | 정책 변경 이력 | 1 | 구현(#49) | 신규 |
 | `cashback_annual_budget` | 연 예산 | 1 | 구현(#31) | `cashback_budget` 이름 변경(기획서 8절), 예약·지급 합계 추가 |
 | `cashback_monthly_budget` | 월 예산 | 1~2 | 구현(#42, #49) | 배정·이월 유입·예약·지급 분리, 상태, **대비금**, **월 기본 요율**, 중단 예약 시각 |
-| `cashback_budget_transfer` | 이월 이력 | 2 | 예정 | 신규 |
-| `cashback_monthly_limit` | 이용자 월 적립 한도 사용량 | 1 | 예정 | 신규 |
-| `operator_setting` | 운영자 설정 한도(공용: 캐시백 월 적립 한도, 지갑 보유·월 충전 한도) | 1 | 예정(#71) | 신규 |
-| `operator_setting_history` | 설정 변경 이력 | 1 | 예정(#72) | 신규 |
-| `cashback_earning` | 적립 건 | 1 | 예정 | 상태에 제외(`EXCLUDED`)·회수 추가, 제외 사유 코드. 적립 정보의 기준 테이블 |
-| `cashback_budget_state_log` | 중단 상태 전이 이력 | 2 | 예정 | 신규 |
-| `cashback_notice` | 변경 예고·소진 예고·중단 공지 | 3 | 예정 | 신규 |
+| `cashback_budget_transfer` | 이월 이력 | 2 | 구현(#133). 자동 이월(`AUTO`)은 PR #136 | 신규 |
+| `cashback_monthly_limit` | 이용자 월 적립 한도 사용량 | 1 | 구현(#85) | 신규 |
+| `operator_setting` | 운영자 설정 한도(공용: 캐시백 월 적립 한도, 지갑 보유·월 충전 한도) | 1 | 구현(#77, #78) | 신규 |
+| `operator_setting_history` | 설정 변경 이력 | 1 | 구현(#77, #78) | 신규 |
+| `cashback_earning` | 적립 건 | 1 | 구현(#87) | 상태에 제외(`EXCLUDED`)·회수 추가, 제외 사유 코드. 적립 정보의 기준 테이블 |
+| `cashback_budget_state_log` | 중단 상태 전이 이력 | 2 | 구현(#132) | 신규 |
+| `cashback_notice` | 변경 예고·소진 예고·중단 공지 | 3 | PR #152 | 신규 |
 | `cashback_seasonal_index`, `cashback_special_day` | 계절 지수·특일 시드 | 4 | 예정(확장) | 신규 |
 
 ### 5-2. 관계
@@ -221,11 +229,13 @@ erDiagram
   CASHBACK_POLICY ||--o{ CASHBACK_POLICY_HISTORY : "변경 이력"
   CASHBACK_POLICY ||--o{ CASHBACK_EARNING : "적용 정책"
   CASHBACK_ANNUAL_BUDGET ||--|{ CASHBACK_MONTHLY_BUDGET : "월 배정"
-  CASHBACK_MONTHLY_BUDGET ||--o{ CASHBACK_EARNING : "예산 확보"
+  CASHBACK_MONTHLY_BUDGET ||--o{ CASHBACK_EARNING : "예산 확보(limit_month)"
   CASHBACK_MONTHLY_BUDGET ||--o{ CASHBACK_BUDGET_TRANSFER : "이월"
   CASHBACK_MONTHLY_BUDGET ||--o{ CASHBACK_BUDGET_STATE_LOG : "상태 전이"
   CASHBACK_MONTHLY_BUDGET ||--o{ CASHBACK_NOTICE : "공지"
 ```
+
+적립 건과 월 예산은 외래키나 월 예산 ID 컬럼 없이 `limit_month`(적립 건)와 `budget_month`(월 예산)가 같은 달이라는 규칙으로 이어진다(10절 11-21).
 
 외부 참조(값으로만 보관): 적립 건의 `payment_id`(A), `wallet_id`(C). `cashback_monthly_limit`의 이용자는 `wallet_id`로 식별한다(`ReserveCommand`에 이용자 ID가 없고 이용자당 지갑 1개를 전제).
 
@@ -268,8 +278,10 @@ erDiagram
 | `total_amount` | BIGINT | 연 예산 |
 | `reserved_amount` | BIGINT | 확보(예약)한 금액. 지급 전 |
 | `paid_amount` | BIGINT | 지급 완료 금액 |
+| `carried_in_amount` | BIGINT, 기본 0 | 이월 유입. 전년 12월에서 넘어온 금액 |
+| `carried_out_amount` | BIGINT, 기본 0 | 이월 유출. 12월에서 다음 해로 넘긴 금액 |
 
-불변식: `reserved_amount + paid_amount ≤ total_amount`. 월 배정 합계 ≤ `total_amount`.
+남은 예산 = `total_amount + carried_in_amount − carried_out_amount − reserved_amount − paid_amount`. 불변식: `reserved_amount + paid_amount ≤ total_amount + carried_in_amount − carried_out_amount`. 월 배정 합계 ≤ `total_amount`. 같은 해 안의 월 이월은 연 예산을 바꾸지 않고, 12월 → 1월 이월만 양쪽 해의 연 예산을 함께 맞춘다.
 
 **`cashback_monthly_budget`** — 월 예산
 
@@ -280,6 +292,7 @@ erDiagram
 | `budget_month` | 연월, unique | |
 | `allocated_amount` | BIGINT | 월 배정 |
 | `carried_in_amount` | BIGINT | 이월 유입 |
+| `carried_out_amount` | BIGINT, 기본 0 | 이월 유출. 다음 달로 넘긴 금액 |
 | `reserved_amount` | BIGINT | 확보(예약). 지급 전 |
 | `paid_amount` | BIGINT | 지급 완료 |
 | `contingency_amount` | BIGINT | 대비금. 월 시작 시 확정(월 배정의 10%). 예약과 혼동되지 않게 `reserve`가 아닌 이름 |
@@ -287,7 +300,7 @@ erDiagram
 | `status` | VARCHAR | `ACTIVE` / `NOTICED` / `STOPPED` / `CLOSED` |
 | `stop_scheduled_at` | TIMESTAMP, null | 공지 후 중단 예약 시각(`NOTICED`일 때) |
 
-남은 예산 = `allocated_amount + carried_in_amount − reserved_amount − paid_amount`. 확보는 한 번의 조건부 UPDATE로 하며 음수가 되지 않는다. 지급되면 `reserved_amount`가 줄고 `paid_amount`가 같은 만큼 늘어 남은 예산은 변하지 않는다.
+남은 예산 = `allocated_amount + carried_in_amount − carried_out_amount − reserved_amount − paid_amount`. 확보는 한 번의 조건부 UPDATE로 하며 음수가 되지 않는다. 지급되면 `reserved_amount`가 줄고 `paid_amount`가 같은 만큼 늘어 남은 예산은 변하지 않는다.
 
 **`cashback_budget_transfer`** — 이월 이력 (INSERT only)
 
@@ -296,8 +309,10 @@ erDiagram
 | `id` | BIGINT PK | |
 | `from_monthly_budget_id`, `to_monthly_budget_id` | BIGINT | 다음 달로만 이월 |
 | `amount` | BIGINT | |
-| `type` | VARCHAR | `AUTO` / `MANUAL` |
-| `created_by`, `created_at` | | 자동이면 `created_by`는 null |
+| `type` | VARCHAR | `AUTO` / `MANUAL`. 수동 이월(#133)이 구현돼 있고 `AUTO`는 PR #136 |
+| `created_by`, `created_at` | | 자동이면 `created_by`는 null. 인증이 머지되기 전까지 수동 이월도 null |
+
+이월할 때마다 넘기는 달의 `carried_out_amount`와 받는 달의 `carried_in_amount`를 함께 바꾼다. 이월 시점은 `created_at`이라 시계열 조회(T6)가 이월을 날짜별로 되돌려 계산하는 근거가 된다.
 
 **`cashback_monthly_limit`** — 이용자 월 적립 한도 사용량
 
@@ -354,15 +369,15 @@ erDiagram
 | 컬럼 | 설명 |
 |---|---|
 | `monthly_budget_id`, `from_status`, `to_status` | 전이 내용 |
-| `reason` | 자동 판정(공지선·긴급선), 예약 시각 도달, 운영자 공지 후 중단, 긴급 중단, 새 월 복귀 |
-| `remaining_rate` | 당시 남은 예산 % |
+| `reason` | `StateChangeReason`: `AUTO_NOTICE_LINE`(공지선), `AUTO_EMERGENCY_LINE`(긴급선), `SCHEDULED_TIME`(예약 시각 도달), `OPERATOR_NOTICE_STOP`(운영자 공지 후 중단), `OPERATOR_EMERGENCY_STOP`(운영자 긴급 중단). 새 월 복귀는 전이가 아니라 이력을 남기지 않는다 |
+| `remaining_rate` | 당시 남은 예산 비율(소수 비율) |
 | `operator_id`, `occurred_at` | 자동이면 `operator_id`는 null |
 
 **`cashback_notice`** — 공지 (3단계, 세부는 그때 확정)
 
 | 컬럼 | 설명 |
 |---|---|
-| `type` | 정책 변경 예고 / 소진 예고 / 긴급 중단 / 중단 예정 취소 |
+| `type` | `NoticeType`: `POLICY_CHANGE`(정책 변경 예고), `BUDGET_NOTICE`(소진 예고), `EMERGENCY_STOP`(긴급 중단), `STOP_CANCELED`(중단 예정 취소, 되돌리는 전이가 없어 현재 등록하지 않음). 구현은 PR #152 |
 | `content`, `effective_from`, `stop_at`(null) | 문구는 날짜만 쓰고 시각은 쓰지 않는다 |
 | `created_at` | |
 
@@ -377,6 +392,9 @@ erDiagram
 | 11-18 | 월 한도의 이용자 식별을 `wallet_id`로, 적립 상태명을 `PENDING` 기준으로 정리 | `ReserveCommand`에 이용자 ID가 없음 |
 | 11-19 | `cashback_monthly_budget`에 `base_rate` 추가 | 달마다 기본 요율을 두고 달 중에는 인하만 하므로, 인하 구간이 없는 때의 요율을 저장할 곳이 필요하다(9절 17번) |
 | 11-19 | `cashback_policy_history` 구현 | 인하로 만든 구간과 끝낸 구간의 변경 전후 값을 남긴다 |
+| 11-23 | `cashback_annual_budget`에 `carried_in_amount`·`carried_out_amount`, `cashback_monthly_budget`에 `carried_out_amount` 추가 | 수동·자동 이월을 반영한다. 기존 DB에서 `ddl-auto: update`가 깨지지 않게 기본값 0을 둔다. 남은 예산 식이 이월 유출을 뺀다 |
+| 11-23 | `cashback_budget_state_log` 구현 | 상태 전이마다 이력을 남긴다(사유 값은 5-3) |
+| 11-23 | `cashback_notice` 추가(PR #152) | 정책 변경 예고와 소진·긴급 중단 공지를 이용자에게 보여 준다 |
 
 ## 6. 구현 순서 (제안)
 
@@ -417,7 +435,7 @@ erDiagram
 
 | 번호 | 고민 | 방향 |
 |---|---|---|
-| 1 | 공지 후 상태 복귀(결제 취소로 예산이 복원되거나 예산을 늘리면 공지선 위로 올라감) | 공지선보다 조금 더 올라야 `ACTIVE`로 복귀(히스테리시스). 복귀 시 "중단 예정이 취소됐어요" 공지 |
+| 1 | 공지 후 상태 복귀(결제 취소로 예산이 복원되거나 예산을 늘리면 공지선 위로 올라감) | 공지선보다 조금 더 올라야 `ACTIVE`로 복귀(히스테리시스). 복귀 시 "중단 예정이 취소됐어요" 공지. **미구현(11-23)**: 상태를 되돌리는 전이는 없고, 중단은 다음 달 새 월 예산이 열릴 때만 풀린다. 필요해지면 이슈로 다룬다 |
 | 2 | 월 경계(중단 중에 월이 바뀜, 정시 중단이 월말에 걸림) | 새 월 예산이 열리면 자동 `ACTIVE`. 월 판단은 접수 시각 기준. 남은 예산은 다음 달로 이월 |
 | 3 | 정시가 되었는데 예산이 남은 경우 | 약속을 지키기 위해 중단하고 남은 금액은 이월 |
 | 4 | 공지가 이용자에게 닿는가 | 결제 전 미리보기 화면의 배너. 푸시는 MVP 밖 |
@@ -482,4 +500,11 @@ erDiagram
 | 11-20 | #69 | 지갑 한도 적용 규칙: 보유 한도는 데브머니 잔액만 대상이고 캐시백 입금(`CASHBACK_EARN`)은 보유 한도 검사 없이 항상 반영한다. 월 충전 누적은 원장의 이번 달 충전 거래 합계로 계산하고, 환불해도 월 충전 한도는 복원하지 않는다(C가 결정) | 한도 때문에 캐시백 입금이 실패하면 적립이 지급 대기에 계속 남는다. 환불은 데브머니만 되므로 캐시백은 현금화 수단이 아니다. 월 충전 한도는 누적 충전액 기준이라 복원하면 충전과 환불을 반복해 우회할 수 있다. 충전이 지갑 행 락 안에서 일어나므로 합계 조회가 안전하다 |
 | 11-20 | #42, P5 | 예산 락 순서는 연 예산 → 월 예산으로 고정한다. **판단 근거** ① 순서의 목적은 모든 경로가 같은 순서로 잡아 데드락을 막는 것이다. ② 월 배정 합계 ≤ 연 예산 검증은 서로 다른 월 행에 걸쳐 있어, 공통 행인 연 예산 행을 먼저 잠가야 직렬화된다. ③ 결제 확보가 월 → 연이면 월 배정 수정(연 → 월)과 서로 기다려 데드락이 난다. ④ "핫한 락은 마지막"은 지갑·QR 대비 예산의 순서에 적용한다. 연·월은 끝쪽에서 연달아 잡고 커밋까지 유지하므로 둘 사이의 순서는 대기 시간에 거의 영향이 없다. ⑤ 일반 SELECT는 행 락을 잡지 않으므로 조회가 많다는 것은 순서의 기준이 아니다 | 같은 해에서 연 행은 모든 달의 결제가, 월 행은 그 달의 결제만 건드려 연 행이 같거나 더 뜨겁다. 따라서 "더 뜨거운 쪽을 나중에"가 순서 기준이 될 수 없고, 일관성과 합계 검증의 필요가 기준이다. 예약(P5)·월 배정 수정·연 총액 변경이 모두 이 순서를 따른다 |
 | 11-21 | #73 PR 2 | 적립 건에 `monthly_budget_id` 컬럼을 두지 않고 `limit_month`로 대신한다. `CashbackReserveResponse`에 `monthlyLimitRemaining`(이번 달 남은 월 적립 한도, 이번 결제 적립액을 뺀 값, 제외 건도 포함, 음수는 0)을 추가한다. 월 예산이 없는 달은 `BUDGET_EXHAUSTED`로 제외한다 | 예산 월과 한도 월이 모두 접수 시각의 월이라 `limit_month`로 취소 때 되돌릴 달을 알 수 있고, 중복 컬럼은 어긋날 위험만 만든다. 남은 한도 필드는 A의 협의 #13 (가)로, 영수증의 월 한도 상태를 채우는 데 쓴다. 구현·검증은 PR #87 |
-| 11-23 | #74 | 적립 취소(`cancel`, 지급 전)는 `PENDING` 건을 `where status = PENDING` 조건부 UPDATE 한 문장으로 `CANCELED`로 바꾸고, 성공했을 때만 월 한도(결제한 달 `limit_month`)와 예산(연 → 월, 마지막)을 되돌린다. 적립 건이 없거나 제외·이미 취소된 건은 아무것도 하지 않고, 이미 지급된(`PAID`) 건은 새 에러 코드 CSH-010(409)으로 거절한다. 지급 후 회수는 지급 배치 이슈에서 구현한다 | 조건부 전환이라 지급 배치와 동시에 와도 한쪽만 성공하고, 같은 결제를 여러 번 취소해도 한 번만 되돌린다. 지급된 건을 몰래 무시하면 결제는 취소됐는데 캐시백은 남는 불일치가 숨겨지므로, 회수를 구현하기 전까지는 명시적으로 거절한다. 구현·검증은 PR #116
+| 11-23 | #74 | 적립 취소(`cancel`, 지급 전)는 `PENDING` 건을 `where status = PENDING` 조건부 UPDATE 한 문장으로 `CANCELED`로 바꾸고, 성공했을 때만 월 한도(결제한 달 `limit_month`)와 예산(연 → 월, 마지막)을 되돌린다. 적립 건이 없거나 제외·이미 취소된 건은 아무것도 하지 않고, 이미 지급된(`PAID`) 건은 새 에러 코드 CSH-010(409)으로 거절한다. 지급 후 회수는 지급 배치 이슈에서 구현한다 (11-23 변경: 회수를 #119에서 구현하면서 이 거절과 CSH-010은 삭제했다. 아래 11-23 행 참고) | 조건부 전환이라 지급 배치와 동시에 와도 한쪽만 성공하고, 같은 결제를 여러 번 취소해도 한 번만 되돌린다. 지급된 건을 몰래 무시하면 결제는 취소됐는데 캐시백은 남는 불일치가 숨겨지므로, 회수를 구현하기 전까지는 명시적으로 거절한다. 구현·검증은 PR #116
+| 11-23 | #119, #128 | 지급 배치와 회수를 구현했다. 지급 후 취소(`PAID`)는 지갑 캐시백 잔액에서 회수하고(`CASHBACK_CLAWBACK`, 음수 허용) 적립 건을 `CLAWED_BACK`으로 바꾸며, 월 한도는 결제한 달에 되돌리고 예산은 되돌리지 않는다. 에러 코드 CSH-010은 삭제했다 | 지급 전 취소와 달리 지급된 예산은 이미 집행됐으므로 복구하지 않는다. 회수를 구현하자 "지급된 건 취소 거절"이 필요 없어졌다. 번호는 다시 쓰지 않아 CSH-010이 비어 있다. 잠금 순서는 지급이 지갑 → 적립 건 → 예산, 취소가 적립 건 → 한도 → 예산이고 결제 취소는 결제 → 지갑 → 적립 건이다(3-3) |
+| 11-23 | #133 | 수동 이월은 다음 달로만, 부분 이월이 가능하고 금액은 남은 예산 이하여야 한다(초과는 CSH-011). 12월에서 넘기면 다음 해 1월로 가며 이때만 연 예산의 `carried_out/in_amount`도 맞춘다. 중단·마감 상태와 상관없이 넘길 수 있다 | 연 예산이 그대로면 받은 금액을 연 예산 한도 때문에 쓰지 못한다. 이월 시점의 기준이 되도록 이력의 `created_at`을 남긴다 |
+| 11-23 | #132, #135 | 중단 상태 전이를 조건부 UPDATE 한 문장으로 구현하고, 운영자 수동 공지 후 중단·긴급 중단(`confirm` 필요)을 같은 전이 로직과 이력(`OPERATOR_*`)으로 얹었다. 이미 중단·마감된 달은 CSH-012(409)로 거절한다. 월 예산 응답에 소진율·남은 비율·경고(`NONE`/`NOTICE_LINE`/`EMERGENCY_LINE`)를 넣었다(#131) | 같은 판정이 동시에 와도 한 번만 전이하고 이력이 한 건만 남는다. 공지 후 복귀는 만들지 않았다(9절 1번) |
+| 11-23 | 정리 | **구현과 달라진 점**: ① C6 월 기준은 접수 시각의 한국 시간 월이고, 월 예산 확보와 한도 차감이 같은 달이라 취소 때 `limit_month`로 되돌린다. ② C7 적립 내역의 "음수 상계 표시"는 구현하지 않았다. 회수로 음수가 된 캐시백 잔액은 다음 입금에서 지갑이 상계하고 적립 내역은 상태(`CLAWED_BACK`)만 보여 준다. ③ 정책 변경 이력 조회와 월 예산 현황은 2절 경로로 확정했다 | 기획 단계의 표현을 구현에 맞춘다 |
+| 11-23 | 에러 코드 | CSH-010(지급 후 취소 거절)은 삭제했고 비워 둔다. CSH-011(`TRANSFER_EXCEEDS_REMAINING`, 이월 금액이 남은 예산 초과)과 CSH-012(`BUDGET_ALREADY_STOPPED`, 이미 중단·마감)를 추가했다 | 번호 충돌을 막기 위해 삭제한 번호를 다시 쓰지 않는다 |
+| 11-23 | #69 | 지갑 한도 규칙을 C가 구현했고(#95, #105 머지) 규칙은 위 11-20 #69 행대로 확정한다. 이슈 #69는 확인 후 닫는다 | 보유 한도는 데브머니 잔액만, 캐시백 입금은 항상 반영, 월 충전 한도는 환불해도 복원하지 않는다 |
+| 11-23 | 법 조문 | 전자금융거래법 제23조, 시행령 제13조의 원문과 2026년 개정 여부는 아직 확인하지 못했다 | 11-20 #69 행의 확인 필요 사항이 그대로 남아 있다 |

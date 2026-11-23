@@ -11,6 +11,7 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackNoticeRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyLimitRepository;
 import com.back.nbe1214finalhot6.domain.wallet.entity.Wallet;
 import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransaction;
@@ -58,6 +59,7 @@ class CashbackPayoutServiceTest {
   @Autowired private CashbackMonthlyLimitRepository limitRepository;
   @Autowired private CashbackAnnualBudgetRepository annualBudgetRepository;
   @Autowired private CashbackMonthlyBudgetRepository monthlyBudgetRepository;
+  @Autowired private CashbackNoticeRepository noticeRepository;
   @Autowired private WalletRepository walletRepository;
   @Autowired private WalletTransactionRepository walletTransactionRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
@@ -76,6 +78,7 @@ class CashbackPayoutServiceTest {
     limitRepository.deleteAll();
     walletTransactionRepository.deleteAll();
     walletRepository.deleteAll();
+    noticeRepository.deleteAll(); // 상태 전이·요율 인하가 남긴 공지가 다른 테스트에 섞이지 않게 한다
     monthlyBudgetRepository.deleteAll();
     annualBudgetRepository.deleteAll();
   }

@@ -46,7 +46,7 @@ import org.springframework.test.web.servlet.RequestBuilder;
 // 로그인한 사용자(허용 역할)로 호출해서 보안 설정을 거쳐도 통과하는지 함께 확인한다.
 @WebMvcTest(MerchantController.class)
 @Import(SecurityConfig.class)
-@WithAuthUser(userId = 1L, role = UserRole.OWNER) // 허용 역할의 회원(1번)으로 로그인한 상태로 호출한다
+@WithAuthUser(userId = 1L, role = UserRole.OWNER) // 허용 역할의 점주(1번 회원)로 로그인한 상태로 호출한다
 class MerchantControllerTest {
 
   @Autowired private MockMvc mockMvc;
