@@ -1,6 +1,7 @@
 package com.back.nbe1214finalhot6.domain.cashback.dto;
 
 import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetStatus;
+import com.back.nbe1214finalhot6.domain.cashback.entity.BudgetWarning;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import java.math.BigDecimal;
 
@@ -11,6 +12,9 @@ import java.math.BigDecimal;
  * @param contingencyAmount 월 시작 시 확정한 대비금
  * @param carriedOutAmount 다음 달로 넘긴 금액
  * @param remainingAmount 아직 확보하지 않은 남은 예산(배정 + 이월 유입 - 이월 유출 - 예약 - 지급)
+ * @param usedRate 소진율 = (확보 + 지급) ÷ (배정 + 이월 유입 - 이월 유출). 소수 비율(0.25 = 25%), 전체 예산이 0 이하면 0
+ * @param remainingRate 남은 예산 비율 = 남은 예산 ÷ (배정 + 이월 유입 - 이월 유출). 전체 예산이 0 이하면 0
+ * @param warning 대비금 경고. 남은 예산이 대비금 이하면 {@code NOTICE_LINE}, 대비금 × 긴급선 비율 이하면 {@code EMERGENCY_LINE}
  */
 public record MonthlyBudgetResponse(
     int budgetYear,
@@ -22,10 +26,14 @@ public record MonthlyBudgetResponse(
     long paidAmount,
     long contingencyAmount,
     long remainingAmount,
+    BigDecimal usedRate,
+    BigDecimal remainingRate,
+    BudgetWarning warning,
     BigDecimal baseRate,
     BudgetStatus status) {
 
-  public static MonthlyBudgetResponse from(CashbackMonthlyBudget budget) {
+  /** @param emergencyRatio 긴급선 비율(`cashback.emergency-ratio`) */
+  public static MonthlyBudgetResponse from(CashbackMonthlyBudget budget, BigDecimal emergencyRatio) {
     return new MonthlyBudgetResponse(
         budget.getBudgetYear(),
         budget.getBudgetMonth(),
@@ -36,6 +44,9 @@ public record MonthlyBudgetResponse(
         budget.getPaidAmount(),
         budget.getContingencyAmount(),
         budget.remainingAmount(),
+        budget.usedRate(),
+        budget.remainingRate(),
+        budget.warning(emergencyRatio),
         budget.getBaseRate(),
         budget.getStatus());
   }

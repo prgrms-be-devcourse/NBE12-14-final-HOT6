@@ -142,6 +142,49 @@ public class CashbackMonthlyBudget {
     return allocatedAmount + carriedInAmount - carriedOutAmount - reservedAmount - paidAmount;
   }
 
+  /** 비율의 분모. 그 달에 쓸 수 있는 전체 예산(배정 + 이월 유입). */
+  public long totalBudget() {
+    return allocatedAmount + carriedInAmount;
+  }
+
+  /** 소진율 = (확보 + 지급) ÷ (배정 + 이월 유입). 전체 예산이 0 이하면 0 이다. 소수 비율이고 소수 넷째 자리까지. */
+  public BigDecimal usedRate() {
+    return ratio(reservedAmount + paidAmount);
+  }
+
+  /** 남은 예산 비율 = 남은 예산 ÷ (배정 + 이월 유입). 전체 예산이 0 이하면 0 이다. 소수 비율이고 소수 넷째 자리까지. */
+  public BigDecimal remainingRate() {
+    return ratio(remainingAmount());
+  }
+
+  /**
+   * 대비금 경고 단계. 남은 예산이 대비금 × 긴급선 비율 이하면 긴급선, 대비금 이하면 공지선이고 그 위는 경고 없음이다. 기준선과 같은 금액은 해당 단계로
+   * 본다. 저장된 값이 아니라 현재 금액으로 계산한다.
+   *
+   * @param emergencyRatio 긴급선 비율(예: 0.5 = 대비금의 절반)
+   */
+  public BudgetWarning warning(BigDecimal emergencyRatio) {
+    long remaining = remainingAmount();
+    if (BigDecimal.valueOf(remaining)
+            .compareTo(BigDecimal.valueOf(contingencyAmount).multiply(emergencyRatio))
+        <= 0) {
+      return BudgetWarning.EMERGENCY_LINE;
+    }
+    if (remaining <= contingencyAmount) {
+      return BudgetWarning.NOTICE_LINE;
+    }
+    return BudgetWarning.NONE;
+  }
+
+  private BigDecimal ratio(long amount) {
+    long total = totalBudget();
+    if (total <= 0) {
+      return BigDecimal.ZERO.setScale(CashbackPolicy.RATE_SCALE);
+    }
+    return BigDecimal.valueOf(amount)
+        .divide(BigDecimal.valueOf(total), CashbackPolicy.RATE_SCALE, RoundingMode.HALF_UP);
+  }
+
   public static void validateMonth(int budgetMonth) {
     if (budgetMonth < 1 || budgetMonth > 12) {
       throw new BusinessException(CashbackErrorCode.INVALID_BUDGET, "월은 1~12 여야 합니다");
