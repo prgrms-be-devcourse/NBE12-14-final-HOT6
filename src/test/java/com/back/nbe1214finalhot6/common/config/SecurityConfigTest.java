@@ -93,6 +93,8 @@ class SecurityConfigTest {
         Arguments.of("POST", "/api/admin/cashback/payouts/run", 401, 403, 403, 200),
         Arguments.of("GET", "/api/admin/cashback/policies", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/cashback/budget/transfers", 401, 403, 403, 200),
+        Arguments.of("GET", "/api/admin/settlements/reconciliation", 401, 403, 403, 200),
+        Arguments.of("POST", "/api/admin/settlements/reconciliation/run", 401, 403, 403, 200),
         // 시민 기능(OWNER 포함, ADMIN 제외)
         Arguments.of("POST", "/api/payments", 401, 200, 200, 403),
         Arguments.of("GET", "/api/payments/by-key/k1", 401, 200, 200, 403),
