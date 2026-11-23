@@ -1,0 +1,82 @@
+package com.back.nbe1214finalhot6.domain.cashback.controller;
+
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.back.nbe1214finalhot6.common.config.SecurityConfig;
+import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeResponse;
+import com.back.nbe1214finalhot6.domain.cashback.entity.NoticeType;
+import com.back.nbe1214finalhot6.domain.cashback.service.CashbackNoticeService;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+// 인증 없이(로그인·CSRF 토큰 없이) 호출해서 임시 보안 설정(경로 허용)도 함께 확인한다.
+@WebMvcTest(CashbackNoticeController.class)
+@Import(SecurityConfig.class)
+class CashbackNoticeControllerTest {
+
+  @Autowired private MockMvc mockMvc;
+  @MockitoBean private CashbackNoticeService noticeService;
+
+  // 목적: 로그인 없이 조회되고 공지 종류·문구·적용 시작일·중단 예정일이 공통 응답 형식으로 내려가며 종류·페이지 파라미터가 서비스에 전달되는지 확인한다.
+  @Test
+  @DisplayName("공지 목록은 로그인 없이 조회되고 파라미터를 서비스에 넘긴다")
+  void list_ok() throws Exception {
+    NoticeResponse notice =
+        new NoticeResponse(
+            3L,
+            NoticeType.POLICY_CHANGE,
+            "12월 1일부터 적립률이 5%로 바뀌어요.",
+            LocalDate.of(2026, 12, 1),
+            null,
+            LocalDateTime.of(2026, 11, 18, 9, 0));
+    given(noticeService.list(NoticeType.POLICY_CHANGE, 1, 5))
+        .willReturn(new PageResponse<>(List.of(notice), 1, 5, 6L, 2));
+
+    mockMvc
+        .perform(
+            get("/api/notices").param("type", "POLICY_CHANGE").param("page", "1").param("size", "5"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.totalElements").value(6))
+        .andExpect(jsonPath("$.data.content[0].type").value("POLICY_CHANGE"))
+        .andExpect(jsonPath("$.data.content[0].content").value("12월 1일부터 적립률이 5%로 바뀌어요."))
+        .andExpect(jsonPath("$.data.content[0].effectiveFrom").value("2026-12-01"))
+        .andExpect(jsonPath("$.data.content[0].stopAt").doesNotExist());
+  }
+
+  // 목적: 종류·페이지를 생략하면 전체, 첫 페이지, 기본 크기 20 으로 조회하는지 확인한다.
+  @Test
+  @DisplayName("파라미터를 생략하면 전체 첫 페이지를 기본 크기로 조회한다")
+  void list_defaults() throws Exception {
+    given(noticeService.list(null, 0, 20)).willReturn(new PageResponse<>(List.of(), 0, 20, 0L, 0));
+
+    mockMvc
+        .perform(get("/api/notices"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.content").isEmpty());
+
+    verify(noticeService).list(null, 0, 20);
+  }
+
+  // 목적: 알 수 없는 종류나 범위를 벗어난 페이지 번호·크기는 400 으로 걸러지는지 확인한다.
+  @Test
+  @DisplayName("잘못된 종류와 페이지 파라미터는 400")
+  void list_invalidParameters() throws Exception {
+    mockMvc.perform(get("/api/notices").param("type", "NOPE")).andExpect(status().isBadRequest());
+    mockMvc.perform(get("/api/notices").param("page", "-1")).andExpect(status().isBadRequest());
+    mockMvc.perform(get("/api/notices").param("size", "0")).andExpect(status().isBadRequest());
+  }
+}

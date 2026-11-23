@@ -24,6 +24,7 @@ public class SecurityConfig {
                     "/api/cashback/**",
                     "/api/auth/login",
                     "/api/merchants/**",
+                    "/api/notices/**",
                     "/api/payments/**",
                     "/api/qr/**",
                     "/api/users/signup")
