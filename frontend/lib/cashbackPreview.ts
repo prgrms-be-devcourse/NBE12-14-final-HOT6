@@ -31,7 +31,7 @@ export type Preview = {
 };
 
 export function computePreview(amount: number, scenario: Scenario): Preview {
-  const rate = 2.0;
+  const rate = 10;
   const eligible = scenario !== "notEligible";
   const paused = scenario === "paused";
   const monthlyRemaining = scenario === "limitExceeded" ? 0 : wallet.monthlyLimit - wallet.monthlyCashback;
@@ -47,6 +47,6 @@ export function computePreview(amount: number, scenario: Scenario): Preview {
     expected: reason === "NONE" ? raw : 0,
     monthlyRemaining,
     reason,
-    upcoming: { rate: 1.5, from: "12월 1일" },
+    upcoming: { rate: 5, from: "12월 1일" },
   };
 }

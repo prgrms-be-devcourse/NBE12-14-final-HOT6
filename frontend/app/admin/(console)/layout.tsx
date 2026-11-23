@@ -1,17 +1,26 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import AdminNav from "@/components/AdminNav";
+import { ICONS } from "@/components/icons";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen md:flex">
-      <aside className="border-b border-zinc-300 bg-white p-4 md:w-56 md:border-b-0 md:border-r">
-        <Logo className="mb-1 text-lg" />
-        <p className="mb-4 text-xs text-zinc-500">운영자 콘솔</p>
+    <div className="web-zoom web-screen md:flex">
+      <aside className="bg-brand-600 p-4 text-white md:w-60 md:shrink-0">
+        <Logo inverse className="mb-1 text-lg text-white" />
+        <p className="mb-5 text-xs text-white/75">운영팀 콘솔</p>
         <AdminNav />
-        <Link href="/admin/login" className="mt-4 block px-3 py-2 text-sm text-zinc-500 hover:text-zinc-900">로그아웃</Link>
+        <Link href="/admin/login" className="mt-4 block rounded-lg px-3 py-2 text-sm text-white/80 hover:bg-white/10">로그아웃</Link>
       </aside>
-      <main className="flex-1 p-5 md:p-8">{children}</main>
+      <main className="flex-1 p-5 md:p-8">
+        <div className="mx-auto mb-3 flex max-w-5xl justify-end">
+          <Link href="/" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-200">
+            {ICONS.home}
+            홈으로
+          </Link>
+        </div>
+        {children}
+      </main>
     </div>
   );
 }

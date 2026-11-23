@@ -1,11 +1,13 @@
 import Link from "next/link";
 import Countdown from "@/components/Countdown";
 import Field from "@/components/Field";
+import HomeLink from "@/components/HomeLink";
 import { user } from "@/lib/mock";
 
 export default function LockedPage() {
   return (
     <div className="flex flex-1 flex-col px-5 pt-14">
+      <HomeLink />
       <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border-2 border-red-700 text-2xl font-bold text-red-700">
         !
       </div>

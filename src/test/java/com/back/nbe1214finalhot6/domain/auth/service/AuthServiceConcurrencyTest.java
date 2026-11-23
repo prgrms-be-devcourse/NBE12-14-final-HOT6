@@ -6,6 +6,9 @@ import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.auth.dto.SignupRequest;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountTransactionRepository;
+import com.back.nbe1214finalhot6.domain.wallet.repository.WalletRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,9 +35,16 @@ class AuthServiceConcurrencyTest {
 
   @Autowired AuthService authService;
   @Autowired UserRepository userRepository;
+  @Autowired AccountRepository accountRepository;
+  @Autowired AccountTransactionRepository accountTransactionRepository;
+  @Autowired WalletRepository walletRepository;
 
+  // 가입이 만든 계좌·지갑이 남으면 회원 ID(user_id)를 재사용하는 다른 지갑 테스트와 유니크 충돌이 나므로 함께 정리
   @AfterEach
   void cleanUp() {
+    accountTransactionRepository.deleteAll();
+    walletRepository.deleteAll();
+    accountRepository.deleteAll();
     userRepository.deleteAll();
   }
 

@@ -9,6 +9,7 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
+import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,7 @@ public class MerchantService {
   private static final int MAX_PAGE_SIZE = 50;
 
   private final MerchantRepository merchantRepository;
+  private final MerchantWalletService merchantWalletService;
 
   @Transactional
   public MerchantRegisterResponse register(MerchantRegisterRequest request) {
@@ -33,6 +35,7 @@ public class MerchantService {
                 request.name(),
                 request.address(),
                 request.resolveCashbackEligible()));
+    merchantWalletService.createFor(merchant.getId());
 
     return MerchantRegisterResponse.from(merchant);
   }

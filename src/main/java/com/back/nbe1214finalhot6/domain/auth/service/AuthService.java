@@ -7,6 +7,7 @@ import com.back.nbe1214finalhot6.domain.auth.entity.User;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
+import com.back.nbe1214finalhot6.domain.wallet.service.WalletOpeningService;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
@@ -21,6 +22,7 @@ public class AuthService {
 
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
+  private final WalletOpeningService walletOpeningService;
 
   @Transactional
   public SignupResponse signup(SignupRequest request) {
@@ -41,6 +43,9 @@ public class AuthService {
             request.name(), request.email(), request.phone(), passwordHash, pinHash, UserRole.USER);
 
     User saved = saveOrThrowDuplicate(user);
+
+    // 같은 트랜잭션에서 모의계좌·가입 보너스 원장·지갑 생성. 하나라도 실패하면 회원 저장까지 롤백됨
+    walletOpeningService.open(saved.getId());
 
     return SignupResponse.from(saved);
   }

@@ -15,7 +15,7 @@ const TABS = [
 export default function TabBar() {
   const path = usePathname();
   return (
-    <nav className="sticky bottom-0 mt-auto grid grid-cols-5 border-t border-slate-200 bg-white" aria-label="하단 메뉴">
+    <nav className="sticky bottom-0 mt-auto grid grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]" aria-label="하단 메뉴">
       {TABS.map((t) => {
         const on = t.match.some((m) => path.startsWith(m));
         return (
@@ -23,7 +23,7 @@ export default function TabBar() {
             key={t.href}
             href={t.href}
             aria-current={on ? "page" : undefined}
-            className={`flex flex-col items-center gap-1 pb-2.5 pt-2.5 text-[12px] tracking-tight ${on ? "font-bold text-blue-600" : "text-slate-500"}`}
+            className={`flex flex-col items-center gap-1 pb-2.5 pt-2 text-[12px] tracking-tight ${on ? "border-t-2 border-brand-600 font-bold text-brand-600" : "border-t-2 border-transparent text-slate-500"}`}
           >
             {t.icon}
             {t.label}

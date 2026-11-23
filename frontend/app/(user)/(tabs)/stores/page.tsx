@@ -17,6 +17,7 @@ export default function StoresPage() {
   useEffect(() => {
     const c = loadCtx();
     if (c.merchantName && c.lat !== undefined && c.lng !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
       setMine({
         id: "mine", name: c.merchantName, category: (c.category as Category) ?? "기타", address: c.merchantAddress ?? "",
         lat: c.lat, lng: c.lng, eligible: c.eligible ?? true, open: true, mine: true,
@@ -60,7 +61,7 @@ export default function StoresPage() {
             <span className="flex items-center gap-1"><i className="inline-block h-3 w-3 rounded-full border-2 border-emerald-500 bg-white" />적립 가능</span>
             <span className="flex items-center gap-1"><i className="inline-block h-3 w-3 rounded-full border-2 border-slate-400 bg-white" />적립 제외</span>
           </span>
-          <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" className="h-3.5 w-3.5 accent-blue-600" checked={onlyEligible} onChange={(e) => setOnlyEligible(e.target.checked)} />적립 가능만 보기</label>
+          <label className="flex cursor-pointer items-center gap-1.5"><input type="checkbox" className="h-3.5 w-3.5 accent-brand-600" checked={onlyEligible} onChange={(e) => setOnlyEligible(e.target.checked)} />적립 가능만 보기</label>
         </div>
 
         {sel && (
@@ -98,7 +99,6 @@ export default function StoresPage() {
             ))}
           </ul>
         )}
-        <p className="note">가맹점 목록 API 연동 전이라 예시 데이터와 내가 등록한 가맹점이 표시됩니다.</p>
       </div>
     </>
   );

@@ -24,7 +24,7 @@ export default function MyPage() {
           <Link href="/my/profile" className="btn btn-outline btn-sm !w-auto">내정보 수정</Link>
         </section>
         <section className="grid grid-cols-2 gap-2">
-          <div className="card-gray !p-3"><div className="note">지갑 잔액</div><div className="mt-0.5 font-bold text-blue-900">{won(wallet.devMoney)}</div></div>
+          <div className="card-gray !p-3"><div className="note">지갑 잔액</div><div className="mt-0.5 font-bold text-slate-900">{won(wallet.devMoney)}</div></div>
           <div className="card-gray !p-3"><div className="note">이번 달 캐시백</div><div className="mt-0.5 font-bold text-emerald-600">{won(wallet.monthlyCashback)}</div></div>
         </section>
         <ul className="card !p-0">

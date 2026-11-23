@@ -1,0 +1,8 @@
+.git
+.gradle
+.idea
+.claude
+build
+frontend
+docs
+.env

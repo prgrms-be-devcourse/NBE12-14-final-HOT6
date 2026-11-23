@@ -19,9 +19,18 @@ export default function StoreMap({ stores, selectedId, onSelect, height = 280 }:
   const el = useRef<HTMLDivElement>(null);
   const ref = useRef<{ map: LMap; L: typeof import("leaflet"); markers: Map<string, LMarker> } | null>(null);
   const select = useRef(onSelect);
-  select.current = onSelect;
   const latest = useRef({ stores, selectedId });
-  latest.current = { stores, selectedId };
+  useEffect(() => {
+    select.current = onSelect;
+    latest.current = { stores, selectedId };
+  });
+
+  const fit = () => {
+    const r = ref.current;
+    const list = latest.current.stores;
+    if (!r || list.length === 0) return;
+    r.map.fitBounds(r.L.latLngBounds(list.map((s) => [s.lat, s.lng] as [number, number])), { padding: [36, 36], maxZoom: 16 });
+  };
 
   const draw = () => {
     const r = ref.current;
@@ -63,21 +72,12 @@ export default function StoreMap({ stores, selectedId, onSelect, height = 280 }:
       ref.current?.map.remove();
       ref.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const fit = () => {
-    const r = ref.current;
-    const list = latest.current.stores;
-    if (!r || list.length === 0) return;
-    r.map.fitBounds(r.L.latLngBounds(list.map((s) => [s.lat, s.lng] as [number, number])), { padding: [36, 36], maxZoom: 16 });
-  };
 
   // 검색·필터로 목록이 바뀌면 다시 그리고 범위를 맞춘다
   useEffect(() => {
     draw();
     fit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stores]);
 
   // 선택이 바뀌면 마커 강조 + 그 위치로 이동
