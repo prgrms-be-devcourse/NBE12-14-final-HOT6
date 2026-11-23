@@ -142,17 +142,17 @@ public class CashbackMonthlyBudget {
     return allocatedAmount + carriedInAmount - carriedOutAmount - reservedAmount - paidAmount;
   }
 
-  /** 비율의 분모. 그 달에 쓸 수 있는 전체 예산(배정 + 이월 유입). */
+  /** 비율의 분모. 그 달에 쓸 수 있는 전체 예산(배정 + 이월 유입 - 이월 유출). */
   public long totalBudget() {
-    return allocatedAmount + carriedInAmount;
+    return allocatedAmount + carriedInAmount - carriedOutAmount;
   }
 
-  /** 소진율 = (확보 + 지급) ÷ (배정 + 이월 유입). 전체 예산이 0 이하면 0 이다. 소수 비율이고 소수 넷째 자리까지. */
+  /** 소진율 = (확보 + 지급) ÷ (배정 + 이월 유입 - 이월 유출). 전체 예산이 0 이하면 0 이다. 소수 비율이고 소수 넷째 자리까지. */
   public BigDecimal usedRate() {
     return ratio(reservedAmount + paidAmount);
   }
 
-  /** 남은 예산 비율 = 남은 예산 ÷ (배정 + 이월 유입). 전체 예산이 0 이하면 0 이다. 소수 비율이고 소수 넷째 자리까지. */
+  /** 남은 예산 비율 = 남은 예산 ÷ (배정 + 이월 유입 - 이월 유출). 전체 예산이 0 이하면 0 이다. 소수 비율이고 소수 넷째 자리까지. */
   public BigDecimal remainingRate() {
     return ratio(remainingAmount());
   }

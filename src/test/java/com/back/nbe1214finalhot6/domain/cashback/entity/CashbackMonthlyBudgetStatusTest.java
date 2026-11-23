@@ -46,6 +46,34 @@ class CashbackMonthlyBudgetStatusTest {
     assertThat(budget.remainingRate()).isEqualByComparingTo("0.6000");
   }
 
+  // 목적: 다음 달로 넘긴 금액(이월 유출)이 전체 예산(분모)에서 빠지는지 확인한다. 배정 1,000,000 에서 250,000 을 넘기고 150,000 을 확보했으면 전체는
+  // 750,000 이고 소진율 20%, 남은 비율 80%(남은 예산 600,000)여야 한다. 넘긴 금액을 분모에 두면 소진율 15% 로 어긋난다.
+  @Test
+  @DisplayName("이월 유출은 전체 예산에서 빠진다")
+  void rates_excludeCarriedOut() {
+    CashbackMonthlyBudget budget = budget(1_000_000L, 0L, 150_000L, 0L);
+    ReflectionTestUtils.setField(budget, "carriedOutAmount", 250_000L);
+
+    assertThat(budget.totalBudget()).isEqualTo(750_000L);
+    assertThat(budget.remainingAmount()).isEqualTo(600_000L);
+    assertThat(budget.usedRate()).isEqualByComparingTo("0.2000");
+    assertThat(budget.remainingRate()).isEqualByComparingTo("0.8000");
+  }
+
+  // 목적: 이월로 남은 예산이 줄어 대비금 이하가 되면 경고가 바뀌는지 확인한다(대비금 100,000, 남은 예산 100,000 이 공지선).
+  @Test
+  @DisplayName("이월 유출로 남은 예산이 줄면 경고 단계가 올라간다")
+  void warning_followsCarriedOut() {
+    CashbackMonthlyBudget budget = budget(1_000_000L, 0L, 0L, 0L);
+    assertThat(budget.warning(EMERGENCY_RATIO)).isEqualTo(BudgetWarning.NONE);
+
+    ReflectionTestUtils.setField(budget, "carriedOutAmount", 900_000L);
+
+    assertThat(budget.warning(EMERGENCY_RATIO)).isEqualTo(BudgetWarning.NOTICE_LINE);
+    ReflectionTestUtils.setField(budget, "carriedOutAmount", 950_000L);
+    assertThat(budget.warning(EMERGENCY_RATIO)).isEqualTo(BudgetWarning.EMERGENCY_LINE);
+  }
+
   // 목적: 나누어 떨어지지 않는 비율이 소수 넷째 자리에서 반올림되는지 확인한다. 1 ÷ 3 = 0.3333.
   @Test
   @DisplayName("나누어 떨어지지 않는 비율은 소수 넷째 자리까지 반올림한다")
