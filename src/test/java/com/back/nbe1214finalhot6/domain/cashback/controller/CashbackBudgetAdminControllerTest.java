@@ -34,7 +34,7 @@ class CashbackBudgetAdminControllerTest {
   @MockitoBean private CashbackBudgetService budgetService;
 
   private AnnualBudgetResponse sample() {
-    return new AnnualBudgetResponse(2026, 1_000_000L, 0L, 0L, 1_000_000L);
+    return new AnnualBudgetResponse(2026, 1_000_000L, 0L, 0L, 0L, 0L, 1_000_000L);
   }
 
   // 목적: PUT 이 200 과 공통 응답 형식으로 내려가고 금액 필드가 그대로 나오는지 확인한다.
@@ -126,6 +126,7 @@ class CashbackBudgetAdminControllerTest {
         2026,
         month,
         1_000_000L,
+        0L,
         0L,
         0L,
         0L,

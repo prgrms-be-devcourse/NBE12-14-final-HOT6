@@ -28,7 +28,7 @@ public interface CashbackMonthlyBudgetRepository
   List<CashbackMonthlyBudget> findAllByBudgetYearOrderByBudgetMonth(int budgetYear);
 
   /**
-   * 적립을 받는 상태이고 남은 예산(배정 + 이월 유입 - 예약 - 지급)이 금액 이상일 때만 확보 금액을 늘린다. 확보하면 1, 아니면 0 을 돌려준다.
+   * 적립을 받는 상태이고 남은 예산(배정 + 이월 유입 - 이월 유출 - 예약 - 지급)이 금액 이상일 때만 확보 금액을 늘린다. 확보하면 1, 아니면 0 을 돌려준다.
    * 연 예산 확보를 먼저 한 뒤에 호출한다(잠금 순서: 연 -> 월). 영속성 컨텍스트를 비우지 않는다(연 예산 쪽 설명 참고).
    */
   @Modifying(flushAutomatically = true)
@@ -37,7 +37,8 @@ public interface CashbackMonthlyBudgetRepository
       update CashbackMonthlyBudget m set m.reservedAmount = m.reservedAmount + :amount
       where m.budgetYear = :year and m.budgetMonth = :month
         and m.status in :statuses
-        and m.allocatedAmount + m.carriedInAmount - m.reservedAmount - m.paidAmount >= :amount
+        and m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
+            - m.reservedAmount - m.paidAmount >= :amount
       """)
   int reserve(
       @Param("year") int year,
@@ -84,4 +85,29 @@ public interface CashbackMonthlyBudgetRepository
       "select coalesce(sum(m.allocatedAmount), 0) from CashbackMonthlyBudget m"
           + " where m.budgetYear = :year")
   long sumAllocated(@Param("year") int year);
+
+  /**
+   * 남은 예산이 금액 이상일 때만 다음 달로 넘긴 금액을 늘린다. 넘기면 1, 모자라거나 월 예산이 없으면 0 을 돌려준다. 한 문장의 조건부 UPDATE 라서
+   * 동시에 들어온 확보·복원과 섞여도 남은 예산이 음수가 되지 않는다. 적립 상태와 상관없이 넘길 수 있다. 영속성 컨텍스트를 비우지 않는다.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.carriedOutAmount = m.carriedOutAmount + :amount
+      where m.budgetYear = :year and m.budgetMonth = :month
+        and m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount
+            - m.reservedAmount - m.paidAmount >= :amount
+      """)
+  int transferOut(
+      @Param("year") int year, @Param("month") int month, @Param("amount") long amount);
+
+  /** 다른 달에서 넘어온 금액을 늘린다. 늘리면 1, 월 예산이 없으면 0 을 돌려준다. */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+      update CashbackMonthlyBudget m set m.carriedInAmount = m.carriedInAmount + :amount
+      where m.budgetYear = :year and m.budgetMonth = :month
+      """)
+  int transferIn(
+      @Param("year") int year, @Param("month") int month, @Param("amount") long amount);
 }

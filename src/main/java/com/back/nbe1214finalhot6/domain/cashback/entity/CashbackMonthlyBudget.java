@@ -50,6 +50,10 @@ public class CashbackMonthlyBudget {
   @Column(name = "carried_in_amount", nullable = false)
   private long carriedInAmount;
 
+  // 다음 달로 넘긴 금액. 이월 처리에서만 바뀐다. 기존 행은 0 으로 채운다
+  @Column(name = "carried_out_amount", nullable = false, columnDefinition = "bigint not null default 0")
+  private long carriedOutAmount;
+
   // 결제 시 확보(예약)해 둔 금액. 아직 지급 전
   @Column(name = "reserved_amount", nullable = false)
   private long reservedAmount;
@@ -123,7 +127,7 @@ public class CashbackMonthlyBudget {
     if (baseRate != null) {
       CashbackPolicy.validateRate(baseRate);
     }
-    if (reservedAmount + paidAmount > 0) {
+    if (reservedAmount + paidAmount + carriedOutAmount > 0) {
       throw new BusinessException(CashbackErrorCode.BUDGET_IN_USE);
     }
     this.allocatedAmount = allocatedAmount;
@@ -133,9 +137,9 @@ public class CashbackMonthlyBudget {
     }
   }
 
-  /** 아직 확보하지 않은 남은 예산(배정 + 이월 유입 - 예약 - 지급). */
+  /** 아직 확보하지 않은 남은 예산(배정 + 이월 유입 - 이월 유출 - 예약 - 지급). */
   public long remainingAmount() {
-    return allocatedAmount + carriedInAmount - reservedAmount - paidAmount;
+    return allocatedAmount + carriedInAmount - carriedOutAmount - reservedAmount - paidAmount;
   }
 
   public static void validateMonth(int budgetMonth) {
