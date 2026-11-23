@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.back.nbe1214finalhot6.common.response.PageResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackExclusionReason;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackSummaryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.EarningResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyLimitResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackEarning;
@@ -187,5 +188,72 @@ class CashbackQueryServiceTest {
     assertThat(second.content()).extracting(EarningResponse::paymentId).containsExactly(3L, 2L);
     assertThat(queryService.listEarnings(WALLET, null, 0, 1_000).size())
         .isEqualTo(CashbackQueryService.MAX_PAGE_SIZE);
+  }
+
+  // 목적: 적립 건이 없는 이용자는 연·월(시계 기준)과 모든 값이 0 으로 나오는지 확인한다.
+  @Test
+  @DisplayName("적립이 없으면 요약은 모두 0 이다")
+  void summary_empty() {
+    assertThat(queryService.getSummary(WALLET))
+        .isEqualTo(new CashbackSummaryResponse(2026, 11, 0L, 0L, 0L, 0L));
+  }
+
+  // 목적: 예정·지급 완료는 금액에 합산하고, 취소·회수는 금액에서 빼며, 제외는 건수로만 세는지 확인한다.
+  @Test
+  @DisplayName("예정과 지급 완료만 금액에 합산하고 제외는 건수로 센다")
+  void summary_sumsByStatus() {
+    pending(1L, WALLET, NOW); // 예정 300
+    pending(2L, WALLET, NOW); // 예정 300
+    pending(3L, WALLET, NOW); // 지급 완료 300
+    pending(4L, WALLET, NOW); // 취소
+    pending(5L, WALLET, NOW); // 회수
+    excluded(6L, WALLET, NOW);
+    excluded(7L, WALLET, NOW);
+    setStatus(3L, "PAID");
+    setStatus(4L, "CANCELED");
+    setStatus(5L, "CLAWED_BACK");
+
+    CashbackSummaryResponse result = queryService.getSummary(WALLET);
+
+    assertThat(result.pendingAmount()).isEqualTo(600L);
+    assertThat(result.paidAmount()).isEqualTo(300L);
+    assertThat(result.earnedAmount()).isEqualTo(900L);
+    assertThat(result.excludedCount()).isEqualTo(2L);
+  }
+
+  // 목적: 다른 이용자의 적립과 이번 달이 아닌 적립(접수 시각 기준, 월 경계 포함)이 섞이지 않는지 확인한다.
+  @Test
+  @DisplayName("다른 이용자와 다른 달의 적립은 섞이지 않고 월 경계는 접수 시각 기준이다")
+  void summary_scopedToWalletAndMonth() {
+    pending(1L, WALLET, LocalDateTime.of(2026, 11, 1, 0, 0)); // 이번 달 첫 순간: 포함
+    pending(2L, WALLET, LocalDateTime.of(2026, 10, 31, 23, 59, 59)); // 지난달: 제외
+    pending(3L, WALLET, LocalDateTime.of(2026, 12, 1, 0, 0)); // 다음 달: 제외
+    pending(4L, WALLET, LocalDateTime.of(2026, 11, 30, 23, 59, 59)); // 이번 달 마지막 순간: 포함
+    pending(5L, OTHER, NOW); // 다른 이용자: 제외
+    excluded(6L, OTHER, NOW);
+
+    CashbackSummaryResponse result = queryService.getSummary(WALLET);
+
+    assertThat(result.pendingAmount()).isEqualTo(600L);
+    assertThat(result.excludedCount()).isZero();
+  }
+
+  // 목적: 요약의 적립액이 같은 이용자의 적립 내역 목록(예정+지급 완료) 금액 합계와 일치하는지 확인한다.
+  @Test
+  @DisplayName("요약 적립액은 적립 내역 목록의 예정·지급 완료 합계와 같다")
+  void summary_matchesEarningList() {
+    pending(1L, WALLET, NOW);
+    pending(2L, WALLET, NOW);
+    pending(3L, WALLET, NOW);
+    setStatus(2L, "PAID");
+    setStatus(3L, "CANCELED");
+
+    long listed =
+        queryService.listEarnings(WALLET, null, 0, 100).content().stream()
+            .filter(e -> e.status() == EarningStatus.PENDING || e.status() == EarningStatus.PAID)
+            .mapToLong(EarningResponse::amount)
+            .sum();
+
+    assertThat(queryService.getSummary(WALLET).earnedAmount()).isEqualTo(listed).isEqualTo(600L);
   }
 }
