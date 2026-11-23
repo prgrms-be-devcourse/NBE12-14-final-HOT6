@@ -21,6 +21,7 @@ public class SecurityConfig {
                     // 경로는 한 줄에 하나씩, 알파벳순으로 추가한다.
                     "/api/admin/cashback/**",
                     "/api/admin/settings/**",
+                    "/api/cashback/**",
                     "/api/merchants/**",
                     "/api/payments/**",
                     "/api/qr/**",
