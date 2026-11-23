@@ -37,15 +37,11 @@ public class OwnedResources {
         .orElseThrow(() -> new BusinessException(WalletErrorCode.WALLET_NOT_FOUND));
   }
 
-  /**
-   * 내 가맹점 번호. 없으면 MER-001(404).
-   *
-   * <p>아직 점주당 가맹점 1개를 막는 제약이 없어서, 여러 개면 가장 먼저 등록한 것을 돌려준다. 제약이 생기면 단순 조회로 바꾼다.
-   */
+  /** 내 가맹점 번호. 점주당 가맹점은 하나(유일 제약)다. 없으면 MER-001(404). */
   @Transactional(readOnly = true)
   public Long merchantIdOf(AuthUser user) {
     return merchantRepository
-        .findFirstByOwnerIdOrderByIdAsc(user.userId())
+        .findByOwnerId(user.userId())
         .map(Merchant::getId)
         .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
   }

@@ -6,22 +6,28 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "merchant")
+@Table(
+    name = "merchant",
+    uniqueConstraints = @UniqueConstraint(name = Merchant.OWNER_UNIQUE, columnNames = "owner_id"))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Merchant {
+
+  // 점주 한 명당 가맹점 하나. 동시에 두 번 등록해도 DB 가 막는다(owner_id 가 null 인 가맹점은 여러 개 가능)
+  public static final String OWNER_UNIQUE = "uk_merchant_owner";
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  // 등록한 사장님의 users.id. 공공데이터로 적재한 가맹점은 사장님이 없으므로 null
+  // 등록한 사장님의 users.id. 공공데이터로 적재한 가맹점은 사장님이 없으므로 null(점주당 하나만 허용)
   @Column(name = "owner_id")
   private Long ownerId;
 
