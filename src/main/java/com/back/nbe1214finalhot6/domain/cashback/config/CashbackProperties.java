@@ -25,7 +25,15 @@ public record CashbackProperties(
     @DefaultValue("0") int rateChangeNoticeDays,
     @DefaultValue("1") int maxRateReductionsPerMonth,
     @DefaultValue Scheduler scheduler,
-    @DefaultValue Forecast forecast) {
+    @DefaultValue Forecast forecast,
+    @DefaultValue Init init) {
+
+  /**
+   * @param enabled true 면 서버가 시작할 때 올해 연 예산이 없으면 한 번 만든다(운영자가 직접 등록하기 전의 초기값)
+   * @param annualBudget 시작할 때 만드는 연 예산 총액(원)
+   */
+  public record Init(
+      @DefaultValue("false") boolean enabled, @DefaultValue("100000000") long annualBudget) {}
 
   /**
    * @param enabled false 면 스케줄러가 돌지 않는다(테스트에서는 배치 메서드를 직접 호출한다)

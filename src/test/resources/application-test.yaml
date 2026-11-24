@@ -16,3 +16,6 @@ jwt:
 cashback:
   scheduler:
     enabled: false
+  # 시작할 때 연 예산을 자동으로 넣지 않는다(예산이 없는 상태를 전제로 하는 테스트가 있다).
+  init:
+    enabled: false
