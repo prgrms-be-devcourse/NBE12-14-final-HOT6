@@ -86,6 +86,12 @@ public class SecurityConfig {
                         "/api/qr/**",
                         "/api/wallet/**")
                     .hasRole("USER")
+                    // 내 정보 조회는 역할 구분 없이 로그인만 하면 된다(운영자 포함)
+                    .requestMatchers(HttpMethod.GET, "/api/users/me")
+                    .authenticated()
+                    // PIN 검증은 이용자(OWNER 포함)만 쓴다. 운영자는 못 쓴다
+                    .requestMatchers(HttpMethod.POST, "/api/users/pin/verify")
+                    .hasRole("USER")
                     // 탈퇴는 이용자(OWNER 포함)만 요청할 수 있다. 점주는 서비스가 DB 역할로 한 번 더 거절하고, 운영자는 여기서 막힌다
                     .requestMatchers(
                         HttpMethod.POST, "/api/users/withdraw", "/api/users/withdraw/settle")
