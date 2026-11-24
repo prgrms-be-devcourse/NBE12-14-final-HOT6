@@ -134,12 +134,62 @@ Controller → PaymentFacade (트랜잭션 없음)
 | `requested_at` | TIMESTAMP | N | 서버 최초 접수 시각 (요율·월 한도·QR 만료 판정 기준) |
 | `completed_at`, `canceled_at`, `canceled_by` | | Y | 완료 시각, 취소 시각(취소 #86에서 구현), 취소한 가맹점주(MVP에서는 비워 둠) |
 
-**ERD 변경 (결제)** (2026-11-20 합의로 컬럼 변경은 없고, 사용분이 채워지는 시점만 T2 → T1로 이동)
+#### 현재 ERD (결제)
 
-| 구분 | 내용 | 이유 |
-| --- | --- | --- |
-| 변경 | `qr_id`(BIGINT) → `qr_token`(VARCHAR(64)) | QR 이미지에는 토큰(UUID)만 담기고 결제 요청이 토큰을 받기 때문. 같은 요청 비교와 QR 사용 처리에 토큰을 씀 |
-| 미반영 | `payment.monthly_budget_id` (`project-spec` 8절에 "컬럼 추가"로 적혀 있음) | 합의 #10 방향대로 `cashback_earning` 쪽에 두고 `payment`에는 추가하지 않음. 확정되면 `project-spec` 8절도 맞춰야 함 |
+결제 테이블은 `payment` 하나이고, 다른 도메인과는 **외래키 없이 값(ID)으로만** 이어진다. 연결은 서비스가 값으로 조회한다.
+
+```mermaid
+erDiagram
+  USERS ||--|| WALLET : "회원 1 : 지갑 1"
+  WALLET ||--o{ PAYMENT : "wallet_id"
+  MERCHANT ||--o{ PAYMENT : "merchant_id"
+  QR_CODE ||--o{ PAYMENT : "qr_token (실패 후 새 키로 같은 QR 재시도 가능)"
+  PAYMENT ||--o| CASHBACK_EARNING : "payment_id (결제 1건 = 적립 1건, 유니크)"
+  PAYMENT ||--o{ WALLET_TRANSACTION : "ref_key = 결제 ID (PAYMENT_* 원장)"
+  CASHBACK_POLICY ||--o{ PAYMENT : "applied_policy_id (달 중 인하 구간만)"
+
+  PAYMENT {
+    BIGINT id PK
+    BIGINT wallet_id "UK(wallet_id, idempotency_key)"
+    BIGINT merchant_id "T1에서 QR로 읽음"
+    VARCHAR qr_token "64, null 가능"
+    VARCHAR idempotency_key "100, UK(wallet_id, idempotency_key)"
+    BIGINT amount "QR 금액 = 데브머니 사용분 + 캐시백 사용분"
+    BIGINT wallet_used_amount "T1에서 계산·저장"
+    BIGINT cashback_used_amount "T1에서 저장"
+    VARCHAR status "PROCESSING COMPLETED FAILED CANCELED"
+    VARCHAR failure_code "50, T3가 기록"
+    BIGINT applied_policy_id "인하 구간 적용 때만"
+    NUMERIC applied_rate "5,4"
+    BIGINT cashback_earned_amount
+    TIMESTAMP requested_at "요율·한도·QR 만료 기준"
+    TIMESTAMP cashback_payable_at
+    VARCHAR cashback_exclusion_reason "30, 문자열"
+    TIMESTAMP completed_at "T2 완료 시각(Clock)"
+    TIMESTAMP canceled_at "취소 시각(Clock)"
+    BIGINT canceled_by "MVP에서는 비워 둠"
+  }
+```
+
+| 항목 | 내용 |
+| --- | --- |
+| 유니크 | `uk_payment_wallet_idempotency (wallet_id, idempotency_key)`: 같은 지갑의 같은 멱등키는 한 행만 만들어져 중복 요청을 막음 |
+| 인덱스 | 위 유니크 외에는 없음. 사장님 결제 내역(11/25~26)과 일 정산 집계가 `merchant_id`와 `completed_at`·`canceled_at`으로 조회하므로 **`(merchant_id, completed_at)`, `(merchant_id, canceled_at)` 인덱스를 검토**한다 |
+| 외래키 | 없음. 지갑·가맹점·QR·적립 건은 ID(토큰)로만 가리킴 (다른 도메인 테이블과 결합하지 않기 위함) |
+| 상태 값 | `PaymentStatus` enum(문자열 저장). Hibernate가 enum 컬럼에 CHECK 제약을 만들 수 있고 `ddl-auto: update`는 이를 갱신하지 않으므로, **상태 값을 추가하면 제약을 다시 만들어야 한다** (지갑 원장 type 값을 추가했을 때 겪은 500과 같은 문제) |
+| 이어지는 다른 테이블 | `cashback_earning.payment_id`(유니크, 적립 건), `wallet_transaction.ref_key`(결제 ID, `PAYMENT_DEVMONEY`·`PAYMENT_CASHBACK`·`PAYMENT_CANCEL_*`), `qr_code.token`, `cashback_policy.id` |
+
+#### ERD 변경 내용 (project-spec 8절 원안 → 현재)
+
+| 구분 | 내용 | 이유 | 시점 |
+| --- | --- | --- | --- |
+| 변경 | `qr_id`(BIGINT) → `qr_token`(VARCHAR(64)) | QR 이미지에는 토큰(UUID)만 담기고 결제 요청이 토큰을 받기 때문. 같은 요청 비교와 QR 사용 처리에 토큰을 씀 | 11/19 |
+| 변경 | `wallet_used_amount`, `cashback_used_amount`가 채워지는 시점: T2 → **T1** (컬럼은 그대로) | 사용자가 캐시백 사용분을 직접 고르는 합의(2-9절). T1 직후 `PROCESSING` 건에도 사용분이 들어 있고 T2는 저장된 값을 지갑에 그대로 넘김 | 11/20 |
+| 추가 | `failure_code` VARCHAR(50) | T3가 실패 사유(예: `QR-003`, `WAL-004`, `COM-010`)를 기록. 같은 멱등키 재요청이나 재조회로 실패 사유를 알려 줌 | 11/19 |
+| 추가 | `cashback_payable_at`, `cashback_exclusion_reason` | 재조회해도 같은 영수증이 나오도록 `reserve` 반환값(지급 예정 시각, 제외 사유)을 저장. 제외 사유는 문자열이라 B가 사유를 추가해도 DB 변경이 없음 | 11/18 |
+| 추가 | `canceled_at` 사용 시작 / `canceled_by`는 미사용 | 취소(#86)가 `canceled_at`을 `Clock`으로 채움. `completed_at`은 지우지 않음(정산 입력 규칙 2-10절). `canceled_by`는 MVP에서 비워 둠 | 11/22 |
+| 미반영 | `payment.monthly_budget_id` (`project-spec` 8절에 "컬럼 추가"로 적혀 있음) | 합의 #10 방향대로 `cashback_earning`(`limit_month`)에 두고 `payment`에는 추가하지 않음. 확정되면 `project-spec` 8절도 맞춰야 함 | - |
+| 의미만 변경 | `wallet_id` | 컬럼은 같고 값의 출처만 바뀜: 요청 본문 → **토큰의 회원으로 서버가 찾음**(2-11절, #153). 스키마 변경은 없음 | 11/23 |
 
 - 기존 DB에는 `qr_id` 컬럼이 남아 있을 수 있습니다 (`ddl-auto: update`는 컬럼을 지우지 않음). nullable이라 동작에는 영향이 없고, 깨끗하게 쓰려면 로컬 DB를 다시 만들면 됩니다.
 - `project-spec` 8절 "ERD 변경 사항" 표에는 위 `qr_id → qr_token` 행이 아직 없습니다 (팀 공통 문서라 별도로 추가 필요).
