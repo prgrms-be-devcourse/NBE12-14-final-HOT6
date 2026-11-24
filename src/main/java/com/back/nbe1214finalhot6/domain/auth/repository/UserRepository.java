@@ -17,6 +17,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   Optional<User> findByEmail(String email);
 
+  // 인증 필터가 매 요청 탈퇴 여부를 확인하는 데 쓴다. 객체를 읽지 않고 존재 여부만 가볍게 묻는다
+  boolean existsByIdAndStatus(Long id, UserStatus status);
+
   /**
    * PIN 실패 횟수를 1 올리고, 올린 값이 한도(max)에 닿으면 같은 문장에서 잠금 시각도 기록한다.
    *

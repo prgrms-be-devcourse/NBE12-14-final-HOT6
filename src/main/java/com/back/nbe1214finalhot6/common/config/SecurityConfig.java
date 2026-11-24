@@ -2,8 +2,12 @@ package com.back.nbe1214finalhot6.common.config;
 
 import com.back.nbe1214finalhot6.common.security.RestAccessDeniedHandler;
 import com.back.nbe1214finalhot6.common.security.RestAuthenticationEntryPoint;
+import com.back.nbe1214finalhot6.domain.auth.entity.UserStatus;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
+import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
 import com.back.nbe1214finalhot6.domain.auth.security.JwtAuthenticationFilter;
+import java.util.function.LongPredicate;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -34,11 +38,20 @@ public class SecurityConfig {
 
   @Bean
   public SecurityFilterChain securityFilterChain(
-      HttpSecurity http, JwtProvider jwtProvider, JsonMapper jsonMapper) throws Exception {
+      HttpSecurity http,
+      JwtProvider jwtProvider,
+      JsonMapper jsonMapper,
+      ObjectProvider<UserRepository> userRepository)
+      throws Exception {
+    // 회원 저장소가 없는 환경(컨트롤러 단위 테스트)에서는 탈퇴 확인을 건너뛴다
+    UserRepository users = userRepository.getIfAvailable();
+    LongPredicate isWithdrawn =
+        users == null ? id -> false : id -> users.existsByIdAndStatus(id, UserStatus.WITHDRAWN);
     http.csrf(AbstractHttpConfigurer::disable)
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .addFilterBefore(
-            new JwtAuthenticationFilter(jwtProvider), UsernamePasswordAuthenticationFilter.class)
+            new JwtAuthenticationFilter(jwtProvider, isWithdrawn),
+            UsernamePasswordAuthenticationFilter.class)
         .exceptionHandling(
             e ->
                 e.authenticationEntryPoint(new RestAuthenticationEntryPoint(jsonMapper))
