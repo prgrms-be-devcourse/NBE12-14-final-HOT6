@@ -4,12 +4,31 @@ import { useState } from "react";
 import BudgetPlanner from "@/components/BudgetPlanner";
 import ConfirmButton from "@/components/ConfirmButton";
 import RateSimulator from "@/components/RateSimulator";
-import { BASE_RATE } from "@/lib/budget";
-import { emergencyStop, noticeStop, reduceRate, thisYearMonth } from "@/lib/adminApi";
+import { ApiError } from "@/lib/api";
+import { emergencyStop, getBudgetSeries, getMonthlyBudget, noticeStop, reduceRate, thisYearMonth } from "@/lib/adminApi";
+import { useLoad } from "@/lib/useLoad";
 
 export default function AdminPolicyPage() {
   const [saved, setSaved] = useState("");
-  const [rate, setRate] = useState(String(BASE_RATE));
+  const [reloadKey, setReloadKey] = useState(0);
+  const [rateInput, setRate] = useState<string | null>(null);
+  const { year, month } = thisYearMonth();
+  const now = new Date();
+  const today = now.getDate();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // 이번 달 월 예산과 일별 남은 예산(서버 값). 월 예산이 없으면(404) null
+  const budget = useLoad(
+    () => getMonthlyBudget(year, month).catch((e: unknown) => { if (e instanceof ApiError && e.status === 404) return null; throw e; }),
+    [year, month, reloadKey],
+  );
+  const series = useLoad(
+    () => getBudgetSeries(`${year}-${pad(month)}-01`, `${year}-${pad(month)}-${pad(today)}`),
+    [year, month, today, reloadKey],
+  );
+  const monthSeries = series.data?.find((s) => s.year === year && s.month === month);
+  // 요율 입력의 시작값은 이번 달 기본 요율이다(직접 바꾸기 전까지)
+  const rate = rateInput ?? (budget.data?.baseRate != null ? String(Math.round(budget.data.baseRate * 1000) / 10) : "");
   const [from, setFrom] = useState("");
   const [busy, setBusy] = useState(false);
   const [apiError, setApiError] = useState("");
@@ -36,12 +55,20 @@ export default function AdminPolicyPage() {
 
       <section className="card space-y-4 !p-5">
         <h2 className="text-lg font-bold">월 예산</h2>
-        <BudgetPlanner onFlash={flash} />
+        <BudgetPlanner year={year} thisMonth={month} onFlash={flash} onChanged={() => setReloadKey((k) => k + 1)} />
       </section>
 
       <section className="card !p-5">
         <h2 className="mb-4 text-lg font-bold">캐시백 정책 · 요율 시뮬레이션</h2>
-        <RateSimulator rate={rate} onRate={setRate} />
+        {budget.loading || series.loading ? (
+          <p className="note">이번 달 예산을 불러오는 중…</p>
+        ) : budget.error || series.error ? (
+          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{budget.error ?? series.error}</p>
+        ) : !budget.data ? (
+          <p className="note rounded-lg bg-amber-50 px-3 py-3 text-amber-800">{month}월 예산이 아직 배정되지 않았어요. 위 월 예산에서 이번 달을 배정하면 요율 시뮬레이션을 볼 수 있어요.</p>
+        ) : (
+          <RateSimulator rate={rate} onRate={setRate} budget={budget.data} points={monthSeries?.points ?? []} today={today} daysInMonth={daysInMonth} />
+        )}
         <div className="mt-5 space-y-3 border-t border-slate-200 pt-5">
           <h3 className="font-bold">정책 저장</h3>
           <div className="grid gap-3 sm:grid-cols-2">

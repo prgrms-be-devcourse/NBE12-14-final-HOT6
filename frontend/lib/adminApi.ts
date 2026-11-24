@@ -1,4 +1,4 @@
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { PageResponse } from "@/lib/types";
 
 // 운영자용 캐시백 API (/api/admin/cashback/**)
@@ -39,3 +39,28 @@ export const thisYearMonth = () => {
 export const STATUS_TEXT: Record<BudgetStatus, string> = { ACTIVE: "정상 적립", NOTICED: "중단 공지 중", STOPPED: "적립 중단", CLOSED: "마감" };
 export const manwon = (n: number) => Math.round(n / 10_000);
 export const md = (iso: string | null) => (iso ? `${iso.slice(5, 7)}.${iso.slice(8, 10)}` : "-");
+
+// 연·월 예산 (/api/admin/cashback/budget/**)
+export type AnnualBudget = {
+  budgetYear: number; totalAmount: number; carriedInAmount: number; carriedOutAmount: number;
+  reservedAmount: number; paidAmount: number; remainingAmount: number;
+};
+export type BudgetTimePoint = { date: string; paidAmount: number; reservedAmount: number; remainingAmount: number };
+export type BudgetMonthSeries = { year: number; month: number; allocatedAmount: number; contingencyAmount: number; points: BudgetTimePoint[] };
+
+// 아직 등록하지 않은 연도(404)는 오류가 아니라 null 로 돌려준다
+export const getAnnualBudget = (year: number) =>
+  api<AnnualBudget>(`${BASE}/budget/annual/${year}`).catch((e: unknown) => {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  });
+export const putAnnualBudget = (year: number, totalAmount: number) =>
+  api<AnnualBudget>(`${BASE}/budget/annual/${year}`, { method: "PUT", body: { totalAmount } });
+export const listMonthlyBudgets = (year: number) => api<MonthlyBudget[]>(`${BASE}/budget/monthly?year=${year}`);
+// baseRate 는 소수 비율(0.1 = 10%). 비우면 서버가 기존 값이나 이전 달 값을 이어받는다
+export const putMonthlyBudget = (year: number, month: number, allocatedAmount: number, baseRate?: number) =>
+  api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}`, { method: "PUT", body: { allocatedAmount, ...(baseRate === undefined ? {} : { baseRate }) } });
+export const transferBudget = (year: number, month: number, amount: number) =>
+  api<unknown>(`${BASE}/budget/transfers`, { method: "POST", body: { year, month, amount } });
+export const getBudgetSeries = (from: string, to: string) =>
+  api<BudgetMonthSeries[]>(`${BASE}/budget/timeseries?from=${from}&to=${to}`);

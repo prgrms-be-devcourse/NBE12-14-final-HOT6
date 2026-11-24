@@ -1,55 +1,91 @@
 "use client";
 
 import { useRef, useState } from "react";
-import {
-  BASE_RATE, DAYS_IN_MONTH, NOV_BUDGET, RESERVE_RATIO, SIM_ASSUMPTIONS, STOP_RATIO, TODAY,
-  actualRemaining, dailyPayout, dayLabel, firstDayBelow, manwon, projectedRemaining, remainingAt,
-} from "@/lib/budget";
+import type { BudgetTimePoint, MonthlyBudget } from "@/lib/adminApi";
 import { won } from "@/lib/format";
 
 const W = 720;
 const H = 320;
 const PAD = { l: 62, r: 20, t: 20, b: 40 };
 const PRESETS = [5, 10, 15, 20];
-const X_TICKS = [1, 5, 10, 15, 20, 25, 30];
 const Y_TICKS = [0, 0.25, 0.5, 0.75, 1];
+// 가정(서버 값이 아니다): 요율이 기본 요율 대비 1% 오를 때마다 하루 지급이 이 비율(%)만큼 는다고 본다
+const ELASTICITY = 0.3;
+// 긴급 중단선 = 대비금의 절반(서버 설정 cashback.emergency-ratio 의 기본값)
+const EMERGENCY_RATIO = 0.5;
 
-const x = (d: number) => PAD.l + ((d - 1) / (DAYS_IN_MONTH - 1)) * (W - PAD.l - PAD.r);
-const y = (v: number) => PAD.t + (1 - v / NOV_BUDGET) * (H - PAD.t - PAD.b);
-const line = (pts: [number, number][]) => pts.map(([a, b], i) => `${i ? "L" : "M"}${a.toFixed(1)} ${b.toFixed(1)}`).join(" ");
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+const line = (pts: [number, number][]) => pts.map(([a, b], i) => `${i ? "L" : "M"}${a.toFixed(1)} ${b.toFixed(1)}`).join(" ");
+const manwon = (n: number) => `${Math.round(n / 10_000).toLocaleString("ko-KR")}만`;
+const dayOf = (iso: string) => Number(iso.slice(8, 10));
 
-type Props = { rate: string; onRate: (v: string) => void };
+type Props = {
+  rate: string;
+  onRate: (v: string) => void;
+  budget: MonthlyBudget; // 이번 달 월 예산(서버 값)
+  points: BudgetTimePoint[]; // 이번 달 일별 남은 예산(서버 값, 오늘까지)
+  today: number; // 오늘 날짜(일)
+  daysInMonth: number;
+};
 
-export default function RateSimulator({ rate, onRate }: Props) {
+export default function RateSimulator({ rate, onRate, budget, points, today, daysInMonth }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
 
+  const month = budget.budgetMonth;
+  const dayLabel = (d: number) => `${month}.${d}`;
+  const budgetTotal = budget.allocatedAmount + budget.carriedInAmount - budget.carriedOutAmount;
+  const baseRate = (budget.baseRate ?? 0) * 100;
+  const used = budget.paidAmount + budget.reservedAmount;
+  const baseDaily = today > 0 ? used / today : 0;
+
+  const x = (d: number) => PAD.l + ((d - 1) / Math.max(daysInMonth - 1, 1)) * (W - PAD.l - PAD.r);
+  const y = (v: number) => PAD.t + (1 - Math.min(v, budgetTotal) / Math.max(budgetTotal, 1)) * (H - PAD.t - PAD.b);
+
+  // 그날 끝의 실제 남은 예산. 점이 없는 날은 직전 값을 이어 쓰고, 첫 점 이전은 월 예산 전체다
+  const actualRemaining = (d: number) => {
+    const prior = points.filter((p) => dayOf(p.date) <= d);
+    return prior.length ? prior[prior.length - 1].remainingAmount : budgetTotal;
+  };
+  const dailyPayout = (r: number) =>
+    baseRate > 0 ? Math.max(0, baseDaily * (r / baseRate) * (1 + (ELASTICITY * (r - baseRate)) / baseRate)) : baseDaily;
+  const projectedRemaining = (r: number, d: number) => Math.max(0, actualRemaining(today) - dailyPayout(r) * (d - today));
+  const remainingAt = (r: number, d: number) => (d <= today ? actualRemaining(d) : projectedRemaining(r, d));
+  const firstDayBelow = (r: number, threshold: number): number | null => {
+    const now = actualRemaining(today);
+    if (now <= threshold) return today;
+    const pay = dailyPayout(r);
+    if (pay <= 0) return null;
+    const day = today + Math.ceil((now - threshold) / pay);
+    return day > daysInMonth ? null : day;
+  };
+
+  const xTicks = [1, 5, 10, 15, 20, 25, daysInMonth].filter((d, i, a) => d <= daysInMonth && a.indexOf(d) === i);
   const parsed = Number(rate);
   const r = rate.trim() && Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), 100) : 0;
-  const reserve = NOV_BUDGET * RESERVE_RATIO;
-  const stop = NOV_BUDGET * STOP_RATIO;
+  const reserve = budget.contingencyAmount;
+  const stop = reserve * EMERGENCY_RATIO;
 
-  const actual = line(range(1, TODAY).map((d) => [x(d), y(actualRemaining(d))]));
-  const futureDays = range(TODAY, DAYS_IN_MONTH);
+  const actual = line(range(1, today).map((d) => [x(d), y(actualRemaining(d))]));
+  const futureDays = range(today, daysInMonth);
   const projPts = futureDays.map((d) => [x(d), y(projectedRemaining(r, d))] as [number, number]);
   const projected = line(projPts);
-  const area = `${projected} L${x(DAYS_IN_MONTH)} ${y(0)} L${x(TODAY)} ${y(0)} Z`;
-  const base = line(futureDays.map((d) => [x(d), y(projectedRemaining(BASE_RATE, d))]));
-  const changed = Math.abs(r - BASE_RATE) > 0.001;
+  const area = `${projected} L${x(daysInMonth)} ${y(0)} L${x(today)} ${y(0)} Z`;
+  const base = line(futureDays.map((d) => [x(d), y(projectedRemaining(baseRate, d))]));
+  const changed = Math.abs(r - baseRate) > 0.001;
 
   const reachReserve = firstDayBelow(r, reserve);
   const reachStop = firstDayBelow(r, stop);
   const reachZero = firstDayBelow(r, 0);
-  const endBalance = projectedRemaining(r, DAYS_IN_MONTH);
-  const danger = reachReserve !== null && reachReserve - TODAY < 3;
+  const endBalance = projectedRemaining(r, daysInMonth);
+  const danger = reachReserve !== null && reachReserve - today < 3;
 
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const box = svgRef.current?.getBoundingClientRect();
     if (!box) return;
     const px = ((e.clientX - box.left) / box.width) * W;
-    const d = Math.round(1 + ((px - PAD.l) / (W - PAD.l - PAD.r)) * (DAYS_IN_MONTH - 1));
-    setHover(Math.min(DAYS_IN_MONTH, Math.max(1, d)));
+    const d = Math.round(1 + ((px - PAD.l) / (W - PAD.l - PAD.r)) * (daysInMonth - 1));
+    setHover(Math.min(daysInMonth, Math.max(1, d)));
   };
 
   const hv = hover !== null ? remainingAt(r, hover) : 0;
@@ -85,7 +121,7 @@ export default function RateSimulator({ rate, onRate }: Props) {
         <div className="mt-2 flex flex-wrap gap-2">
           {PRESETS.map((p) => (
             <button key={p} type="button" onClick={() => onRate(String(p))} className={`chip ${r === p ? "chip-on" : ""}`}>
-              {p}%{p === BASE_RATE ? " (현재)" : ""}
+              {p}%{p === baseRate ? " (현재)" : ""}
             </button>
           ))}
         </div>
@@ -97,17 +133,17 @@ export default function RateSimulator({ rate, onRate }: Props) {
           viewBox={`0 0 ${W} ${H}`}
           className="block w-full touch-none select-none"
           role="img"
-          aria-label={`요율 ${r}% 적용 시 11월 남은 예산 예상 그래프. ${reachReserve ? `${dayLabel(reachReserve)}에 대비금에 닿을 것으로 예상됩니다.` : "월말까지 대비금에 닿지 않습니다."}`}
+          aria-label={`요율 ${r}% 적용 시 ${month}월 남은 예산 예상 그래프. ${reachReserve ? `${dayLabel(reachReserve)}에 대비금에 닿을 것으로 예상됩니다.` : "월말까지 대비금에 닿지 않습니다."}`}
           onPointerMove={onMove}
           onPointerLeave={() => setHover(null)}
         >
           {Y_TICKS.map((t) => (
             <g key={t}>
-              <line x1={PAD.l} x2={W - PAD.r} y1={y(NOV_BUDGET * t)} y2={y(NOV_BUDGET * t)} className="stroke-slate-200" strokeWidth={1} />
-              <text x={PAD.l - 8} y={y(NOV_BUDGET * t) + 4} textAnchor="end" className="fill-slate-500" fontSize={12}>{manwon(NOV_BUDGET * t)}</text>
+              <line x1={PAD.l} x2={W - PAD.r} y1={y(budgetTotal * t)} y2={y(budgetTotal * t)} className="stroke-slate-200" strokeWidth={1} />
+              <text x={PAD.l - 8} y={y(budgetTotal * t) + 4} textAnchor="end" className="fill-slate-500" fontSize={12}>{manwon(budgetTotal * t)}</text>
             </g>
           ))}
-          {X_TICKS.map((d) => (
+          {xTicks.map((d) => (
             <text key={d} x={x(d)} y={H - 14} textAnchor="middle" className="fill-slate-500" fontSize={12}>{dayLabel(d)}</text>
           ))}
 
@@ -116,21 +152,21 @@ export default function RateSimulator({ rate, onRate }: Props) {
           <line x1={PAD.l} x2={W - PAD.r} y1={y(stop)} y2={y(stop)} className="stroke-red-600" strokeWidth={1.5} strokeDasharray="6 4" />
           <text x={W - PAD.r - 4} y={y(stop) + 15} textAnchor="end" className="fill-red-700" fontSize={12} fontWeight={700}>긴급 중단 {manwon(stop)}</text>
 
-          <line x1={x(TODAY)} x2={x(TODAY)} y1={PAD.t} y2={H - PAD.b} className="stroke-slate-400" strokeWidth={1} strokeDasharray="2 3" />
-          <text x={x(TODAY) - 6} y={PAD.t + 10} textAnchor="end" className="fill-slate-600" fontSize={12}>오늘 {dayLabel(TODAY)}</text>
+          <line x1={x(today)} x2={x(today)} y1={PAD.t} y2={H - PAD.b} className="stroke-slate-400" strokeWidth={1} strokeDasharray="2 3" />
+          <text x={x(today) - 6} y={PAD.t + 10} textAnchor="end" className="fill-slate-600" fontSize={12}>오늘 {dayLabel(today)}</text>
 
           <path d={area} className="fill-brand-600" fillOpacity={0.12} style={{ transition: "d 200ms ease-out" }} />
           {changed && <path d={base} fill="none" className="stroke-slate-400" strokeWidth={2} strokeDasharray="5 4" />}
           <path d={actual} fill="none" className="stroke-slate-700" strokeWidth={3} strokeLinecap="round" />
           <path d={projected} fill="none" className="stroke-brand-600" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" style={{ transition: "d 200ms ease-out" }} />
-          <circle cx={x(TODAY)} cy={y(actualRemaining(TODAY))} r={5} className="fill-white stroke-slate-700" strokeWidth={2.5} />
+          <circle cx={x(today)} cy={y(actualRemaining(today))} r={5} className="fill-white stroke-slate-700" strokeWidth={2.5} />
 
           {hover !== null && (
             <g pointerEvents="none">
               <line x1={x(hover)} x2={x(hover)} y1={PAD.t} y2={H - PAD.b} className="stroke-slate-500" strokeWidth={1} />
               <circle cx={x(hover)} cy={y(hv)} r={5} className="fill-brand-600 stroke-white" strokeWidth={2} />
               <rect x={tipX - 78} y={PAD.t + 16} width={156} height={40} rx={6} className="fill-slate-900" />
-              <text x={tipX} y={PAD.t + 33} textAnchor="middle" className="fill-white" fontSize={12}>{dayLabel(hover)} {hover <= TODAY ? "실제" : "예상"} 남은 예산</text>
+              <text x={tipX} y={PAD.t + 33} textAnchor="middle" className="fill-white" fontSize={12}>{dayLabel(hover)} {hover <= today ? "실제" : "예상"} 남은 예산</text>
               <text x={tipX} y={PAD.t + 49} textAnchor="middle" className="fill-white" fontSize={13} fontWeight={700}>{won(Math.round(hv))}</text>
             </g>
           )}
@@ -138,7 +174,7 @@ export default function RateSimulator({ rate, onRate }: Props) {
         <div className="flex flex-wrap gap-x-4 gap-y-1 px-2 pb-1 pt-0.5 text-xs text-slate-600">
           <span className="flex items-center gap-1.5"><i className="inline-block h-0.5 w-5 bg-slate-700" />실제 남은 예산</span>
           <span className="flex items-center gap-1.5"><i className="inline-block h-1 w-5 rounded bg-brand-600" />요율 {r}% 예상</span>
-          {changed && <span className="flex items-center gap-1.5"><i className="inline-block h-0.5 w-5 border-t-2 border-dashed border-slate-400" />현재 요율 {BASE_RATE}% 예상</span>}
+          {changed && <span className="flex items-center gap-1.5"><i className="inline-block h-0.5 w-5 border-t-2 border-dashed border-slate-400" />현재 요율 {baseRate}% 예상</span>}
         </div>
       </div>
 
@@ -167,7 +203,10 @@ export default function RateSimulator({ rate, onRate }: Props) {
       <p className="note">
         {reachStop && `긴급 중단선 도달 ${dayLabel(reachStop)}`}{reachStop && reachZero ? " · " : ""}{reachZero && `소진 ${dayLabel(reachZero)}`}
         {(reachStop || reachZero) && " · "}
-        가정: 지금까지의 하루 평균 지급액({won(SIM_ASSUMPTIONS.baseDaily)}, 요율 {SIM_ASSUMPTIONS.baseRate}%)을 기준으로, 요율이 {SIM_ASSUMPTIONS.baseRate}%p 오를 때마다 수요가 {Math.round(SIM_ASSUMPTIONS.elasticity * 100)}% 늘어난다고 보았습니다. 저장 전 미리보기이며 시연용 예시 데이터입니다.
+        {used === 0
+          ? "아직 이번 달 결제가 없어서 하루 지급액을 0원으로 보고 있어요."
+          : `가정: 이번 달 지금까지의 하루 평균 지급·확보액(${won(Math.round(baseDaily))}, 기본 요율 ${baseRate}%)을 기준으로, 요율이 기본 요율 대비 1% 오를 때마다 수요가 ${ELASTICITY}%씩 늘어난다고 보았습니다.`}
+        {" "}저장 전 미리보기이며, 하루 평균과 남은 예산은 실제 값이고 수요 변화는 가정입니다.
       </p>
     </div>
   );
