@@ -15,7 +15,7 @@
 | 결제 | `POST /api/payments` | QR/가맹점 검증, 지갑 차감, 캐시백 예산 예약, QR 사용 처리를 한 흐름으로 |
 | 결제 결과 재조회 | `GET /api/payments/by-key/{key}` | 응답을 못 받았을 때 멱등키로 결과 확인 |
 | 결제 취소 | `POST /api/payments/{id}/cancel` | 지갑 환급, 캐시백 적립 취소, 중복 취소 방지 |
-| 사장님 결제 내역 | `GET /api/merchants/me/payments` (토큰의 가맹점, OWNER) | 결제·취소·순매출 조회 (미착수, 11/25~26) |
+| 사장님 결제 내역 | `GET /api/merchants/me/payments` (토큰의 가맹점, OWNER) | 결제·취소·순매출 조회 (구현, #201, 2-15절) |
 
 추가 업무: 리질리언스 패턴(타임아웃·재시도·서킷브레이커·벌크헤드). **지금 시스템에는 외부 호출이 없고 의존 대상이 DB 하나뿐**이라, 서킷브레이커처럼 외부 호출을 전제로 한 패턴은 붙일 곳이 없다. DB 중심(락 대기 타임아웃, 커넥션 풀·쿼리 타임아웃, 제한적 재시도, 요청 제한)으로 범위를 좁히고, 먼저 부하·동시성 측정으로 병목을 보인 뒤 적용해 전후를 비교한다 (4절, 합의 #4).
 
@@ -98,6 +98,7 @@ Controller → PaymentFacade (트랜잭션 없음)
 | PAY-005 | 503 | 락 대기 초과 | **MVP 이후로 보류.** T2 락 대기 상한(5초)을 넘었을 때 (2-8절) |
 | PAY-006 | 409 | 취소할 수 없는 결제 상태 | 구현 (#86). `COMPLETED`만 취소 가능. `PROCESSING`/`FAILED`는 거절, 이미 `CANCELED`는 에러 없이 기존 결과 반환 |
 | PAY-007 | 403 | 본인 가맹점의 결제가 아님 | 구현 (#86). 다른 가맹점이 취소하려 할 때 |
+| PAY-008 | 400 | 사장님 결제 내역의 조회 기간이 올바르지 않음 | 구현 (#201). 시작이 끝보다 늦거나 31일 초과 |
 
 - 다른 도메인이 던지는 실패는 그 도메인의 코드를 그대로 씁니다 (QR-001~004, 캐시백 CSH-xxx, 가맹점 MER-001 등). T3는 던져진 `BusinessException`의 코드를 `payment.failure_code`에 **그대로 기록**합니다.
 - 가맹점·금액은 요청으로 받지 않고 서버가 QR에서 읽으므로, 요청과 QR이 다를 때의 `QR-004`(불일치)는 없어졌습니다 (D의 이슈 #64 / PR #67).
@@ -174,7 +175,7 @@ erDiagram
 | 항목 | 내용 |
 | --- | --- |
 | 유니크 | `uk_payment_wallet_idempotency (wallet_id, idempotency_key)`: 같은 지갑의 같은 멱등키는 한 행만 만들어져 중복 요청을 막음 |
-| 인덱스 | 위 유니크 외에는 없음. 사장님 결제 내역(11/25~26)과 일 정산 집계가 `merchant_id`와 `completed_at`·`canceled_at`으로 조회하므로 **`(merchant_id, completed_at)`, `(merchant_id, canceled_at)` 인덱스를 검토**한다 |
+| 인덱스 | 위 유니크 외에 **`idx_payment_merchant_completed (merchant_id, completed_at)`, `idx_payment_merchant_canceled (merchant_id, canceled_at)`** (#201). 사장님 결제 내역과 일 정산 집계가 가맹점별로 완료·취소 시각 범위를 조회한다 |
 | 외래키 | 없음. 지갑·가맹점·QR·적립 건은 ID(토큰)로만 가리킴 (다른 도메인 테이블과 결합하지 않기 위함) |
 | 상태 값 | `PaymentStatus` enum(문자열 저장). Hibernate가 enum 컬럼에 CHECK 제약을 만들 수 있고 `ddl-auto: update`는 이를 갱신하지 않으므로, **상태 값을 추가하면 제약을 다시 만들어야 한다** (지갑 원장 type 값을 추가했을 때 겪은 500과 같은 문제) |
 | 이어지는 다른 테이블 | `cashback_earning.payment_id`(유니크, 적립 건), `wallet_transaction.ref_key`(결제 ID, `PAYMENT_DEVMONEY`·`PAYMENT_CASHBACK`·`PAYMENT_CANCEL_*`), `qr_code.token`, `cashback_policy.id` |
@@ -348,6 +349,24 @@ D의 일 정산(매일 00:10)과 사장님 결제 내역(PAY-04)이 결제의 �
 - 결제 쪽이 확인할 것: ① `isSameRequest`(같은 키 비교)에 `pin`을 넣지 않기 ② 요청 DTO의 `toString`에서 `pin`을 가리기 ③ 재조회에는 PIN이 필요 없음 ④ 2/2가 머지되는 순간 PIN 없는 결제는 400이 되므로 프론트와 머지 시점 맞추기.
 - 결제 서비스(`PaymentFacade` 등)는 건드리지 않고 컨트롤러·DTO만 바뀐다고 했으므로 2/2 PR을 리뷰해서 확인한다 (합의 #21).
 
+### 2-15. 사장님 결제 내역·매출 조회 (PAY-04, #201)
+
+**한 줄 요약**: 점주가 자기 가맹점의 결제 내역과 매출(결제·취소·순매출)을 기간별로 본다. 가맹점은 토큰의 회원으로 찾는다(`merchantIdOf`).
+
+| 항목 | 내용 |
+| --- | --- |
+| API | `GET /api/merchants/me/payments?from=yyyy-MM-dd&to=yyyy-MM-dd&page=0&size=20` (OWNER) |
+| 기간 | 양 끝 포함, 최대 31일. 모두 생략하면 오늘, `from`만 주면 그날 하루. 시작이 끝보다 늦거나 31일을 넘으면 `PAY-008`(400) |
+| 요약 | 기간 안의 결제 건수·금액, 취소 건수·금액, **순매출 = 결제 − 취소** (취소가 더 많은 날은 음수) |
+| 목록 | 기간 안에 완료했거나 취소한 결제. 최신순(`completedAt`, `id` 내림차순), 기본 20건·최대 100건. 결제번호(취소에 사용), 상태, 총액, 데브머니·캐시백 사용분, 완료·취소 시각. **결제한 이용자 정보(지갑 번호)는 담지 않음** |
+| 집계 기준 | 일 정산과 같다(2-10절). 결제는 `completedAt`의 날짜(상태 `COMPLETED`·`CANCELED`), 취소는 `canceledAt`의 날짜(`CANCELED`). 금액은 결제 총액(`amount`). `PROCESSING`·`FAILED`는 완료 시각이 없어 제외 |
+| 구조 | `MerchantPaymentController` → `MerchantPaymentQueryService`(읽기 전용) → `PaymentRepository`의 집계·목록 쿼리 |
+| 권한 | `/api/merchants/**` OWNER 규칙. USER 403(`COM-008`), 토큰 없음 401(`COM-005`) |
+
+- **일 정산과 일치하는지**: 서비스 테스트가 일 정산이 쓰는 집계(`MerchantSalesRepository`)와 같은 금액이 나오는지 비교한다.
+- **테스트**: 서비스 11건(내 가맹점만, 요약, 미완료 제외, 결제·취소 날짜 기준, 자정 경계, 일 정산 일치, 최신순, 페이징, 기본 기간, 빈 기간, 기간 검증), 컨트롤러 8건(응답 형태, `merchantIdOf` 사용, 파라미터 전달, 기간·형식 오류, 가맹점 없음 404, USER 403, 토큰 없음 401). 순매출 부호를 뒤집으면 테스트가 실패하는 것을 확인함.
+- **프론트**: `/merchant/payments`(매출·정산 탭)가 이 API를 호출해 요약과 목록을 보여 주도록 연동이 필요하다.
+
 ## 3. 진행 현황
 
 | 항목 | 상태 |
@@ -368,7 +387,7 @@ D의 일 정산(매일 00:10)과 사장님 결제 내역(PAY-04)이 결제의 �
 | PIN 결제 강제 (#187, C) | 진행 중 (PR #188 1/2 리뷰). 2/2에서 결제 컨트롤러·DTO 수정 예정 (2-14절) |
 | 회원 탈퇴 (#191, C) | 진행 중 (PR #192 1/2). 탈퇴한 지갑의 결제 취소 정책 필요 (2-12절, 합의 #22) |
 | 동시성 테스트 (같은 키·같은 QR·같은 지갑 동시) | **미착수.** 결제 도메인에는 동시성 테스트가 아직 없음 (QR만 D의 `QrServiceConcurrencyTest`). 11/27에 진행 |
-| 사장님 결제 내역 | 미착수 (11/25~26) |
+| 사장님 결제 내역 (#201) | 구현·테스트 완료 (PR 대기). `GET /api/merchants/me/payments`, 2-15절. 프론트 `/merchant/payments` 연동은 프론트 담당 |
 
 ## 4. 일정 (계획)
 

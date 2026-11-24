@@ -60,11 +60,11 @@
 
 ## 11/25 (수) ~ 11/26 (목) — 사장님 결제 내역 (PAY-04)
 
-- [ ] 이슈 작성, 브랜치 생성
-- [ ] `GET /api/merchants/me/payments`(OWNER): 결제·취소·순매출. 경로를 `/api/merchants/me/**`에 두어 기존 OWNER 규칙과 `merchantIdOf`를 그대로 사용
-- [ ] 집계 기준을 일 정산과 맞춤: 결제는 `completedAt`의 날짜, 취소는 `canceledAt`의 날짜 ([기획서 2-10](../plan/payment-sy-1121.md))
-- [ ] 테스트: 다른 가맹점의 결제는 보이지 않음, 취소가 취소한 날에 반영, 기간·페이징, 일 정산 금액과 일치
-- [ ] `SecurityConfigTest` 권한 표와 `SecurityRuleCoverageTest` 통과 확인
+- [x] 이슈 #201 작성, 브랜치 `feat/#201-merchant-payments` 생성
+- [x] `GET /api/merchants/me/payments`(OWNER): 결제·취소·순매출. 경로를 `/api/merchants/me/**`에 두어 기존 OWNER 규칙과 `merchantIdOf`를 그대로 사용
+- [x] 집계 기준을 일 정산과 맞춤: 결제는 `completedAt`의 날짜, 취소는 `canceledAt`의 날짜 ([기획서 2-10](../plan/payment-sy-1121.md))
+- [x] 테스트: 다른 가맹점의 결제는 보이지 않음, 취소가 취소한 날에 반영, 기간·페이징, 일 정산 금액과 일치
+- [x] `SecurityConfigTest` 권한 표와 `SecurityRuleCoverageTest` 통과 확인
 - [ ] PR 올리기
 
 ## 11/27 (금) — 동시성 테스트와 개선 전 수치

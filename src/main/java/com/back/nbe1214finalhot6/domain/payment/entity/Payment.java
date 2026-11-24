@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
@@ -23,7 +24,12 @@ import lombok.NoArgsConstructor;
     uniqueConstraints =
         @UniqueConstraint( //유니크 복합키 설정 : 지갑id & 멱등키
             name = "uk_payment_wallet_idempotency",
-            columnNames = {"wallet_id", "idempotency_key"}))
+            columnNames = {"wallet_id", "idempotency_key"}),
+    // 사장님 결제 내역과 일 정산 집계가 가맹점별로 완료·취소 시각 범위를 조회한다
+    indexes = {
+      @Index(name = "idx_payment_merchant_completed", columnList = "merchant_id, completed_at"),
+      @Index(name = "idx_payment_merchant_canceled", columnList = "merchant_id, canceled_at")
+    })
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
