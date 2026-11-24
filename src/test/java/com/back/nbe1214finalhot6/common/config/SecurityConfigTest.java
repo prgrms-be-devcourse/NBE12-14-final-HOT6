@@ -107,6 +107,8 @@ class SecurityConfigTest {
         Arguments.of("GET", "/api/wallet", 401, 200, 200, 403),
         Arguments.of("POST", "/api/wallet/charges", 401, 200, 200, 403),
         Arguments.of("POST", "/api/wallet/refunds", 401, 200, 200, 403),
+        Arguments.of("GET", "/api/wallet/account", 401, 200, 200, 403),
+        Arguments.of("GET", "/api/wallet/account/transactions", 401, 200, 200, 403),
         // 탈퇴는 시민 기능(점주는 통과하지만 서비스가 AUTH-007 로 거절, 운영자는 403)
         Arguments.of("POST", "/api/users/withdraw", 401, 200, 200, 403),
         Arguments.of("POST", "/api/users/withdraw/settle", 401, 200, 200, 403),
