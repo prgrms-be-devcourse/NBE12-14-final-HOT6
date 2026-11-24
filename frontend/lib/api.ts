@@ -13,9 +13,10 @@ export class ApiError extends Error {
   }
 }
 
-type Options = { method?: string; body?: unknown; idempotencyKey?: string };
+// stay401: 401 이 나도 로그인 화면으로 보내지 않고(세션만 지운다) 화면이 "로그인이 필요해요" 안내를 직접 보여 줄 때 쓴다
+type Options = { method?: string; body?: unknown; idempotencyKey?: string; stay401?: boolean };
 
-export async function api<T>(path: string, { method = "GET", body, idempotencyKey }: Options = {}): Promise<T> {
+export async function api<T>(path: string, { method = "GET", body, idempotencyKey, stay401 = false }: Options = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (idempotencyKey) headers["Idempotency-Key"] = idempotencyKey;
@@ -39,7 +40,7 @@ export async function api<T>(path: string, { method = "GET", body, idempotencyKe
   // 토큰이 없거나 만료·무효면 세션을 지우고 해당 앱의 로그인 화면으로 보낸다. 로그인 요청 자체의 401(자격 증명 오류)은 화면이 메시지로 보여 준다
   if (res.status === 401 && path !== "/auth/login") {
     clearSession();
-    if (typeof window !== "undefined") window.location.assign(LOGIN_PATH[audienceOfPath(window.location.pathname)]);
+    if (!stay401 && typeof window !== "undefined") window.location.assign(LOGIN_PATH[audienceOfPath(window.location.pathname)]);
   }
 
   if (!res.ok || !json?.success) {

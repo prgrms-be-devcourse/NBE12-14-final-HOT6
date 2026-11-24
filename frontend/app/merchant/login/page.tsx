@@ -12,7 +12,7 @@ export default function MerchantLoginPage() {
       <h1 className="mb-4 text-xl font-medium">로그인</h1>
       <LoginForm audience="merchant" />
       <p className="mt-auto py-6 text-center text-[13px] text-zinc-500">
-        아직 가맹점이 없으신가요? <Link href="/merchant/register" className="font-semibold text-zinc-900">가맹점 등록 →</Link>
+        아직 가맹점이 없으신가요? <Link href="/login?next=/merchant/register" className="font-semibold text-zinc-900">가맹점 등록 →</Link>
       </p>
     </div>
   );

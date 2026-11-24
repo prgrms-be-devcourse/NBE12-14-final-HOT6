@@ -7,7 +7,7 @@ import type {
 } from "@/lib/types";
 
 export const registerMerchant = (body: MerchantRegisterRequest) =>
-  api<MerchantRegisterResponse>("/merchants", { method: "POST", body });
+  api<MerchantRegisterResponse>("/merchants", { method: "POST", body, stay401: true }); // 401 이면 등록 화면이 "로그인이 필요해요"를 보여 준다
 
 // 가맹점은 토큰의 회원으로 찾는다 (점주 기능은 /merchants/me 아래)
 export const getMyMerchant = () => api<MerchantResponse>("/merchants/me");

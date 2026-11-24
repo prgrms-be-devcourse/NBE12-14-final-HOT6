@@ -14,7 +14,7 @@ const LANES: { title: string; note?: string; items: Item[] }[] = [
   { title: "회원 앱 · 마이페이지", items: [
     { href: "/my", label: "⑯ 마이페이지" }, { href: "/my/profile", label: "⑰ 내정보 수정" }, { href: "/my/withdraw", label: "⑱ 회원 탈퇴 · 정산" } ] },
   { title: "사장님 앱", items: [
-    { href: "/merchant/register", label: "① 가맹점 등록", star: true }, { href: "/merchant/edit", label: "② 정보 · 상태관리" },
+    { href: "/merchant/register", label: "① 가맹점 등록", star: true }, { href: "/merchant/edit", label: "② 가맹점 정보" },
     { href: "/merchant/qr", label: "③ QR 생성", star: true }, { href: "/merchant/paid", label: "④ QR 결제 완료 확인", star: true },
     { href: "/merchant/payments", label: "⑤ 결제 내역" }, { href: "/merchant/daily", label: "⑥ 일 정산" }, { href: "/merchant/monthly", label: "⑦ 월 정산" } ] },
   { title: "운영팀", items: [

@@ -9,7 +9,6 @@ import { loadCtx, saveCtx } from "@/lib/devContext";
 import { getMyMerchant, updateMerchant } from "@/lib/endpoints";
 
 export default function MerchantEditPage() {
-  const [open, setOpen] = useState(true);
   const [editing, setEditing] = useState(false);
   const [f, setF] = useState({ name: "", address: "", phone: "" });
   const [eligible, setEligible] = useState(true);
@@ -41,7 +40,7 @@ export default function MerchantEditPage() {
     };
   }, []);
 
-  // PATCH /api/merchants/me : 이름·주소만 서버에 반영. 연락처·위치·업종은 API 미지원이라 이 브라우저에만 저장
+  // 이름·주소만 서버에 반영한다. 연락처·위치는 서버에 저장하지 않아 이 브라우저에만 둔다
   const save = async () => {
     setBusy(true);
     setMsg(null);
@@ -66,17 +65,17 @@ export default function MerchantEditPage() {
 
   return (
     <>
-      <Header title="가맹점 정보 · 상태관리" />
+      <Header title="가맹점 정보" />
       <div className="space-y-3 px-5 pb-5">
-        <div className="card flex items-center justify-between !p-3.5">
-          <div><div className="font-semibold">{f.name}</div><span className={`badge mt-1 ${eligible ? "badge-ok" : "badge-warn"}`}>{eligible ? "적립 가능 가맹점" : "적립 제외 가맹점"}</span></div>
-          <span className={`badge ${open ? "badge-info" : "badge-bad"}`}>{open ? "운영중" : "중지"}</span>
+        <div className="card !p-3.5">
+          <div className="font-semibold">{f.name}</div>
+          <span className={`badge mt-1 ${eligible ? "badge-ok" : "badge-warn"}`}>{eligible ? "적립 가능 가맹점" : "적립 제외 가맹점"}</span>
         </div>
         {input("name", "가맹점명")}
         {input("address", "주소")}
-        {input("phone", "연락처")}
+        {input("phone", "연락처 (이 기기에만 저장돼요)")}
         <div>
-          <span className="label">지도</span>
+          <span className="label">지도 (이 기기에만 저장돼요)</span>
           {ready && <MapPicker value={pos} onChange={editing ? setPos : undefined} />}
           <p className="note mt-1">{editing ? "지도를 눌러 위치를 바꿀 수 있어요" : pos ? "등록된 위치" : "위치가 등록되지 않았어요 (수정에서 선택)"}</p>
         </div>
@@ -85,17 +84,8 @@ export default function MerchantEditPage() {
           ? <div className="flex gap-2.5"><button type="button" onClick={() => setEditing(false)} className="btn btn-outline">취소</button><button type="button" onClick={save} disabled={busy || !f.name.trim() || !f.address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "저장 중…" : "저장"}</button></div>
           : <button type="button" onClick={() => setEditing(true)} disabled={!loaded} className="btn btn-outline disabled:opacity-40">수정</button>}
 
-        <div>
-          <span className="label">운영 상태</span>
-          <div className="flex gap-2" role="radiogroup">
-            {[["운영중", true], ["중지", false]].map(([l, v]) => (
-              <button key={String(l)} type="button" role="radio" aria-checked={open === v} onClick={() => setOpen(v as boolean)} className={`chip flex-1 ${open === v ? "chip-on" : ""}`}>{l}</button>
-            ))}
-          </div>
-          <p className={`mt-2 text-[13px] ${open ? "text-slate-500" : "font-medium text-red-600"}`} role="status">중지 상태에서는 QR 결제가 거절됩니다</p>
-        </div>
         <Link href="/merchant/qr" className="btn btn-primary">QR 생성하러 가기</Link>
-        <p className="note">※ 이름·주소 수정은 PATCH /api/merchants/me 로 저장돼요. 연락처·위치·운영 상태 변경은 API 연동 전이라 화면에서만 반영됩니다.</p>
+        <p className="note">가맹점명과 주소는 서버에 저장돼요. 연락처와 지도 위치는 이 기기에서만 보이고 서버에는 저장되지 않아요.</p>
       </div>
     </>
   );
