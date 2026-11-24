@@ -12,6 +12,7 @@ import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.NoticeType;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackNoticeService;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,7 +46,9 @@ class CashbackNoticeControllerTest {
             "12월 1일부터 적립률이 5%로 바뀌어요.",
             LocalDate.of(2026, 12, 1),
             null,
-            LocalDateTime.of(2026, 11, 18, 9, 0));
+            LocalDateTime.of(2026, 11, 18, 9, 0),
+            new BigDecimal("0.05"),
+            new BigDecimal("0.10"));
     given(noticeService.list(NoticeType.POLICY_CHANGE, 1, 5))
         .willReturn(new PageResponse<>(List.of(notice), 1, 5, 6L, 2));
 
@@ -58,7 +61,9 @@ class CashbackNoticeControllerTest {
         .andExpect(jsonPath("$.data.content[0].type").value("POLICY_CHANGE"))
         .andExpect(jsonPath("$.data.content[0].content").value("12월 1일부터 적립률이 5%로 바뀌어요."))
         .andExpect(jsonPath("$.data.content[0].effectiveFrom").value("2026-12-01"))
-        .andExpect(jsonPath("$.data.content[0].stopAt").doesNotExist());
+        .andExpect(jsonPath("$.data.content[0].stopAt").doesNotExist())
+        .andExpect(jsonPath("$.data.content[0].rate").value(0.05))
+        .andExpect(jsonPath("$.data.content[0].previousRate").value(0.10));
   }
 
   // 목적: 종류·페이지를 생략하면 전체, 첫 페이지, 기본 크기 20 으로 조회하는지 확인한다.
