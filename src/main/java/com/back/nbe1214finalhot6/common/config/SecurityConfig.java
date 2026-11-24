@@ -64,6 +64,9 @@ public class SecurityConfig {
                     .permitAll()
                     .requestMatchers("/actuator/health/**")
                     .permitAll()
+                    // API 명세(Swagger UI). 운영 환경에서는 springdoc 을 꺼 두어 이 경로가 열리지 않는다
+                    .requestMatchers(HttpMethod.GET, "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                    .permitAll()
                     // 운영자
                     .requestMatchers("/api/admin/**")
                     .hasRole("ADMIN")
