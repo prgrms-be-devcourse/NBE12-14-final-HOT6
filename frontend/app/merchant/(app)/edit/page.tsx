@@ -16,7 +16,6 @@ export default function MerchantEditPage() {
   const [eligible, setEligible] = useState(true);
   const [pos, setPos] = useState<LatLng | null>(null);
   const [ready, setReady] = useState(false);
-  const [merchantId, setMerchantId] = useState(1);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -24,7 +23,6 @@ export default function MerchantEditPage() {
     const c = loadCtx();
     setF((x) => ({ ...x, name: c.merchantName ?? x.name, address: c.merchantAddress ?? x.address }));
     setEligible(c.eligible ?? true);
-    setMerchantId(c.merchantId);
     if (c.lat !== undefined && c.lng !== undefined) setPos({ lat: c.lat, lng: c.lng });
     setReady(true);
   }, []);
@@ -34,7 +32,7 @@ export default function MerchantEditPage() {
     setBusy(true);
     setMsg(null);
     try {
-      const res = await updateMerchant(merchantId, { name: f.name.trim(), address: f.address.trim() });
+      const res = await updateMerchant({ name: f.name.trim(), address: f.address.trim() });
       saveCtx({ merchantName: res.name, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
       setF((x) => ({ ...x, name: res.name, address: res.address }));
       setEligible(res.cashbackEligible);

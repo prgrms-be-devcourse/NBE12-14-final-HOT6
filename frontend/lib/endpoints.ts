@@ -7,8 +7,9 @@ import type {
 export const registerMerchant = (body: MerchantRegisterRequest) =>
   api<MerchantRegisterResponse>("/merchants", { method: "POST", body });
 
-export const updateMerchant = (merchantId: number, body: MerchantUpdateRequest) =>
-  api<MerchantResponse>(`/merchants/${merchantId}`, { method: "PATCH", body });
+// 점주 본인 가맹점은 토큰의 회원으로 찾는다 (/me)
+export const updateMerchant = (body: MerchantUpdateRequest) =>
+  api<MerchantResponse>("/merchants/me", { method: "PATCH", body });
 
 export const searchMerchants = (name: string, page = 0, size = 20) =>
   api<PageResponse<MerchantResponse>>(`/merchants?name=${encodeURIComponent(name)}&page=${page}&size=${size}`);
@@ -20,12 +21,12 @@ export const pay = (body: PaymentRequest, idempotencyKey: string) =>
 export const getPaymentByKey = (walletId: number, key: string) =>
   api<PaymentResponse>(`/payments/by-key/${encodeURIComponent(key)}?walletId=${walletId}`);
 
-// 가맹점주 전액 취소. merchantId 는 인증 연동 전까지 임시로 쿼리 파라미터로 보낸다
-export const cancelPayment = (paymentId: number, merchantId: number) =>
-  api<PaymentResponse>(`/payments/${paymentId}/cancel?merchantId=${merchantId}`, { method: "POST" });
+// 가맹점주 전액 취소. 가맹점은 토큰의 회원으로 정한다
+export const cancelPayment = (paymentId: number) =>
+  api<PaymentResponse>(`/payments/${paymentId}/cancel`, { method: "POST" });
 
-export const createDynamicQr = (merchantId: number, amount: number) =>
-  api<QrCreateResponse>(`/merchants/${merchantId}/qr/dynamic`, { method: "POST", body: { amount } });
+export const createDynamicQr = (amount: number) =>
+  api<QrCreateResponse>("/merchants/me/qr/dynamic", { method: "POST", body: { amount } });
 
 export const scanQr = (token: string) => api<QrScanResponse>(`/qr/${encodeURIComponent(token)}`);
 

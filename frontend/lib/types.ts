@@ -1,7 +1,6 @@
 // 백엔드 DTO 와 1:1 (src/main/java/.../dto)
 // 적립 대상 여부는 서버가 결정한다: revenueProof(연매출 30억 미만 증빙 서류)가 있으면 자동 승인
 export type MerchantRegisterRequest = {
-  ownerId: number;
   name: string;
   address: string;
   revenueProof?: string;
