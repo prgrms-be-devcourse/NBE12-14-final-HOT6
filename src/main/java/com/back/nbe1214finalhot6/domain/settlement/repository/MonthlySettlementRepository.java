@@ -16,6 +16,10 @@ public interface MonthlySettlementRepository extends JpaRepository<MonthlySettle
   // 달에 상관없이 아직 지급이 끝나지 않은 건. 오래된 건부터 재시도한다.
   List<MonthlySettlement> findByStatusOrderByIdAsc(MonthlySettlementStatus status);
 
+  // 한 가맹점의 기간 안 월 정산 건. 양 끝 달을 포함한다.
+  List<MonthlySettlement> findByMerchantIdAndSettlementMonthBetweenOrderBySettlementMonthAsc(
+      Long merchantId, LocalDate from, LocalDate to);
+
   // 같은 건의 출금·지급 완료가 동시에 진행되지 않게 잠그고 읽음. 락 순서는 정산 건 → 지갑
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   Optional<MonthlySettlement> findWithLockById(Long id);

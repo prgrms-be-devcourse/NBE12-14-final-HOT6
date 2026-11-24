@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LogoutLink from "@/components/LogoutLink";
 import Header from "@/components/Header";
 import { won } from "@/lib/format";
 import { user, wallet } from "@/lib/mock";
@@ -37,7 +38,7 @@ export default function MyPage() {
           ))}
         </ul>
         <div className="flex gap-2.5 pt-1">
-          <Link href="/" className="btn btn-outline">로그아웃</Link>
+          <LogoutLink href="/" className="btn btn-outline">로그아웃</LogoutLink>
           <Link href="/my/withdraw" className="btn btn-danger">회원 탈퇴</Link>
         </div>
       </div>

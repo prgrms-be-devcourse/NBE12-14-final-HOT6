@@ -1,5 +1,4 @@
-import Link from "next/link";
-import Field from "@/components/Field";
+import LoginForm from "@/components/LoginForm";
 import HomeLink from "@/components/HomeLink";
 import Logo from "@/components/Logo";
 
@@ -10,11 +9,7 @@ export default function AdminLoginPage() {
       <div className="card w-full max-w-sm !p-8">
         <Logo className="text-2xl" />
         <p className="mt-1 text-sm text-zinc-500">운영팀 콘솔</p>
-        <form className="mt-6 space-y-3">
-          <Field label="이메일" type="email" />
-          <Field label="비밀번호" type="password" />
-          <Link href="/admin" className="btn btn-primary">로그인</Link>
-        </form>
+        <div className="mt-6"><LoginForm audience="admin" /></div>
       </div>
     </div>
   );

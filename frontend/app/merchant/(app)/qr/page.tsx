@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import Countdown from "@/components/Countdown";
 import Header from "@/components/Header";
 import { ApiError } from "@/lib/api";
-import { loadCtx, saveCtx } from "@/lib/devContext";
+import { saveCtx } from "@/lib/devContext";
 import { createDynamicQr, getQrStatus, secondsUntil } from "@/lib/endpoints";
 import { LIMITS } from "@/lib/limits";
 import { won } from "@/lib/format";
@@ -15,16 +15,12 @@ const STATUS_LABEL: Record<QrStatus, string> = { WAITING: "대기중", USED: "�
 const POLL_MS = 2000;
 
 export default function MerchantQrPage() {
-  const [merchantId, setMerchantId] = useState(1);
   const [amount, setAmount] = useState(12000);
   const [qr, setQr] = useState<QrCreateResponse | null>(null);
   const [status, setStatus] = useState<QrStatus | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
-  useEffect(() => setMerchantId(loadCtx().merchantId), []);
 
   useEffect(() => {
     if (!qr || status !== "WAITING") return;
@@ -41,7 +37,7 @@ export default function MerchantQrPage() {
     setBusy(true);
     setCopied(false);
     try {
-      const res = await createDynamicQr(merchantId, amount);
+      const res = await createDynamicQr(amount);
       setQr(res);
       setStatus("WAITING");
       saveCtx({ qrToken: res.token });
