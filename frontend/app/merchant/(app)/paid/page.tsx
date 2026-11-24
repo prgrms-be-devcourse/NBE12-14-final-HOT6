@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
+import { ApiError } from "@/lib/api";
 import { loadCtx } from "@/lib/devContext";
 import { getQrStatus } from "@/lib/endpoints";
 import type { QrStatus, QrStatusResponse } from "@/lib/types";
@@ -17,6 +18,7 @@ const fmtTime = (iso: string) => iso.slice(11, 16);
 export default function MerchantPaidPage() {
   const [token, setToken] = useState("");
   const [res, setRes] = useState<QrStatusResponse | null>(null);
+  const [error, setError] = useState(""); // 상태 조회가 실패했을 때의 안내 (성공하면 지운다)
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
@@ -34,9 +36,13 @@ export default function MerchantPaidPage() {
         .then((r) => {
           if (!alive) return;
           setRes(r);
+          setError("");
           if (r.status !== "WAITING") clearInterval(timer);
         })
-        .catch(() => {});
+        // 실패해도 계속 다시 시도한다. "확인하는 중이에요"에서 멈춰 보이지 않게 이유를 보여 준다
+        .catch((e) => {
+          if (alive) setError(e instanceof ApiError ? e.message : "QR 상태를 확인하지 못했어요");
+        });
     };
     const timer = setInterval(check, POLL_MS);
     check();
@@ -58,7 +64,12 @@ export default function MerchantPaidPage() {
         </div>
         <section className="card text-center">
           {!token && <p className="text-sm text-zinc-500">아직 만든 QR이 없어요. 새 QR을 만들어 주세요.</p>}
-          {token && !res && <p role="status" className="text-sm text-zinc-500">QR 상태를 확인하는 중이에요…</p>}
+          {token && !res && !error && <p role="status" className="text-sm text-zinc-500">QR 상태를 확인하는 중이에요…</p>}
+          {token && error && (
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">
+              QR 상태를 확인하지 못했어요 ({error}). {res ? "마지막으로 확인한 상태를 보여 드려요. " : ""}잠시 뒤 다시 확인해요.
+            </p>
+          )}
           {res?.status === "USED" && <div className="amt-in text-xl font-bold">결제가 완료됐어요</div>}
           {res?.status === "WAITING" && <div className="text-sm text-zinc-600">손님의 결제를 기다리고 있어요 · {fmtTime(res.expiresAt)}까지 유효</div>}
           {res?.status === "EXPIRED" && <div className="text-sm text-zinc-600">QR 유효시간이 지났어요. 새 QR을 만들어 주세요.</div>}

@@ -84,16 +84,21 @@ export default function MerchantQrPage() {
             <div className={`mx-auto grid h-44 w-44 grid-cols-7 gap-0.5 rounded-lg border-2 border-brand-600 p-2 ${status === "WAITING" ? "" : "opacity-30"}`} aria-label="결제 QR">
               {Array.from({ length: 49 }, (_, i) => <span key={i} className={((i * 7 + (i >> 2)) % 3 === 0) ? "bg-slate-800" : "bg-slate-100"} />)}
             </div>
+            <p className="mt-2 text-[12px] text-slate-500">위 그림은 예시예요. 스캔되지 않으니 손님에게 아래 결제 코드를 알려 주세요.</p>
             <p className="mt-3 text-lg font-extrabold tabular-nums">{won(qr.amount)}</p>
-            <p className="mt-1 text-sm">
-              남은 시간{" "}
-              {status === "WAITING"
-                ? <Countdown key={qr.token} seconds={secondsUntil(qr.expiresAt)} onExpire={expire} className="font-semibold" />
-                : <span className="font-semibold">00:00</span>}
-            </p>
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-left">
-              <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-600" title={qr.token}>{qr.token}</span>
-              <button type="button" onClick={copy} className="btn btn-outline btn-sm !w-auto shrink-0">{copied ? "복사됨" : "코드 복사"}</button>
+            <div className={`mt-3 rounded-xl border px-3 py-3 ${status === "WAITING" ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+              <div className="text-[13px] font-semibold text-slate-700">QR 유효시간</div>
+              <div className="text-3xl font-extrabold tabular-nums" role="timer">
+                {status === "WAITING"
+                  ? <Countdown key={qr.token} seconds={secondsUntil(qr.expiresAt)} onExpire={expire} className="text-slate-900" warnBelow={30} warnClassName="!text-red-600" />
+                  : <span className="text-slate-400">00:00</span>}
+              </div>
+              <p className="mt-1 text-[12px] text-slate-600">만든 뒤 3분 동안만 결제할 수 있어요. 지나면 새 QR을 만들어 주세요.</p>
+            </div>
+            <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2.5 text-left">
+              <div className="text-[13px] font-semibold text-slate-700">결제 코드 <span className="font-normal text-slate-500">· 손님 앱의 QR 결제 화면에 입력해요</span></div>
+              <div className="mt-1.5 break-all font-mono text-sm text-slate-800 select-all" data-testid="qr-token">{qr.token}</div>
+              <button type="button" onClick={copy} className="btn btn-outline btn-sm mt-2">{copied ? "복사됨" : "코드 복사"}</button>
             </div>
           </section>
         )}
