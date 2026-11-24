@@ -89,3 +89,24 @@ export type QrStatus = "WAITING" | "USED" | "EXPIRED";
 export type QrCreateResponse = { token: string; amount: number; expiresAt: string };
 export type QrScanResponse = { merchantId: number; merchantName: string; amount: number; cashbackEligible: boolean; expiresAt: string };
 export type QrStatusResponse = { status: QrStatus; expiresAt: string };
+
+// 점주의 결제 내역·매출. 결제는 완료한 날, 취소는 취소한 날에 센다 (일 정산과 같은 기준). 결제한 이용자 정보는 없다
+export type MerchantPaymentItem = {
+  paymentId: number;
+  status: PaymentStatus;
+  amount: number;
+  walletUsedAmount: number;
+  cashbackUsedAmount: number;
+  completedAt: string | null;
+  canceledAt: string | null;
+};
+export type MerchantPaymentsResponse = {
+  from: string;
+  to: string;
+  paymentCount: number;
+  paymentAmount: number;
+  cancelCount: number;
+  cancelAmount: number;
+  netSales: number; // 결제 - 취소. 취소가 더 많은 날은 음수
+  payments: PageResponse<MerchantPaymentItem>;
+};

@@ -1,13 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Countdown from "@/components/Countdown";
 import Header from "@/components/Header";
 import SignBoard from "@/components/SignBoard";
 import { ICONS } from "@/components/icons";
 import { ApiError } from "@/lib/api";
-import { getCashbackPreview, getUpcomingPolicyChange, pctText, REASON_TEXT } from "@/lib/cashbackApi";
+import { getCashbackPreview, getUpcomingPolicyChange, pctText, REASON_TEXT, REASON_TONE, REASON_TONE_CLASS } from "@/lib/cashbackApi";
 import { loadCtx, saveCtx } from "@/lib/devContext";
 import { getMyWallet, scanQr, secondsUntil } from "@/lib/endpoints";
 import { LIMITS } from "@/lib/limits";
@@ -27,10 +27,14 @@ export default function ScanPage() {
   const [load, setLoad] = useState<Load>({ kind: "idle" });
   const [expired, setExpired] = useState(false);
   const [cashbackInput, setCashbackInput] = useState(""); // 비우면 0 (캐시백을 쓰지 않고 데브머니로만 결제)
+  const lastToken = useRef(""); // 마지막으로 조회한 QR (바뀌었는지 비교한다)
 
   const lookup = (t: string) => {
     const v = t.trim();
     if (!v) return;
+    // 다른 QR 이면 이전 QR 에서 입력한 캐시백을 지운다 (남아 있으면 새 결제금액을 넘어 결제 버튼이 막힌다)
+    if (v !== lastToken.current) setCashbackInput("");
+    lastToken.current = v;
     setToken(v);
     setExpired(false);
     setLoad({ kind: "loading" });
@@ -88,6 +92,9 @@ export default function ScanPage() {
   const eligible = qr?.cashbackEligible ?? true;
   const reason = !eligible ? "NOT_ELIGIBLE" : (p?.exclusionReason ?? "NONE");
   const earning = !!p && p.earnable && p.expectedAmount > 0 && devMoney > 0;
+  // 안내 문구의 색 (적립됨 초록, 대상 아님·데브머니 없음·1원 미만 회색, 월 한도 초과 주황, 예산 소진·적립 중단 빨강)
+  // (적립 중단은 위쪽 빨강 안내가 따로 알리므로, 여기서는 사유만 본다. 서버가 중단 달에 적립이 안 되면 사유를 BUDGET_EXHAUSTED 로 준다)
+  const tone = earning ? "ok" : devMoney === 0 || previewLoad.loading ? "muted" : REASON_TONE[reason];
   const rate = p?.appliedRate ?? 0;
   const monthlyRemaining = p?.monthlyLimitRemaining ?? 0;
   const overLimit = amount > LIMITS.perPayment;
@@ -185,7 +192,13 @@ export default function ScanPage() {
                   <button type="button" onClick={() => setCashbackInput("")} className="btn btn-outline btn-sm !w-auto shrink-0">지우기</button>
                 </div>
               </label>
-              {!cashbackOk && <p role="alert" className="mt-2 text-[13px] font-medium text-red-600">캐시백은 {won(cashbackMax)} 이하로 입력해 주세요 ({wallet && wallet.availableCashback < amount ? "쓸 수 있는 캐시백까지만 사용할 수 있어요" : "결제금액까지만 사용할 수 있어요"})</p>}
+              {!cashbackOk && (
+                <p role="alert" className="mt-2 text-[13px] font-medium text-red-600">
+                  {cashbackMax === 0
+                    ? "지금 쓸 수 있는 캐시백이 없어요. 캐시백 사용 금액을 비워 주세요"
+                    : `캐시백은 ${won(cashbackMax)} 이하로 입력해 주세요 (${wallet && wallet.availableCashback < amount ? "쓸 수 있는 캐시백까지만 사용할 수 있어요" : "결제금액까지만 사용할 수 있어요"})`}
+                </p>
+              )}
               <p className="note mt-2">나머지 {won(devMoney)}은 데브머니로 결제돼요</p>
             </section>
 
@@ -207,7 +220,13 @@ export default function ScanPage() {
                 <span className="badge">예상</span>
               </div>
               {previewLoad.error && <p role="alert" className="mt-1 text-[13px] text-red-600">{previewLoad.error}</p>}
-              {!earning && !previewLoad.error && <p className="mt-1 text-[13px] text-slate-600">{devMoney === 0 ? "캐시백으로만 결제하면 적립되지 않아요." : previewLoad.loading ? "계산 중이에요…" : REASON_TEXT[reason]}</p>}
+              {!previewLoad.error && (
+                <p role="status" className={`mt-2 rounded-lg border px-3 py-2 text-[13px] font-medium ${REASON_TONE_CLASS[tone]}`}>
+                  {earning
+                    ? REASON_TEXT.NONE
+                    : devMoney === 0 ? "캐시백으로만 결제하면 적립되지 않아요." : previewLoad.loading ? "계산 중이에요…" : REASON_TEXT[reason]}
+                </p>
+              )}
               <dl className="mt-2 space-y-1.5 text-[13px]">
                 <div className="flex justify-between"><dt className="text-slate-500">적용 요율 (접수 시각 기준)</dt><dd className="font-bold tabular-nums">{pctText(rate)}</dd></div>
                 {earning && <div className="flex justify-between"><dt className="text-slate-500">계산 근거</dt><dd className="font-medium tabular-nums">{devMoney.toLocaleString("ko-KR")} × {pctText(rate)} = {p!.expectedAmount.toLocaleString("ko-KR")}원</dd></div>}

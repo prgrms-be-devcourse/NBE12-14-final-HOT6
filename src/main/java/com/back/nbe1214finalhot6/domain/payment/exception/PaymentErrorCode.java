@@ -28,7 +28,9 @@ public enum PaymentErrorCode implements ErrorCode {
   // 취소: 완료(COMPLETED) 상태의 결제만 취소할 수 있다
   PAYMENT_NOT_CANCELABLE("PAY-006", HttpStatus.CONFLICT, "취소할 수 없는 결제 상태입니다"),
   // 취소: 본인 가맹점의 결제만 취소할 수 있다
-  PAYMENT_MERCHANT_MISMATCH("PAY-007", HttpStatus.FORBIDDEN, "본인 가맹점의 결제만 취소할 수 있습니다");
+  PAYMENT_MERCHANT_MISMATCH("PAY-007", HttpStatus.FORBIDDEN, "본인 가맹점의 결제만 취소할 수 있습니다"),
+  // 사장님 결제 내역: 시작이 끝보다 늦거나 31일을 넘는 기간
+  PAYMENT_INVALID_PERIOD("PAY-008", HttpStatus.BAD_REQUEST, "조회 기간이 올바르지 않습니다 (최대 31일)");
 
   private final String code;
   private final HttpStatus status;

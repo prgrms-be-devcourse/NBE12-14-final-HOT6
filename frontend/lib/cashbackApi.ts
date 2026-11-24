@@ -58,6 +58,19 @@ export const REASON_TEXT: Record<ExclusionCode, string> = {
   BUDGET_EXHAUSTED: "이번 달 캐시백 예산이 소진되었거나 적립이 중단되어 적립되지 않아요.",
 };
 
+// 사유 안내의 색: 적립됨=초록, 대상 아님·데브머니 없음·1원 미만=회색, 월 한도 초과=주황, 예산 소진·적립 중단=빨강
+export type ReasonTone = "ok" | "muted" | "warn" | "bad";
+export const REASON_TONE: Record<ExclusionCode, ReasonTone> = {
+  NONE: "ok", NOT_ELIGIBLE: "muted", NO_WALLET_USAGE: "muted", AMOUNT_TOO_SMALL: "muted",
+  MONTHLY_LIMIT_EXCEEDED: "warn", BUDGET_EXHAUSTED: "bad",
+};
+export const REASON_TONE_CLASS: Record<ReasonTone, string> = {
+  ok: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  muted: "border-slate-200 bg-slate-50 text-slate-600",
+  warn: "border-orange-200 bg-orange-50 text-orange-800",
+  bad: "border-red-200 bg-red-50 text-red-700",
+};
+
 // 곧 적용될 요율 인하 예고 (오늘 이후에 시작하는 가장 최근 POLICY_CHANGE 공지)
 export async function getUpcomingPolicyChange(): Promise<Notice | null> {
   const today = new Date().toISOString().slice(0, 10);
