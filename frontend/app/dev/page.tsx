@@ -1,5 +1,4 @@
 import Link from "next/link";
-import DevContextPanel from "@/components/DevContextPanel";
 
 type Item = { href: string; label: string; star?: boolean };
 const LANES: { title: string; note?: string; items: Item[] }[] = [
@@ -28,7 +27,6 @@ export default function DevMenuPage() {
       <h1 className="text-2xl font-semibold">화면 목록 <span className="text-base font-normal text-zinc-500">(개발용)</span></h1>
       <p className="mt-1 text-sm text-zinc-500">전체 화면 목록 · <span className="text-amber-600">★</span> = 11/24 중간 제출 필수 화면</p>
       <Link href="/dev/api" className="btn btn-primary mt-4 !w-auto">API 테스트 열기 →</Link>
-      <DevContextPanel />
       <div className="mt-6 space-y-4">
         {LANES.map((l) => (
           <section key={l.title} className="card">

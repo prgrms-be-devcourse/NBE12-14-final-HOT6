@@ -220,6 +220,29 @@ class MerchantWalletServiceTest {
   }
 
   @Test
+  @DisplayName("정산 계좌 잔액은 계좌로 출금된 지급액의 합이다")
+  void 계좌잔액_조회() {
+    service.createFor(MERCHANT_ID);
+    service.deposit(MERCHANT_ID, 10_000L, 1L);
+    service.withdrawToAccount(MERCHANT_ID, 10_000L, 1L);
+    service.deposit(MERCHANT_ID, 5_000L, 2L);
+    service.withdrawToAccount(MERCHANT_ID, 5_000L, 2L);
+
+    assertThat(service.getAccount(MERCHANT_ID).balance()).isEqualTo(15_000L);
+  }
+
+  @Test
+  @DisplayName("정산 계좌가 없으면 MWL-004 로 거절한다")
+  void 계좌잔액_계좌없음() {
+    assertThatThrownBy(() -> service.getAccount(MERCHANT_ID))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e ->
+                assertThat(e.getErrorCode())
+                    .isEqualTo(MerchantWalletErrorCode.MERCHANT_ACCOUNT_NOT_FOUND));
+  }
+
+  @Test
   @DisplayName("계좌가 없으면 출금이 거절되고 지갑 잔액은 그대로다")
   void 출금_계좌없음() {
     service.createFor(MERCHANT_ID);

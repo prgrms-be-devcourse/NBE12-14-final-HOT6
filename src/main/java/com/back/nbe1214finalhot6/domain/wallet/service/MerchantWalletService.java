@@ -1,6 +1,7 @@
 package com.back.nbe1214finalhot6.domain.wallet.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.domain.wallet.dto.MerchantAccountResponse;
 import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantAccount;
 import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantWallet;
 import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantWalletTransaction;
@@ -24,6 +25,16 @@ public class MerchantWalletService {
   private final MerchantAccountRepository accountRepository;
   private final MerchantWalletTransactionRepository transactionRepository;
   private final Clock clock;
+
+  /** 정산 계좌의 현재 잔액. 월 정산 지급액이 계좌로 출금되어 쌓인 금액이다. */
+  @Transactional(readOnly = true)
+  public MerchantAccountResponse getAccount(Long merchantId) {
+    return accountRepository
+        .findByMerchantId(merchantId)
+        .map(account -> new MerchantAccountResponse(account.getBalance()))
+        .orElseThrow(
+            () -> new BusinessException(MerchantWalletErrorCode.MERCHANT_ACCOUNT_NOT_FOUND));
+  }
 
   /** 가맹점 등록 때 잔액 0원의 지갑과 계좌를 함께 만듦. */
   @Transactional
