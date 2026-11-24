@@ -23,3 +23,13 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
   access-token-minutes: 30
+
+# API 명세(Swagger UI): /swagger-ui.html. 운영 환경에서는 application-prod.yaml 에서 끈다.
+springdoc:
+  swagger-ui:
+    tags-sorter: alpha
+    operations-sorter: method
+    display-request-duration: true
+    persist-authorization: true # 새로고침해도 Authorize 에 넣은 토큰을 유지한다
+    groups-order: asc
+  default-produces-media-type: application/json
