@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
 // ok=false 이면 message 를 보여 주고, locked 면 잠금 화면으로 보낸다
 export type PinResult = { ok: true } | { ok: false; message: string; locked?: boolean };
@@ -19,16 +19,20 @@ export default function PinPad({ mode, doneHref, lockedHref = "/locked", onSubmi
   const router = useRouter();
   const [pin, setPin] = useState("");
   const [first, setFirst] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [requesting, setBusy] = useState(false);
+  const [moving, startTransition] = useTransition();
+  const busy = requesting || moving;
   const [error, setError] = useState("");
 
   const submit = async (value: string) => {
     if (!onSubmit) return router.push(doneHref);
     setBusy(true);
     const res = await onSubmit(value);
-    if (res.ok) return router.push(doneHref);
-    if (res.locked) return router.push(lockedHref);
+    // 화면이 이동한 뒤에도 이 컴포넌트는 메모리에 남을 수 있어서(되돌아오면 그대로 보임) busy 를 반드시 푼다.
+    // 이동 중에는 pending 으로 "확인하는 중" 을 이어서 보여 준다.
     setBusy(false);
+    if (res.ok) return startTransition(() => router.push(doneHref));
+    if (res.locked) return startTransition(() => router.push(lockedHref));
     if (mode === "set") setFirst(null);
     setError(res.message);
   };
