@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { mmss } from "@/lib/format";
 
-type Props = { seconds: number; className?: string; onExpire?: () => void };
+// warnBelow 초 이하로 남으면 warnClassName 을 더해 눈에 띄게 한다(예: 빨간색)
+type Props = { seconds: number; className?: string; onExpire?: () => void; warnBelow?: number; warnClassName?: string };
 
-export default function Countdown({ seconds, className, onExpire }: Props) {
+export default function Countdown({ seconds, className, onExpire, warnBelow, warnClassName }: Props) {
   const [left, setLeft] = useState(seconds);
   const [base, setBase] = useState(seconds);
 
@@ -23,5 +24,6 @@ export default function Countdown({ seconds, className, onExpire }: Props) {
     if (left === 0) onExpire?.();
   }, [left, onExpire]);
 
-  return <span className={className}>{mmss(left)}</span>;
+  const warn = warnBelow !== undefined && left <= warnBelow;
+  return <span className={warn && warnClassName ? `${className ?? ""} ${warnClassName}` : className}>{mmss(left)}</span>;
 }
