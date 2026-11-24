@@ -51,6 +51,14 @@ public class MerchantController {
   }
 
   @Operation(
+      summary = "내 가맹점 조회",
+      description = "로그인한 점주의 가맹점을 조회한다(가맹점 번호는 토큰의 회원으로 찾는다). 가맹점이 없으면 404")
+  @GetMapping("/me")
+  public ApiResponse<MerchantResponse> getMine(@AuthenticationPrincipal AuthUser user) {
+    return ApiResponse.ok(merchantService.get(ownedResources.merchantIdOf(user)));
+  }
+
+  @Operation(
       summary = "가맹점 수정",
       description =
           "로그인한 점주의 가맹점을 수정한다(가맹점 번호는 토큰의 회원으로 찾는다). "

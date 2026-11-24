@@ -93,6 +93,8 @@ class SecurityConfigTest {
         Arguments.of("POST", "/api/admin/cashback/payouts/run", 401, 403, 403, 200),
         Arguments.of("GET", "/api/admin/cashback/policies", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/cashback/budget/transfers", 401, 403, 403, 200),
+        Arguments.of("GET", "/api/admin/settlements/reconciliation", 401, 403, 403, 200),
+        Arguments.of("POST", "/api/admin/settlements/reconciliation/run", 401, 403, 403, 200),
         // 시민 기능(OWNER 포함, ADMIN 제외)
         Arguments.of("POST", "/api/payments", 401, 200, 200, 403),
         Arguments.of("GET", "/api/payments/by-key/k1", 401, 200, 200, 403),
@@ -106,11 +108,16 @@ class SecurityConfigTest {
         // 가맹점: 등록과 이름 검색은 시민도, 관리는 점주만
         Arguments.of("POST", "/api/merchants", 401, 200, 200, 403),
         Arguments.of("GET", "/api/merchants", 401, 200, 200, 403),
+        Arguments.of("GET", "/api/merchants/me", 401, 403, 200, 403),
+        Arguments.of("GET", "/api/merchants/me/account", 401, 403, 200, 403),
         Arguments.of("PATCH", "/api/merchants/me", 401, 403, 200, 403),
         Arguments.of("POST", "/api/merchants/me/qr/dynamic", 401, 403, 200, 403),
         Arguments.of("GET", "/api/merchants/me/settlements/daily", 401, 403, 200, 403),
+        Arguments.of("GET", "/api/merchants/me/settlements/monthly", 401, 403, 200, 403),
         // 결제 취소는 점주만
         Arguments.of("POST", "/api/payments/1/cancel", 401, 403, 200, 403),
+        // 내 정보 조회는 모든 로그인 역할이 쓴다(운영자 포함)
+        Arguments.of("GET", "/api/users/me", 401, 200, 200, 200),
         // PIN 검증은 이용자(OWNER 포함)만, 운영자는 못 쓴다
         Arguments.of("POST", "/api/users/pin/verify", 401, 200, 200, 403),
         // 규칙에 없는 경로는 로그인만 하면 된다(ADMIN 포함)
