@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -67,6 +68,19 @@ public class User {
     this.pinHash = pinHash;
     this.role = role;
     this.status = UserStatus.ACTIVE;
+  }
+
+  /**
+   * PIN 잠금이 유지되는 시간. 이 시간이 지나면 잠금이 자동으로 풀린다.
+   *
+   * <p>임시 방식이다. 스펙(AUTH-04)의 원래 방식은 이메일 인증번호로 해제한 뒤 PIN 을 재설정하는 것인데 MVP(11/24) 일정에 이메일 발송이 없어서, 스펙의 대체안(30분 자동
+   * 해제)을 쓴다. MVP 이후에는 이메일 인증으로 해제(U7)하는 방식으로 바꾼다. 그때 이 자동 해제는 없애거나 이메일 인증이 안 될 때의 보조 수단으로만 남긴다.
+   */
+  public static final Duration PIN_LOCK_DURATION = Duration.ofMinutes(30);
+
+  /** 지금(now) PIN 이 잠겨 있는지. 잠긴 지 {@link #PIN_LOCK_DURATION}이 지났으면 잠겨 있지 않은 것으로 본다. */
+  public boolean isPinLocked(LocalDateTime now) {
+    return pinLockedAt != null && now.isBefore(pinLockedAt.plus(PIN_LOCK_DURATION));
   }
 
   /** 가맹점을 등록한 회원을 점주로 올린다. 이미 점주면 그대로 두고, 운영자는 점주가 될 수 없다. */

@@ -4,11 +4,12 @@ import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransaction;
 import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-// 거래 내역 조회는 W5에서 추가함
 public interface WalletTransactionRepository extends JpaRepository<WalletTransaction, Long> {
 
   // 같은 (type, refKey)가 이미 반영됐는지 확인(재요청 방지)
@@ -30,4 +31,7 @@ public interface WalletTransactionRepository extends JpaRepository<WalletTransac
       @Param("type") WalletTransactionType type,
       @Param("periodStart") LocalDateTime periodStart,
       @Param("periodEnd") LocalDateTime periodEnd);
+
+  // 지갑의 거래 내역. 정렬은 호출한 쪽의 Pageable 로 정한다(최신순: createdAt, id 내림차순)
+  Page<WalletTransaction> findByWalletId(Long walletId, Pageable pageable);
 }

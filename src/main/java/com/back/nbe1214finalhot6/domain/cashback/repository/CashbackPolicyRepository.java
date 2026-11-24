@@ -2,6 +2,7 @@ package com.back.nbe1214finalhot6.domain.cashback.repository;
 
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -44,4 +45,7 @@ public interface CashbackPolicyRepository extends JpaRepository<CashbackPolicy, 
 
   /** {@code [from, to)} 안에서 시작한 구간 수. 그 달의 요율 인하 횟수를 셀 때 쓴다. */
   long countByStartsAtGreaterThanEqualAndStartsAtLessThan(LocalDateTime from, LocalDateTime to);
+
+  /** 종료 시각이 주어진 시각 중 하나인 요율 구간. 인하가 직전 구간을 적용 시각에 끝내므로, 인하 구간의 직전 구간을 찾는 데 쓴다. 읽기만 한다. */
+  List<CashbackPolicy> findByEndsAtIn(Collection<LocalDateTime> endsAt);
 }

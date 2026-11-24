@@ -1,5 +1,6 @@
 package com.back.nbe1214finalhot6.domain.cashback.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -7,26 +8,31 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.security.OwnedResources;
+import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackExclusionReason;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackPreviewRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackPreviewResponse;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackService;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
+import com.back.nbe1214finalhot6.domain.wallet.exception.WalletErrorCode;
+import com.back.nbe1214finalhot6.support.WithAuthUser;
 import java.math.BigDecimal;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-// 로그인한 사용자(허용 역할)로 호출해서 보안 설정을 거쳐도 통과하는지 함께 확인한다.
+// 로그인한 이용자(허용 역할)로 호출해서 보안 설정을 거쳐도 통과하는지 함께 확인한다. 지갑은 토큰의 회원으로 찾는다.
 @WebMvcTest(CashbackPreviewController.class)
 @Import(SecurityConfig.class)
-@WithMockUser(roles = "USER")
+@WithAuthUser(role = UserRole.USER)
 class CashbackPreviewControllerTest {
 
   private static final String URL = "/api/cashback/preview";
@@ -35,6 +41,13 @@ class CashbackPreviewControllerTest {
   @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private CashbackService cashbackService;
   @MockitoBean private MerchantService merchantService;
+  @MockitoBean private OwnedResources ownedResources;
+
+  // 로그인한 이용자의 지갑은 1번이다
+  @BeforeEach
+  void myWalletIsOne() {
+    given(ownedResources.walletIdOf(any())).willReturn(1L);
+  }
 
   // 목적: 가맹점의 적립 대상 여부가 서비스 요청에 실리고 미리보기 결과가 공통 응답 형식으로 내려가는지 확인한다.
   @Test
@@ -47,8 +60,7 @@ class CashbackPreviewControllerTest {
                 true, false, new BigDecimal("0.03"), 360L, 4_000L, CashbackExclusionReason.NONE));
 
     mockMvc
-        .perform(
-            get(URL).param("walletId", "1").param("merchantId", "7").param("walletUsedAmount", "12000"))
+        .perform(get(URL).param("merchantId", "7").param("walletUsedAmount", "12000"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.earnable").value(true))
@@ -65,16 +77,46 @@ class CashbackPreviewControllerTest {
   @DisplayName("파라미터가 없거나 잘못되면 400")
   void invalidParameters() throws Exception {
     mockMvc.perform(get(URL)).andExpect(status().isBadRequest());
+    mockMvc.perform(get(URL).param("merchantId", "7")).andExpect(status().isBadRequest());
     mockMvc
-        .perform(get(URL).param("walletId", "1").param("merchantId", "7"))
+        .perform(get(URL).param("merchantId", "7").param("walletUsedAmount", "-1"))
         .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(get(URL).param("merchantId", "7").param("walletUsedAmount", "abc"))
+        .andExpect(status().isBadRequest());
+  }
+
+  // 목적: 요청에 다른 회원의 walletId 를 실어 보내도 무시하고 토큰의 회원 지갑으로 계산하는지 확인한다.
+  @Test
+  @DisplayName("요청에 다른 지갑 번호를 보내도 토큰의 회원 지갑으로 계산한다")
+  void ignoresWalletIdParameter() throws Exception {
+    given(merchantService.isCashbackEligible(7L)).willReturn(true);
+    given(cashbackService.preview(new CashbackPreviewRequest(1L, true, 12_000L)))
+        .willReturn(
+            new CashbackPreviewResponse(
+                true, false, new BigDecimal("0.03"), 360L, 4_000L, CashbackExclusionReason.NONE));
+
     mockMvc
         .perform(
-            get(URL).param("walletId", "1").param("merchantId", "7").param("walletUsedAmount", "-1"))
-        .andExpect(status().isBadRequest());
+            get(URL)
+                .param("walletId", "99")
+                .param("merchantId", "7")
+                .param("walletUsedAmount", "12000"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.expectedAmount").value(360));
+  }
+
+  // 목적: 지갑이 없는 회원이면 404(WAL-001)로 응답하는지 확인한다.
+  @Test
+  @DisplayName("내 지갑이 없으면 404")
+  void walletNotFound() throws Exception {
+    given(merchantService.isCashbackEligible(7L)).willReturn(true);
+    given(ownedResources.walletIdOf(any()))
+        .willThrow(new BusinessException(WalletErrorCode.WALLET_NOT_FOUND));
+
     mockMvc
-        .perform(
-            get(URL).param("walletId", "1").param("merchantId", "7").param("walletUsedAmount", "abc"))
-        .andExpect(status().isBadRequest());
+        .perform(get(URL).param("merchantId", "7").param("walletUsedAmount", "12000"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("WAL-001"));
   }
 }

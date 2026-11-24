@@ -142,6 +142,21 @@ class MerchantControllerTest {
   }
 
   @Test
+  @DisplayName("이미 가맹점을 등록한 회원이면 409 MER-002 이다")
+  void 이미등록했으면409() throws Exception {
+    given(registrationFacade.register(any(), any()))
+        .willThrow(new BusinessException(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED));
+
+    mockMvc
+        .perform(
+            post("/api/merchants")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody("테스트 가맹점", "인천광역시 남동구 1")))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MER-002"));
+  }
+
+  @Test
   @DisplayName("이름이 100자면 201, 101자면 400")
   void 이름길이경계값() throws Exception {
     given(registrationFacade.register(any(), any()))
@@ -159,6 +174,33 @@ class MerchantControllerTest {
 
     expectCreated(requestBody("테스트 가맹점", "가".repeat(200)));
     expectBadRequest(requestBody("테스트 가맹점", "가".repeat(201)), "address");
+  }
+
+  @Test
+  @DisplayName("내 가맹점을 조회하면 200 과 가맹점 정보를 반환한다")
+  void 내가맹점조회() throws Exception {
+    given(merchantService.get(1L))
+        .willReturn(new MerchantResponse(1L, "내 가게", "서울시 중구", true));
+
+    mockMvc
+        .perform(get("/api/merchants/me"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.merchantId").value(1))
+        .andExpect(jsonPath("$.data.name").value("내 가게"))
+        .andExpect(jsonPath("$.data.cashbackEligible").value(true));
+  }
+
+  @Test
+  @DisplayName("가맹점이 없는 점주가 내 가맹점을 조회하면 404 MER-001")
+  void 내가맹점없음() throws Exception {
+    given(ownedResources.merchantIdOf(any()))
+        .willThrow(new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+
+    mockMvc
+        .perform(get("/api/merchants/me"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("MER-001"));
   }
 
   @Test

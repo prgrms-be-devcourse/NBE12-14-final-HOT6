@@ -3,6 +3,7 @@ package com.back.nbe1214finalhot6.domain.cashback.repository;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackEarning;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -144,4 +145,15 @@ public interface CashbackEarningRepository extends JpaRepository<CashbackEarning
       @Param("walletId") Long walletId,
       @Param("from") LocalDateTime from,
       @Param("to") LocalDateTime to);
+
+  /** 접수 시각이 {@code from} 이상 {@code to} 미만이고 상태가 {@code statuses} 중 하나인 적립 건의 금액 합계. 없으면 0 이다. 읽기만 한다. */
+  @Query(
+      """
+      select coalesce(sum(e.amount), 0L) from CashbackEarning e
+      where e.requestedAt >= :from and e.requestedAt < :to and e.status in :statuses
+      """)
+  long sumAmountRequestedBetween(
+      @Param("from") LocalDateTime from,
+      @Param("to") LocalDateTime to,
+      @Param("statuses") Collection<EarningStatus> statuses);
 }
