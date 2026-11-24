@@ -88,6 +88,8 @@ class SecurityConfigTest {
         Arguments.of("GET", "/api/auth/login", 401, 200, 200, 200), // 로그인 경로는 POST 만 열려 있다
         // 운영자 전용
         Arguments.of("GET", "/api/admin/settings", 401, 403, 403, 200),
+        Arguments.of("POST", "/api/admin/settlements/daily/run", 401, 403, 403, 200),
+        Arguments.of("POST", "/api/admin/settlements/monthly/run", 401, 403, 403, 200),
         Arguments.of("PUT", "/api/admin/cashback/budget/annual/2026", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/cashback/policies/reductions", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/cashback/payouts/run", 401, 403, 403, 200),
@@ -105,6 +107,9 @@ class SecurityConfigTest {
         Arguments.of("GET", "/api/wallet", 401, 200, 200, 403),
         Arguments.of("POST", "/api/wallet/charges", 401, 200, 200, 403),
         Arguments.of("POST", "/api/wallet/refunds", 401, 200, 200, 403),
+        // 탈퇴는 시민 기능(점주는 통과하지만 서비스가 AUTH-007 로 거절, 운영자는 403)
+        Arguments.of("POST", "/api/users/withdraw", 401, 200, 200, 403),
+        Arguments.of("POST", "/api/users/withdraw/settle", 401, 200, 200, 403),
         // 가맹점: 등록과 이름 검색은 시민도, 관리는 점주만
         Arguments.of("POST", "/api/merchants", 401, 200, 200, 403),
         Arguments.of("GET", "/api/merchants", 401, 200, 200, 403),
@@ -118,6 +123,8 @@ class SecurityConfigTest {
         Arguments.of("POST", "/api/payments/1/cancel", 401, 403, 200, 403),
         // 내 정보 조회는 모든 로그인 역할이 쓴다(운영자 포함)
         Arguments.of("GET", "/api/users/me", 401, 200, 200, 200),
+        // PIN 검증은 이용자(OWNER 포함)만, 운영자는 못 쓴다
+        Arguments.of("POST", "/api/users/pin/verify", 401, 200, 200, 403),
         // 규칙에 없는 경로는 로그인만 하면 된다(ADMIN 포함)
         Arguments.of("GET", "/api/probe/other", 401, 200, 200, 200));
   }

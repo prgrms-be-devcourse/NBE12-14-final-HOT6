@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import { won } from "@/lib/format";
-import { loadCtx } from "@/lib/devContext";
 import { EXCLUSION_TEXT, STATUS_BADGE, STATUS_LABEL, getCashbackSummary, getEarnings, mmdd, type EarningStatus } from "@/lib/cashbackApi";
 import { useLoad } from "@/lib/useLoad";
 
@@ -12,10 +11,9 @@ const FILTERS: { label: string; status?: EarningStatus }[] = [
 ];
 
 export default function AccrualsPage() {
-  const walletId = loadCtx().walletId;
   const [f, setF] = useState(FILTERS[0]);
-  const summary = useLoad(() => getCashbackSummary(walletId), [walletId]);
-  const list = useLoad(() => getEarnings(walletId, f.status, 0, 50), [walletId, f.status]);
+  const summary = useLoad(() => getCashbackSummary(), []);
+  const list = useLoad(() => getEarnings(f.status, 0, 50), [f.status]);
   const s = summary.data;
 
   return (

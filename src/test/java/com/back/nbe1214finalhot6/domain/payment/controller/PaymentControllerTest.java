@@ -3,9 +3,14 @@ package com.back.nbe1214finalhot6.domain.payment.controller;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -16,8 +21,11 @@ import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.idempotency.IdempotencyKeys;
 import com.back.nbe1214finalhot6.common.security.OwnedResources;
+import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
+import com.back.nbe1214finalhot6.domain.auth.service.PinService;
 import com.back.nbe1214finalhot6.domain.payment.exception.PaymentErrorCode;
+import com.back.nbe1214finalhot6.domain.payment.dto.PayRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
@@ -33,12 +41,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /** 결제 컨트롤러 테스트. 재조회 API(`GET /api/payments/by-key/{key}`)의 요청·응답 형태를 검증한다. */
 @WebMvcTest(PaymentController.class)
@@ -52,6 +64,7 @@ class PaymentControllerTest {
   @MockitoBean private PaymentQueryService paymentQueryService;
   @MockitoBean private PaymentCancelService paymentCancelService;
   @MockitoBean private OwnedResources ownedResources;
+  @MockitoBean private PinService pinService;
 
   @BeforeEach
   void setUp() {
@@ -165,7 +178,7 @@ class PaymentControllerTest {
     String key = UUID.randomUUID().toString();
     String body =
         """
-        {"walletId": 99, "qrToken": "qr-token-1", "cashbackUsed": 1000}
+        {"walletId": 99, "qrToken": "qr-token-1", "cashbackUsed": 1000, "pin": "123456"}
         """;
     // when : 결제 요청
     mockMvc
@@ -185,7 +198,7 @@ class PaymentControllerTest {
     String key = UUID.randomUUID().toString();
     String body =
             """
-            {"qrToken": "qr-token-1", "cashbackUsed": 1000}
+            {"qrToken": "qr-token-1", "cashbackUsed": 1000, "pin": "123456"}
             """;
     // when : 결제 요청
     mockMvc
@@ -199,6 +212,99 @@ class PaymentControllerTest {
     verify(paymentFacade).pay(key, new PaymentRequest(1L, "qr-token-1", 1000L));
   }
 
+
+  // 목적: 결제 전에 PIN 을 검증하는지(로그인한 회원 번호로), 그리고 PIN 검증이 결제 처리보다 먼저인지 확인한다.
+  @Test
+  @DisplayName("결제 전에 로그인한 회원의 PIN 을 먼저 검증한다")
+  void 결제전_PIN_검증() throws Exception {
+    String key = UUID.randomUUID().toString();
+
+    mockMvc.perform(payRequest(key, "{\"qrToken\": \"qr-token-1\", \"cashbackUsed\": 0, \"pin\": \"123456\"}"))
+        .andExpect(status().isOk());
+
+    InOrder order = inOrder(pinService, paymentFacade);
+    order.verify(pinService).verify(1L, "123456");
+    order.verify(paymentFacade).pay(key, new PaymentRequest(1L, "qr-token-1", 0L));
+  }
+
+  // 목적: PIN 이 틀리면 결제를 시작하지 않는지(결제 기록도 QR 사용 처리도 없는지) 확인한다.
+  @Test
+  @DisplayName("PIN 이 틀리면 400 AUTH-005 이고 결제를 시작하지 않는다")
+  void PIN_불일치면_결제_안함() throws Exception {
+    willThrow(new BusinessException(AuthErrorCode.PIN_MISMATCH, "PIN이 일치하지 않습니다 (잔여 3회)"))
+        .given(pinService)
+        .verify(1L, "000000");
+
+    mockMvc
+        .perform(payRequest(UUID.randomUUID().toString(), "{\"qrToken\": \"qr-token-1\", \"pin\": \"000000\"}"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("AUTH-005"))
+        .andExpect(jsonPath("$.message").value("PIN이 일치하지 않습니다 (잔여 3회)"));
+
+    verify(paymentFacade, never()).pay(any(), any());
+  }
+
+  @Test
+  @DisplayName("PIN 이 잠겼으면 409 AUTH-006 이고 결제를 시작하지 않는다")
+  void PIN_잠금이면_결제_안함() throws Exception {
+    willThrow(new BusinessException(AuthErrorCode.PIN_LOCKED)).given(pinService).verify(anyLong(), anyString());
+
+    mockMvc
+        .perform(payRequest(UUID.randomUUID().toString(), "{\"qrToken\": \"qr-token-1\", \"pin\": \"123456\"}"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("AUTH-006"));
+
+    verify(paymentFacade, never()).pay(any(), any());
+  }
+
+  // 목적: PIN 이 없거나 6자리 숫자가 아니면 PIN 검증도 결제도 하기 전에 400 COM-001 로 거절하는지 확인한다(PIN 시도로 세지 않는다).
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{\"qrToken\": \"qr-token-1\"}",
+        "{\"qrToken\": \"qr-token-1\", \"pin\": \"\"}",
+        "{\"qrToken\": \"qr-token-1\", \"pin\": \"12345\"}",
+        "{\"qrToken\": \"qr-token-1\", \"pin\": \"12345a\"}"
+      })
+  @DisplayName("PIN 이 없거나 6자리 숫자가 아니면 400 COM-001 이고 PIN 검증도 결제도 하지 않는다")
+  void PIN_형식오류(String body) throws Exception {
+    mockMvc
+        .perform(payRequest(UUID.randomUUID().toString(), body))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("COM-001"));
+
+    verify(pinService, never()).verify(anyLong(), anyString());
+    verify(paymentFacade, never()).pay(any(), any());
+  }
+
+  // 목적: 응답을 못 받았을 때 쓰는 재조회 API 는 읽기만 하므로 PIN 을 요구하지 않는지 확인한다.
+  @Test
+  @DisplayName("재조회는 PIN 을 검증하지 않는다")
+  void 재조회는_PIN_불필요() throws Exception {
+    mockMvc
+        .perform(get("/api/payments/by-key/{key}", UUID.randomUUID().toString()))
+        .andExpect(status().isOk());
+
+    verifyNoInteractions(pinService);
+  }
+
+  // 목적: PIN 이 로그에 남지 않도록 요청 객체의 문자열 표현에서 PIN 을 가리는지 확인한다.
+  @Test
+  @DisplayName("요청 객체를 문자열로 만들어도 PIN 이 보이지 않는다")
+  void PIN은_로그에_안_남는다() {
+    PayRequest request = new PayRequest("qr-token-1", 1000L, "123456");
+
+    org.assertj.core.api.Assertions.assertThat(request.toString())
+        .doesNotContain("123456")
+        .contains("pin=****");
+  }
+
+  private MockHttpServletRequestBuilder payRequest(String key, String body) {
+    return post("/api/payments")
+        .header("Idempotency-Key", key)
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(body);
+  }
 
   @Test
   @WithAuthUser(userId = 2L, role = UserRole.OWNER)

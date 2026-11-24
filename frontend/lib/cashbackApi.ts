@@ -1,7 +1,7 @@
 import { api } from "@/lib/api";
 import type { PageResponse } from "@/lib/types";
 
-// 백엔드 캐시백 응답 (이용자용). 로그인 이용자의 지갑 조회 API가 생기기 전까지 walletId 는 개발용 컨텍스트에서 받는다
+// 백엔드 캐시백 응답 (이용자용). 지갑은 서버가 토큰의 회원으로 찾는다
 export type CashbackSummary = {
   year: number; month: number; earnedAmount: number; pendingAmount: number; paidAmount: number; excludedCount: number;
 };
@@ -20,10 +20,10 @@ export type Notice = {
   rate?: number | null; previousRate?: number | null; // 공지 요율 (#161)
 };
 
-export const getCashbackSummary = (walletId: number) => api<CashbackSummary>(`/cashback/summary?walletId=${walletId}`);
-export const getMonthlyLimit = (walletId: number) => api<MonthlyLimit>(`/cashback/monthly-limit?walletId=${walletId}`);
-export const getEarnings = (walletId: number, status?: EarningStatus, page = 0, size = 20) =>
-  api<PageResponse<Earning>>(`/cashback/earnings?walletId=${walletId}${status ? `&status=${status}` : ""}&page=${page}&size=${size}`);
+export const getCashbackSummary = () => api<CashbackSummary>("/cashback/summary");
+export const getMonthlyLimit = () => api<MonthlyLimit>("/cashback/monthly-limit");
+export const getEarnings = (status?: EarningStatus, page = 0, size = 20) =>
+  api<PageResponse<Earning>>(`/cashback/earnings?page=${page}&size=${size}${status ? `&status=${status}` : ""}`);
 export const getNotices = (type?: NoticeType, page = 0, size = 20) =>
   api<PageResponse<Notice>>(`/notices?${type ? `type=${type}&` : ""}page=${page}&size=${size}`);
 
@@ -45,8 +45,8 @@ export const mmdd = (iso: string | null) => (iso ? `${iso.slice(5, 7)}.${iso.sli
 export type CashbackPreview = {
   earnable: boolean; paused: boolean; appliedRate: number; expectedAmount: number; monthlyLimitRemaining: number; exclusionReason: ExclusionCode;
 };
-export const getCashbackPreview = (walletId: number, merchantId: number, walletUsedAmount: number) =>
-  api<CashbackPreview>(`/cashback/preview?walletId=${walletId}&merchantId=${merchantId}&walletUsedAmount=${walletUsedAmount}`);
+export const getCashbackPreview = (merchantId: number, walletUsedAmount: number) =>
+  api<CashbackPreview>(`/cashback/preview?merchantId=${merchantId}&walletUsedAmount=${walletUsedAmount}`);
 
 // 적립 제외 사유 안내 문구 (미리보기·영수증 공통)
 export const REASON_TEXT: Record<ExclusionCode, string> = {
