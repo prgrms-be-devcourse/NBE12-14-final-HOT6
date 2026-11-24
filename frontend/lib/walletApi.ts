@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { won } from "@/lib/format";
 import type { PageResponse } from "@/lib/types";
 
 // 지갑 거래 내역·충전·환불. 지갑은 서버가 토큰의 회원으로 찾는다 (내 지갑 조회는 endpoints.getMyWallet)
@@ -21,6 +22,25 @@ export const chargeWallet = (amount: number, idempotencyKey: string) =>
   api<MoneyResult>("/wallet/charges", { method: "POST", body: { amount }, idempotencyKey });
 export const refundWallet = (amount: number, idempotencyKey: string) =>
   api<MoneyResult>("/wallet/refunds", { method: "POST", body: { amount }, idempotencyKey });
+
+// 내 모의계좌(가입하면 200만원). 충전하면 줄고 환불하면 는다. 가맹점 정산 계좌(endpoints.getMyAccount)와는 다르다
+export type AccountTxType = "SIGNUP_BONUS" | "CHARGE" | "REFUND";
+// 금액은 입금이 +, 차감이 -. 충전은 계좌에서 빠지므로 -, 환불은 계좌로 돌아오므로 +. balanceAfter 는 그 거래 직후의 계좌 잔액
+export type AccountTx = {
+  transactionId: number; type: AccountTxType; amount: number; balanceAfter: number; refKey: number | null; createdAt: string;
+};
+export const getAccountBalance = () => api<{ balance: number }>("/wallet/account");
+export const getAccountTransactions = (page = 0, size = 10) =>
+  api<PageResponse<AccountTx>>(`/wallet/account/transactions?page=${page}&size=${size}`);
+
+const ACCOUNT_TITLE: Record<AccountTxType, string> = { SIGNUP_BONUS: "가입 보너스", CHARGE: "지갑으로 충전", REFUND: "지갑에서 환불" };
+export const accountRow = (t: AccountTx) => ({
+  id: String(t.transactionId),
+  title: ACCOUNT_TITLE[t.type] ?? t.type,
+  kind: t.amount >= 0 ? ("charge" as const) : ("payment" as const), // 입금=파랑, 출금=빨강
+  amount: t.amount,
+  date: `${t.createdAt.slice(5, 7)}.${t.createdAt.slice(8, 10)} ${t.createdAt.slice(11, 16)} · 계좌 잔액 ${won(t.balanceAfter)}`,
+});
 
 // 화면 거래 행으로 바꾼다 (TxRow 가 쓰는 형태)
 const TITLE: Record<WalletTxType, { title: string; kind: "charge" | "refund" | "payment" | "cashback" }> = {

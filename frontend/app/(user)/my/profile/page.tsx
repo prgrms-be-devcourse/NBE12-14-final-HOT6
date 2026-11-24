@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import Field from "@/components/Field";
 import Header from "@/components/Header";
 import { useLoad } from "@/lib/useLoad";
@@ -19,7 +18,6 @@ export default function ProfilePage() {
         <div className="pt-2 text-sm font-semibold">비밀번호 변경</div>
         <Field label="현재 비밀번호" type="password" />
         <Field label="새 비밀번호" type="password" />
-        <Link href="/pin-setup" className="btn btn-outline">간편비밀번호 변경</Link>
         <button type="submit" disabled className="btn btn-primary disabled:opacity-40">저장</button>
         <p className="note">이름·비밀번호 변경은 아직 지원하지 않아요.</p>
       </form>

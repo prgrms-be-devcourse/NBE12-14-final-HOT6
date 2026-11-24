@@ -9,7 +9,7 @@ import { loadSignupDraft, PASSWORD_RULE, PHONE_RULE, saveSignupDraft } from "@/l
 
 export default function SignupPage() {
   const router = useRouter();
-  // 2단계에서 이메일·전화번호 중복으로 돌아오면 입력값을 그대로 채워 둔다
+  // 2단계에서 돌아오면 입력값을 그대로 채워 둔다
   const [init] = useState(() => loadSignupDraft());
   const [name, setName] = useState(init?.name ?? "");
   const [email, setEmail] = useState(init?.email ?? "");
@@ -41,7 +41,6 @@ export default function SignupPage() {
     <>
       <Header title="회원가입" right="1 / 2" />
       <form className="space-y-3 px-5" onSubmit={next} noValidate>
-        {init?.error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{init.error}</p>}
         <Field label="이름" value={name} onChange={setName} autoComplete="name" maxLength={100} error={show("name")} />
         <Field label="이메일" type="email" value={email} onChange={setEmail} autoComplete="email" inputMode="email" error={show("email")} />
         <Field label="전화번호" value={phone} onChange={(v) => setPhone(v.replace(/\D/g, "").slice(0, 11))} inputMode="numeric" autoComplete="tel" placeholder="01012345678" hint="하이픈 없이 숫자만 입력" error={show("phone")} />

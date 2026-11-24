@@ -13,8 +13,7 @@ const MENUS = [
   { href: "/wallet", label: "지갑 거래내역" },
   { href: "/pay/history", label: "결제 내역" },
   { href: "/cashback/accruals", label: "캐시백 적립내역" },
-  { href: "/pin-setup", label: "간편비밀번호 변경" },
-  { href: "/cashback", label: "알림 (정책 변경 예고)" },
+  { href: "/cashback/notices", label: "알림 (정책 변경 예고)" },
 ];
 
 export default function MyPage() {
@@ -41,7 +40,8 @@ export default function MyPage() {
           <div className="card-gray !p-3"><div className="note">이번 달 캐시백</div><div className="mt-0.5 font-bold text-emerald-600">{summary.data ? won(summary.data.earnedAmount) : "…"}</div></div>
         </section>
         <ul className="card !p-0">
-          {MENUS.map((m, i) => (
+          {/* 점주가 되기 전(USER)인 회원에게만 가맹점 등록 입구를 보여 준다 */}
+          {(me.data?.role === "USER" ? [...MENUS, { href: "/merchant/register", label: "가맹점 등록하기" }] : MENUS).map((m, i) => (
             <li key={m.label} className={i ? "border-t border-zinc-200" : ""}>
               <Link href={m.href} className="flex items-center justify-between px-4 py-3.5 text-[15px]">
                 {m.label}<span aria-hidden className="text-zinc-400">›</span>

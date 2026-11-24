@@ -7,11 +7,12 @@ import { ApiError } from "@/lib/api";
 import { getMyWallet } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
-import { idemKeyFor, refundWallet } from "@/lib/walletApi";
+import { getAccountBalance, idemKeyFor, refundWallet } from "@/lib/walletApi";
 
 export default function RefundPage() {
   const router = useRouter();
   const wallet = useLoad(getMyWallet, []);
+  const account = useLoad(getAccountBalance, []);
   const [amount, setAmount] = useState(30000);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -58,12 +59,21 @@ export default function RefundPage() {
         </div>
         <div>
           <span className="label">환불 받을 계좌</span>
-          <div className="card !py-3"><div className="text-[15px]">모의계좌 (가입 시 생성)</div></div>
+          <div className="card !py-3">
+            <div className="text-[15px]">모의계좌 (가입 시 생성)</div>
+            <div className="note mt-0.5">계좌 잔액 {account.data ? won(account.data.balance) : account.error ? "불러오지 못했어요" : "…"}</div>
+          </div>
         </div>
         <div className="flex items-baseline justify-between border-t border-zinc-200 pt-3">
           <span className="text-[13px] text-zinc-500">환불 후 잔액</span>
           <span className="text-xl font-bold text-slate-900">{wallet.data ? won(max - amount) : "…"}</span>
         </div>
+        {account.data && (
+          <div className="flex items-baseline justify-between">
+            <span className="text-[13px] text-zinc-500">환불 후 모의계좌 잔액</span>
+            <span className="text-[15px] font-semibold tabular-nums text-slate-900">{won(account.data.balance + amount)}</span>
+          </div>
+        )}
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{error}</p>}
         <button type="button" onClick={submit} disabled={busy || amount === 0 || !wallet.data} className="btn btn-danger disabled:opacity-40">{busy ? "환불 중…" : "환불하기"}</button>
       </div>
