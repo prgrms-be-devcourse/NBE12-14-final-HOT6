@@ -124,6 +124,9 @@ docker compose -f docker-compose.prod.yml restart nginx
 ./deploy.sh <브랜치>     # 기본값은 main
 ```
 
+- 확인할 때는 `./deploy.sh dev`로 `dev`를 배포하고, 최종 제출 때는 `dev`를 `main`에 머지한 뒤 인자 없이 `./deploy.sh`로 `main`을 배포합니다.
+- 서버는 GitHub에 올라간 브랜치를 받아 오므로, 로컬에서 고친 내용은 push한 뒤에 배포됩니다.
+
 ## 7. 접속 확인
 
 | 확인 | 주소 | 기대 결과 |
@@ -153,8 +156,29 @@ docker compose -f docker-compose.prod.yml restart nginx
 ## 알려진 사항
 
 - `ddl-auto: update`를 서버에서 유지하고 있습니다. 마이그레이션 도구가 도입되면 `validate`로 바꿉니다.
-- **인증 없는 API가 외부에 열려 있습니다.** 기존 `SecurityConfig`가 가맹점, QR, 결제, 회원가입, 운영자 API를 인증 없이 허용하고, nginx가 `/api/`를 그대로 전달합니다. 인증 기능(COM-03)이 합쳐지기 전까지의 임시 상태이므로, 실제 개인정보나 계좌 정보를 입력하지 않습니다.
-- nginx에서 `/api/admin` 경로를 403으로 차단하고 있습니다. 인증 기능이 합쳐지면 이 차단을 제거합니다. 결제, 가맹점, QR은 화면이 사용하는 경로라서 nginx로 막지 않습니다.
+- `ddl-auto: update`는 이미 만든 CHECK 제약(enum에 허용하는 값)을 갱신하지 않습니다. enum 값이 늘어난 뒤에 배포하면 새 값을 저장할 때 500 오류가 날 수 있으므로, 배포 DB에서 아래 쿼리로 허용 값을 확인합니다. 빠진 값이 있으면 `ALTER TABLE <테이블> DROP CONSTRAINT <제약 이름>;`으로 제약을 지웁니다.
+
+  ```sql
+  SELECT conrelid::regclass AS 테이블, conname, pg_get_constraintdef(oid) AS 규칙
+  FROM pg_constraint WHERE contype = 'c' AND conname LIKE '%_check';
+  ```
+
+- nginx가 HTTPS 응답에 HSTS(1년), `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` 헤더를 붙입니다. CSP는 Next.js의 인라인 스크립트와 지도 타일 때문에 설정하지 않았습니다.
+- 인증(JWT)이 적용되어 있습니다. 이용자(`USER`), 점주(`OWNER`), 운영자(`ADMIN`) 역할에 따라 접근할 수 있는 경로가 나뉘고, 토큰이 없으면 401입니다. 그래도 실제 개인정보나 계좌 정보는 입력하지 않습니다.
+- 운영자 API(`/api/admin`)는 nginx에서 막지 않고 백엔드의 인증(`ADMIN` 역할)에 맡깁니다. 운영자 계정은 가입으로 만들 수 없어서, 아래 "운영자 계정 만들기"의 방법으로 만듭니다.
 - 운영 환경에서는 Swagger(API 명세)를 끄고, 프론트의 개발용 화면(`/dev`)도 nginx에서 막습니다. API 명세는 로컬에서 앱을 실행해 `http://localhost:8080/swagger-ui/index.html`로 확인합니다.
-- `ProdSecurityConfig`는 헬스 체크를 열기 위한 임시 설정입니다. 인증 기능이 합쳐지면 `SecurityConfig`로 통합하고 삭제합니다.
 - 상태 파일은 로컬에 보관합니다. 팀 공유가 필요해지면 S3 버킷으로 옮깁니다.
+
+### 운영자 계정 만들기
+
+가입은 항상 이용자(`USER`)로만 되므로, 가입한 뒤 DB에서 역할을 바꿉니다.
+
+1. 가입 API로 계정을 만듭니다(`POST /api/users/signup`). 비밀번호는 8~15자에 영문, 숫자, 특수문자(`!@#%^&*`)를 모두 포함하고, 전화번호는 하이픈 없이 숫자만, PIN은 6자리 숫자입니다.
+2. RDS는 비공개 서브넷에 있어서 EC2에서 접속합니다. 비밀번호는 `.env`의 `DB_PASSWORD`를 프롬프트에 직접 입력합니다.
+
+   ```bash
+   docker run --rm -it postgres:17-alpine psql -h <RDS 주소> -U devpay -d devpay \
+     -c "update users set role = 'ADMIN' where email = '<운영자 이메일>';"
+   ```
+
+3. 역할은 로그인할 때 토큰에 담기므로 다시 로그인합니다. 운영자는 가맹점을 등록하거나 이용자 기능(결제, 지갑)을 쓸 수 없어서, 이용자 계정과 따로 만듭니다.
