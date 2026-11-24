@@ -7,7 +7,7 @@ import { ApiError } from "@/lib/api";
 import { getMyWallet } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
-import { chargeWallet, idemKeyFor } from "@/lib/walletApi";
+import { chargeWallet, getAccountBalance, idemKeyFor } from "@/lib/walletApi";
 
 export default function ChargePage() {
   const router = useRouter();
@@ -16,12 +16,15 @@ export default function ChargePage() {
   const [submitError, setSubmitError] = useState("");
   const keyRef = useRef<{ amount: number; key: string } | null>(null);
   const wallet = useLoad(getMyWallet, []);
+  const account = useLoad(getAccountBalance, []);
   const w = wallet.data;
 
   // 충전 가능액은 월 충전 한도와 보유 한도 중 더 빡빡한 쪽이다 (서버가 최종 판단하고, 여기서는 미리 안내한다)
   const monthlyLeft = w ? Math.max(0, w.monthlyChargeLimit - w.chargedThisMonth) : 0;
   const holdingLeft = w ? Math.max(0, w.holdingLimit - w.devMoney) : 0;
+  const accountBalance = account.data?.balance;
   const error = !w ? ""
+    : accountBalance !== undefined && amount > accountBalance ? `모의계좌 잔액이 부족해요 (잔액 ${won(accountBalance)})`
     : amount > monthlyLeft ? `이번 달 충전 한도를 넘어요 (남은 한도 ${won(monthlyLeft)})`
     : amount > holdingLeft ? `지갑 보유 한도를 넘어요 (${won(w.holdingLimit)}까지 보유 가능 · 충전 가능 ${won(holdingLeft)})`
     : "";
@@ -66,12 +69,21 @@ export default function ChargePage() {
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{error}</p>}
         <div>
           <span className="label">충전 수단</span>
-          <div className="card !py-3 text-[15px]">모의계좌에서 충전</div>
+          <div className="card !py-3 text-[15px]">
+            모의계좌에서 충전
+            <div className="note mt-0.5">계좌 잔액 {account.data ? won(account.data.balance) : account.error ? "불러오지 못했어요" : "…"}</div>
+          </div>
         </div>
         <div className="flex items-baseline justify-between border-t border-zinc-200 pt-3">
           <span className="text-[13px] text-zinc-500">충전 후 잔액</span>
           <span className="amt-in text-xl font-bold">{w ? won(w.devMoney + amount) : "…"}</span>
         </div>
+        {accountBalance !== undefined && (
+          <div className="flex items-baseline justify-between">
+            <span className="text-[13px] text-zinc-500">충전 후 모의계좌 잔액</span>
+            <span className="text-[15px] font-semibold tabular-nums text-slate-900">{won(Math.max(0, accountBalance - amount))}</span>
+          </div>
+        )}
         {submitError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{submitError}</p>}
         <button type="button" onClick={submit} disabled={blocked} className="btn btn-primary disabled:opacity-40">{busy ? "충전 중…" : "충전하기"}</button>
       </div>
