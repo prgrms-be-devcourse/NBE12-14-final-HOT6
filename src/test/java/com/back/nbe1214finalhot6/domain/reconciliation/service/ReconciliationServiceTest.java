@@ -60,7 +60,7 @@ class ReconciliationServiceTest {
   }
 
   @Test
-  @DisplayName("결과 저장이 실패해도 다음 종류의 검사는 실행한다")
+  @DisplayName("결과 저장이 실패해도 다음 종류의 검사는 실행하고, 저장 못 한 종류는 저장되지 않은 ERROR 로 응답에 남긴다")
   void 저장실패해도_다음종류_실행() {
     ReconciliationOutcome outcome = new ReconciliationOutcome(1, List.of());
     given(salesCheck.type()).willReturn(ReconciliationType.DAILY_NET_SALES);
@@ -77,7 +77,13 @@ class ReconciliationServiceTest {
 
     List<ReconciliationResult> results = service.run(DATE);
 
-    assertThat(results).hasSize(1);
+    assertThat(results).hasSize(2);
+    ReconciliationResult unsaved = results.get(0);
+    assertThat(unsaved.getType()).isEqualTo(ReconciliationType.DAILY_NET_SALES);
+    assertThat(unsaved.getStatus()).isEqualTo(ReconciliationStatus.ERROR);
+    assertThat(unsaved.getId()).isNull();
+    assertThat(unsaved.getErrorMessage()).contains("저장하지 못했습니다");
+    assertThat(results.get(1).getStatus()).isEqualTo(ReconciliationStatus.MATCHED);
     verify(carryCheck).check(DATE);
   }
 
