@@ -40,27 +40,4 @@ export const payments: Payment[] = [
 
 export const user = { name: "홍길동", email: "hong@mail.com", maskedEmail: "ab***@gmail.com" };
 
-export const merchant = {
-  name: "○○카페",
-  address: "서울 ○○구 ○○로 12",
-  phone: "02-000-0000",
-};
-
-export const merchantPayments = [
-  { id: "m1", user: "○○○님", time: "12:31", amount: 12000, status: "완료" },
-  { id: "m2", user: "○○○님", time: "12:05", amount: 8500, status: "완료" },
-  { id: "m3", user: "○○○님", time: "11:40", amount: 20000, status: "취소" },
-  { id: "m4", user: "○○○님", time: "11:12", amount: 6000, status: "완료" },
-  { id: "m5", user: "○○○님", time: "10:48", amount: 15000, status: "완료" },
-] as const;
-
-export const dailySettles = [
-  { date: "11.17", net: 320000, carry: 0 },
-  { date: "11.16", net: 410000, carry: 0 },
-  { date: "11.15", net: 285000, carry: 12000 },
-  { date: "11.14", net: 0, carry: 0 },
-  { date: "11.13", net: 198000, carry: 0 },
-  { date: "11.12", net: 356000, carry: 0 },
-];
-
 export const weekdays = ["월", "화", "수", "목", "금", "토", "일"];

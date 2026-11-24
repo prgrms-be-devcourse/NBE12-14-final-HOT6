@@ -50,7 +50,7 @@ function ReceiptBody() {
       await sleep(delay);
       if (!alive.current) return;
       try {
-        const res = await getPaymentByKey(p.request.walletId, p.key);
+        const res = await getPaymentByKey(p.key);
         if (res.status !== "PROCESSING") return show({ kind: "ok", res });
       } catch {
         /* 404(PAY-003, 서버가 받은 적 없음)나 연결 오류는 계속 시도한다 */

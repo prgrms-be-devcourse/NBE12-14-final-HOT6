@@ -4,17 +4,15 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Progress from "@/components/Progress";
 import { won } from "@/lib/format";
-import { loadCtx } from "@/lib/devContext";
 import {
   EXCLUSION_TEXT, STATUS_BADGE, STATUS_LABEL, getCashbackSummary, getEarnings, getMonthlyLimit, getNotices, mmdd, pctText,
 } from "@/lib/cashbackApi";
 import { useLoad } from "@/lib/useLoad";
 
 export default function CashbackPage() {
-  const walletId = loadCtx().walletId;
-  const summary = useLoad(() => getCashbackSummary(walletId), [walletId]);
-  const limit = useLoad(() => getMonthlyLimit(walletId), [walletId]);
-  const recent = useLoad(() => getEarnings(walletId, undefined, 0, 3), [walletId]);
+  const summary = useLoad(() => getCashbackSummary(), []);
+  const limit = useLoad(() => getMonthlyLimit(), []);
+  const recent = useLoad(() => getEarnings(undefined, 0, 3), []);
   const notices = useLoad(() => getNotices(undefined, 0, 1), []);
 
   const s = summary.data;

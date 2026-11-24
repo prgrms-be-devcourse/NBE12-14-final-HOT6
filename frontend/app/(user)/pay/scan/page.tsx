@@ -9,18 +9,19 @@ import { ICONS } from "@/components/icons";
 import { ApiError } from "@/lib/api";
 import { getCashbackPreview, getUpcomingPolicyChange, pctText, REASON_TEXT } from "@/lib/cashbackApi";
 import { loadCtx, saveCtx } from "@/lib/devContext";
-import { scanQr, secondsUntil } from "@/lib/endpoints";
+import { getMyWallet, scanQr, secondsUntil } from "@/lib/endpoints";
 import { LIMITS } from "@/lib/limits";
 import { won } from "@/lib/format";
 import { newPending, savePending } from "@/lib/pendingPayment";
 import { useLoad } from "@/lib/useLoad";
-import type { QrScanResponse } from "@/lib/types";
+import type { QrScanResponse, WalletResponse } from "@/lib/types";
 
 type Load = { kind: "idle" } | { kind: "loading" } | { kind: "error"; message: string } | { kind: "ok"; qr: QrScanResponse };
 
 export default function ScanPage() {
   const router = useRouter();
-  const [walletId, setWalletId] = useState(1);
+  const [wallet, setWallet] = useState<WalletResponse | null>(null);
+  const [walletError, setWalletError] = useState("");
   const [token, setToken] = useState("");
   const [input, setInput] = useState("");
   const [load, setLoad] = useState<Load>({ kind: "idle" });
@@ -46,21 +47,39 @@ export default function ScanPage() {
     const fromUrl = new URLSearchParams(window.location.search).get("token") ?? "";
     const t = fromUrl || c.qrToken || "";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
-    setWalletId(c.walletId);
     setInput(t);
     if (t) lookup(t);
+  }, []);
+
+  // 얼마를 쓸 수 있는지 미리 보여 주려고 내 지갑을 읽는다
+  useEffect(() => {
+    let alive = true;
+    getMyWallet()
+      .then((w) => {
+        if (alive) setWallet(w);
+      })
+      .catch((e) => {
+        if (alive) setWalletError(e instanceof ApiError ? e.message : "지갑 정보를 불러오지 못했어요");
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const qr = load.kind === "ok" ? load.qr : null;
   const amount = qr?.amount ?? 0;
   // 캐시백 사용 금액: 0 ~ 결제금액. 나머지는 데브머니로 낸다. 적립은 데브머니로 낸 금액 기준이다
   const cashbackUsed = cashbackInput.trim() === "" ? 0 : Number(cashbackInput);
-  const cashbackOk = Number.isInteger(cashbackUsed) && cashbackUsed >= 0 && cashbackUsed <= amount;
+  // 캐시백은 결제금액과 지갑에서 쓸 수 있는 캐시백 중 작은 값까지만 쓸 수 있다
+  const cashbackMax = wallet ? Math.min(amount, wallet.availableCashback) : amount;
+  const cashbackOk = Number.isInteger(cashbackUsed) && cashbackUsed >= 0 && cashbackUsed <= cashbackMax;
   const devMoney = cashbackOk ? amount - cashbackUsed : amount;
+  const devMoneyShort = wallet ? Math.max(0, devMoney - wallet.devMoney) : 0;
+
   // 결제 전 미리보기: 데브머니로 낼 금액이 바뀔 때마다 서버에서 다시 계산한다 (예상값)
-  const previewKey = qr && walletId > 0 && devMoney > 0 ? `${walletId}:${qr.merchantId}:${devMoney}` : "";
+  const previewKey = qr && devMoney > 0 ? `${qr.merchantId}:${devMoney}` : "";
   const previewLoad = useLoad(
-    () => (previewKey ? getCashbackPreview(walletId, qr!.merchantId, devMoney) : Promise.resolve(null)),
+    () => (previewKey ? getCashbackPreview(qr!.merchantId, devMoney) : Promise.resolve(null)),
     [previewKey],
   );
   const upcomingLoad = useLoad(() => getUpcomingPolicyChange(), []);
@@ -72,11 +91,11 @@ export default function ScanPage() {
   const rate = p?.appliedRate ?? 0;
   const monthlyRemaining = p?.monthlyLimitRemaining ?? 0;
   const overLimit = amount > LIMITS.perPayment;
-  const valid = !!qr && !expired && walletId > 0 && amount > 0 && !overLimit && cashbackOk;
+  const valid = !!qr && !expired && !!wallet && devMoneyShort === 0 && amount > 0 && !overLimit && cashbackOk;
 
   const go = () => {
     if (!qr) return;
-    savePending(newPending({ walletId, qrToken: token, cashbackUsed }));
+    savePending(newPending({ qrToken: token, cashbackUsed }));
     router.push("/pin?next=/pay/receipt");
   };
 
@@ -136,6 +155,21 @@ export default function ScanPage() {
             </section>
 
             <section className="card">
+              <span className="text-[13px] font-bold text-slate-700">내 지갑</span>
+              {wallet ? (
+                <dl className="mt-2 space-y-1.5 text-[13px]">
+                  <div className="flex justify-between"><dt className="text-slate-500">데브머니</dt><dd className="font-bold tabular-nums">{won(wallet.devMoney)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-slate-500">결제 가능 캐시백</dt><dd className="font-bold tabular-nums">{won(wallet.availableCashback)}</dd></div>
+                </dl>
+              ) : walletError ? (
+                <p role="alert" className="mt-2 text-[13px] font-medium text-red-600">{walletError}</p>
+              ) : (
+                <p role="status" className="note mt-2">지갑 정보를 불러오는 중이에요…</p>
+              )}
+              {wallet && wallet.cashbackBalance < 0 && <p className="note mt-2">캐시백 잔액이 {wallet.cashbackBalance.toLocaleString("ko-KR")}원이라 지금은 캐시백을 쓸 수 없어요</p>}
+            </section>
+
+            <section className="card">
               <label className="block">
                 <span className="label">캐시백 사용 (비우면 사용 안 함)</span>
                 <div className="flex gap-2">
@@ -147,11 +181,11 @@ export default function ScanPage() {
                     placeholder="0"
                     aria-invalid={!cashbackOk}
                   />
-                  <button type="button" onClick={() => setCashbackInput(String(amount))} className="btn btn-outline btn-sm !w-auto shrink-0">전액</button>
+                  <button type="button" onClick={() => setCashbackInput(String(cashbackMax))} className="btn btn-outline btn-sm !w-auto shrink-0">전액</button>
                   <button type="button" onClick={() => setCashbackInput("")} className="btn btn-outline btn-sm !w-auto shrink-0">지우기</button>
                 </div>
               </label>
-              {!cashbackOk && <p role="alert" className="mt-2 text-[13px] font-medium text-red-600">캐시백 사용 금액은 결제금액({won(amount)}) 이하로 입력해 주세요</p>}
+              {!cashbackOk && <p role="alert" className="mt-2 text-[13px] font-medium text-red-600">캐시백은 {won(cashbackMax)} 이하로 입력해 주세요 ({wallet && wallet.availableCashback < amount ? "쓸 수 있는 캐시백까지만 사용할 수 있어요" : "결제금액까지만 사용할 수 있어요"})</p>}
               <p className="note mt-2">나머지 {won(devMoney)}은 데브머니로 결제돼요</p>
             </section>
 
@@ -184,6 +218,7 @@ export default function ScanPage() {
 
             {expired && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">QR 유효시간이 지났어요. 가맹점에 새 QR을 요청해 주세요.</p>}
             {overLimit && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">결제 한도({won(LIMITS.perPayment)})를 넘어 결제할 수 없어요</p>}
+            {devMoneyShort > 0 && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">데브머니가 {won(devMoneyShort)} 부족해요. 충전하거나 캐시백을 더 사용해 주세요</p>}
             <button type="button" onClick={go} disabled={!valid} className="btn btn-primary disabled:opacity-40">결제하기 (간편비밀번호)</button>
 
           </>

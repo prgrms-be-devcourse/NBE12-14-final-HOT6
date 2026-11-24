@@ -16,7 +16,7 @@ type State =
 
 const fmt = (iso?: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "-");
 
-// 가맹점주 결제 취소 (전액). 결제 목록 API 가 생기기 전까지는 영수증의 결제번호(숫자)를 입력해 취소한다
+// 가맹점주 결제 취소 (전액). 가맹점은 토큰의 회원으로 찾는다. 결제 목록 API 가 생기기 전까지는 영수증의 결제번호(숫자)를 입력해 취소한다
 export default function CancelPaymentForm() {
   const [paymentId, setPaymentId] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });

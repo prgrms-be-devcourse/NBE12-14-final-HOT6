@@ -1,19 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadCtx } from "@/lib/devContext";
-import { merchant } from "@/lib/mock";
+import { getMyMerchant } from "@/lib/endpoints";
 
 // 사장님 앱 상단: 지금 어느 가맹점으로 보고 있는지
 export default function MerchantStrip() {
-  const [name, setName] = useState<string>(merchant.name);
+  const [name, setName] = useState("내 가맹점");
   const [id, setId] = useState<number | null>(null);
   useEffect(() => {
-    const c = loadCtx();
-    /* eslint-disable react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다 */
-    if (c.merchantName) setName(c.merchantName);
-    setId(c.merchantId);
-    /* eslint-enable react-hooks/set-state-in-effect */
+    let alive = true;
+    getMyMerchant()
+      .then((m) => {
+        if (!alive) return;
+        setName(m.name);
+        setId(m.merchantId);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
   }, []);
   return (
     <div className="flex items-center justify-between border-b border-slate-200 bg-brand-50 px-5 py-2 text-[13px]">
