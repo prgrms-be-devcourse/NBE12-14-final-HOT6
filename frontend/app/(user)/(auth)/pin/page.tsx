@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import Header from "@/components/Header";
-import PinPad from "@/components/PinPad";
+import PinVerifyPad from "@/components/PinVerifyPad";
 import { safeNext } from "@/lib/format";
 
 async function PinBody({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
-  return <PinPad mode="enter" doneHref={safeNext(next, "/wallet")} />;
+  return <PinVerifyPad doneHref={safeNext(next, "/wallet")} />;
 }
 
 export default function PinPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {

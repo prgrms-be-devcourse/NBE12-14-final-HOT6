@@ -1,8 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import LogoutLink from "@/components/LogoutLink";
 import Header from "@/components/Header";
+import { getCashbackSummary } from "@/lib/cashbackApi";
+import { getMyWallet } from "@/lib/endpoints";
 import { won } from "@/lib/format";
-import { user, wallet } from "@/lib/mock";
+import { useLoad } from "@/lib/useLoad";
+import { getMyInfo } from "@/lib/userApi";
 
 const MENUS = [
   { href: "/wallet", label: "지갑 거래내역" },
@@ -13,20 +18,27 @@ const MENUS = [
 ];
 
 export default function MyPage() {
+  const me = useLoad(getMyInfo, []);
+  const wallet = useLoad(getMyWallet, []);
+  const summary = useLoad(getCashbackSummary, []);
   return (
     <>
       <Header title="마이페이지" />
       <div className="space-y-3 px-5 pb-4">
+        {me.error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{me.error}</p>}
         <section className="card flex items-center justify-between">
           <div>
-            <div className="font-medium">{user.name}</div>
-            <div className="note">{user.email}</div>
+            <div className="flex items-center gap-2 font-medium">{me.data?.name ?? "…"}{me.data?.pinLocked && <span className="badge badge-bad">간편비밀번호 잠김</span>}</div>
+            <div className="note">{me.data?.email ?? ""}</div>
           </div>
           <Link href="/my/profile" className="btn btn-outline btn-sm !w-auto">내정보 수정</Link>
         </section>
+        {me.data?.needsRelogin && (
+          <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">회원 정보가 바뀌었어요. 로그아웃 후 다시 로그인하면 적용돼요.</p>
+        )}
         <section className="grid grid-cols-2 gap-2">
-          <div className="card-gray !p-3"><div className="note">지갑 잔액</div><div className="mt-0.5 font-bold text-slate-900">{won(wallet.devMoney)}</div></div>
-          <div className="card-gray !p-3"><div className="note">이번 달 캐시백</div><div className="mt-0.5 font-bold text-emerald-600">{won(wallet.monthlyCashback)}</div></div>
+          <div className="card-gray !p-3"><div className="note">지갑 잔액</div><div className="mt-0.5 font-bold text-slate-900">{wallet.data ? won(wallet.data.devMoney) : "…"}</div></div>
+          <div className="card-gray !p-3"><div className="note">이번 달 캐시백</div><div className="mt-0.5 font-bold text-emerald-600">{summary.data ? won(summary.data.earnedAmount) : "…"}</div></div>
         </section>
         <ul className="card !p-0">
           {MENUS.map((m, i) => (

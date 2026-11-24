@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import SignBoard from "@/components/SignBoard";
 import { ICONS } from "@/components/icons";
@@ -10,6 +11,7 @@ import { getPaymentByKey, pay } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { paymentErrorText } from "@/lib/paymentErrors";
 import { clearPending, loadPending, type PendingPayment } from "@/lib/pendingPayment";
+import { dropPin, peekPin } from "@/lib/pinStore";
 import { REASON_TEXT, pctText, type ExclusionCode } from "@/lib/cashbackApi";
 import type { PaymentResponse } from "@/lib/types";
 
@@ -18,7 +20,7 @@ type State =
   | { kind: "none" }
   | { kind: "polling" } // 응답을 못 받아 같은 멱등키로 결과를 재조회하는 중
   | { kind: "timeout" } // 재조회로도 확인하지 못함
-  | { kind: "error"; message: string }
+  | { kind: "error"; message: string; retryPin?: boolean } // retryPin: 간편비밀번호가 틀려 결제가 시작되지 않음
   | { kind: "ok"; res: PaymentResponse };
 
 const STATUS_LABEL: Record<PaymentResponse["status"], string> = {
@@ -31,6 +33,7 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const fmt = (iso?: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "-");
 
 function ReceiptBody() {
+  const router = useRouter();
   const [state, setState] = useState<State>({ kind: "loading" });
   const called = useRef(false);
   const alive = useRef(true);
@@ -41,7 +44,11 @@ function ReceiptBody() {
     return () => { alive.current = false; };
   }, []);
 
-  const show = (s: State) => { if (alive.current) setState(s); };
+  // 결과가 정해지면(성공·실패) 메모리에 둔 간편비밀번호를 지운다. 결과를 모르는 동안은 다시 결제할 수 있게 둔다
+  const show = (s: State) => {
+    if (s.kind === "ok" || s.kind === "error") dropPin();
+    if (alive.current) setState(s);
+  };
 
   // 같은 멱등키로 결과를 다시 조회한다. 서버는 새로 처리하지 않고 저장된 결과만 돌려준다
   const poll = async (p: PendingPayment) => {
@@ -61,15 +68,23 @@ function ReceiptBody() {
 
   // 결제 요청. 다시 보내도 같은 멱등키라 중복 결제되지 않는다
   const submit = async (p: PendingPayment) => {
+    // 간편비밀번호는 저장소에 남기지 않는다. 새로고침 등으로 사라졌으면 다시 입력받는다
+    const pin = peekPin();
+    if (!pin) return router.replace("/pin?next=/pay/receipt");
     show({ kind: "loading" });
     try {
-      const res = await pay(p.request, p.key);
+      const res = await pay({ ...p.request, pin }, p.key);
       if (res.status === "PROCESSING") return poll(p);
       show({ kind: "ok", res });
     } catch (e) {
       // 응답을 못 받았거나(연결 오류, 5xx) 이전 요청이 아직 처리 중이면 재조회로 결과를 확인한다
       if (e instanceof ApiError && (e.status === 0 || e.status >= 500 || e.code === "COM-004")) return poll(p);
-      show({ kind: "error", message: e instanceof ApiError ? paymentErrorText(e.code, e.message) : paymentErrorText() });
+      if (e instanceof ApiError && e.code === "AUTH-006") return router.replace("/locked"); // 5회 실패로 잠김
+      show({
+        kind: "error",
+        message: e instanceof ApiError ? paymentErrorText(e.code, e.message) : paymentErrorText(),
+        retryPin: e instanceof ApiError && e.code === "AUTH-005",
+      });
     }
   };
 
@@ -112,9 +127,9 @@ function ReceiptBody() {
     return (
       <div className="flex flex-1 flex-col px-5 pt-16">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-600" aria-hidden>{ICONS.alert}</div>
-        <h1 className="mt-3 text-center text-xl font-bold">결제에 실패했습니다</h1>
+        <h1 className="mt-3 text-center text-xl font-bold">{state.retryPin ? "간편비밀번호를 확인해 주세요" : "결제에 실패했습니다"}</h1>
         <p role="alert" className="mt-2 text-center text-sm text-red-800">{state.message}</p>
-        <div className="mt-6 flex gap-2.5"><Link href="/pay/scan" className="btn btn-outline">다시 시도</Link><Link href="/wallet" className="btn btn-primary" onClick={clearPending}>확인</Link></div>
+        <div className="mt-6 flex gap-2.5"><Link href={state.retryPin ? "/pin?next=/pay/receipt" : "/pay/scan"} className="btn btn-outline">{state.retryPin ? "다시 입력" : "다시 시도"}</Link><Link href="/wallet" className="btn btn-primary" onClick={clearPending}>확인</Link></div>
       </div>
     );
 

@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  // 개발 중 모든 페이지를 자동으로 즉시 이동(instant navigation) 검증하지 않고, 페이지가 직접 `instant` 를 내보낸 곳만 검증한다.
+  // 로그인 확인(AuthGuard) 뒤에 브라우저에서 데이터를 불러오는 화면이 대부분이라, 서버가 미리 그릴 내용이 없어 매번 경고가 난다.
+  experimental: {
+    instantInsights: { validationLevel: "manual-warning" },
+  },
   turbopack: {
     rules: {
       "*.css": {

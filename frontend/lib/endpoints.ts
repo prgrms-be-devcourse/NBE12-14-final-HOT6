@@ -17,7 +17,8 @@ export const updateMerchant = (body: MerchantUpdateRequest) => api<MerchantRespo
 export const searchMerchants = (name: string, page = 0, size = 20) =>
   api<PageResponse<MerchantResponse>>(`/merchants?name=${encodeURIComponent(name)}&page=${page}&size=${size}`);
 
-export const pay = (body: PaymentRequest, idempotencyKey: string) =>
+// 간편비밀번호(pin)는 결제를 시작하기 전에 서버가 다시 검증한다. 같은 멱등키로 다시 보낼 때도 pin 을 같이 보낸다
+export const pay = (body: PaymentRequest & { pin: string }, idempotencyKey: string) =>
   api<PaymentResponse>("/payments", { method: "POST", body, idempotencyKey });
 
 // 응답을 못 받은 결제를 같은 멱등키로 다시 조회한다 (새로 처리하지 않고 저장된 결과만 반환, 없으면 404 PAY-003)
