@@ -39,6 +39,11 @@ class ReconciliationCheckTest {
   private static final LocalDate D17 = LocalDate.of(2026, 11, 17);
   private static final LocalDate OCTOBER_FIRST = LocalDate.of(2026, 10, 1);
   private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 1, 0, 30);
+  private static final List<ReconciliationType> SETTLEMENT_TYPES =
+      List.of(
+          ReconciliationType.DAILY_NET_SALES,
+          ReconciliationType.SETTLEMENT_CARRY,
+          ReconciliationType.MONTHLY_PAYOUT);
 
   @Autowired ReconciliationService reconciliationService;
   @Autowired ReconciliationResultRepository resultRepository;
@@ -71,9 +76,11 @@ class ReconciliationCheckTest {
 
     List<ReconciliationResult> results = reconciliationService.run(D17);
 
-    assertThat(results).hasSize(3);
-    assertThat(results).allMatch(r -> r.getStatus() == ReconciliationStatus.MATCHED);
-    assertThat(resultRepository.count()).isEqualTo(3);
+    assertThat(results).hasSize(ReconciliationType.values().length);
+    assertThat(results)
+        .filteredOn(r -> SETTLEMENT_TYPES.contains(r.getType()))
+        .allMatch(r -> r.getStatus() == ReconciliationStatus.MATCHED);
+    assertThat(resultRepository.count()).isEqualTo(ReconciliationType.values().length);
   }
 
   @Test
@@ -204,7 +211,7 @@ class ReconciliationCheckTest {
     reconciliationService.run(D17);
     reconciliationService.run(D17);
 
-    assertThat(resultRepository.count()).isEqualTo(6);
+    assertThat(resultRepository.count()).isEqualTo(ReconciliationType.values().length * 2L);
   }
 
   private ReconciliationResult resultOf(ReconciliationType type) {
