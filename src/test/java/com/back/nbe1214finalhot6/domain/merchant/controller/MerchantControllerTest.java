@@ -177,6 +177,33 @@ class MerchantControllerTest {
   }
 
   @Test
+  @DisplayName("내 가맹점을 조회하면 200 과 가맹점 정보를 반환한다")
+  void 내가맹점조회() throws Exception {
+    given(merchantService.get(1L))
+        .willReturn(new MerchantResponse(1L, "내 가게", "서울시 중구", true));
+
+    mockMvc
+        .perform(get("/api/merchants/me"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.merchantId").value(1))
+        .andExpect(jsonPath("$.data.name").value("내 가게"))
+        .andExpect(jsonPath("$.data.cashbackEligible").value(true));
+  }
+
+  @Test
+  @DisplayName("가맹점이 없는 점주가 내 가맹점을 조회하면 404 MER-001")
+  void 내가맹점없음() throws Exception {
+    given(ownedResources.merchantIdOf(any()))
+        .willThrow(new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+
+    mockMvc
+        .perform(get("/api/merchants/me"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("MER-001"));
+  }
+
+  @Test
   @DisplayName("가맹점을 수정하면 200 과 수정 결과를 반환한다")
   void 가맹점수정성공() throws Exception {
     given(merchantService.update(eq(1L), any()))
