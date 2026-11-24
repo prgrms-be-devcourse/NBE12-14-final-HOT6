@@ -7,7 +7,7 @@ import { ICONS } from "@/components/icons";
 
 const ROLES = [
   { href: "/login", title: "회원", badge: "모바일웹", icon: ICONS.user, desc: "QR로 결제하고 캐시백을 받아요. 지갑과 결제 내역을 한곳에서 관리합니다.", cta: "회원 로그인", sub: { href: "/signup", label: "회원가입" } },
-  { href: "/merchant/login", title: "가맹점주", badge: "모바일웹", icon: ICONS.store, desc: "QR을 만들어 결제를 받고, 매출과 일·월 정산을 확인합니다.", cta: "가맹점주 로그인", sub: { href: "/merchant/register", label: "가맹점 등록" } },
+  { href: "/merchant/login", title: "가맹점주", badge: "모바일웹", icon: ICONS.store, desc: "QR을 만들어 결제를 받고, 매출과 일·월 정산을 확인합니다.", cta: "가맹점주 로그인", sub: { href: "/login?next=/merchant/register", label: "가맹점 등록" } },
   { href: "/admin/login", title: "운영팀", badge: "웹", icon: ICONS.chart, desc: "캐시백 정책과 예산을 관리하고, 대시보드와 정산·원장 대사를 봅니다.", cta: "운영팀 로그인", sub: undefined },
 ];
 

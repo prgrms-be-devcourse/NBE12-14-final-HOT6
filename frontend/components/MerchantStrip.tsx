@@ -25,7 +25,6 @@ export default function MerchantStrip() {
       <span className="font-bold text-brand-900">{name}</span>
       <span className="flex items-center gap-2 text-brand-700">
         {id !== null && <span className="text-xs">가맹점 #{id}</span>}
-        <span className="badge badge-ok">운영중</span>
       </span>
     </div>
   );

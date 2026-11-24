@@ -4,13 +4,27 @@ import Link from "next/link";
 import { useState } from "react";
 import Header from "@/components/Header";
 import MapPicker, { type LatLng } from "@/components/MapPicker";
+import RegisterGate from "@/components/RegisterGate";
 import { ApiError } from "@/lib/api";
 import { saveCtx } from "@/lib/devContext";
 import { CATEGORIES } from "@/lib/stores";
 import { registerMerchant } from "@/lib/endpoints";
 
+// 로그인한 이용자만 등록할 수 있다(RegisterGate). 로그인하지 않았으면 이용자 로그인으로 보낸다
 export default function MerchantRegisterPage() {
+  return (
+    <>
+      <Header title="가맹점 등록" back="/merchant/login" />
+      <RegisterGate>
+        <RegisterForm />
+      </RegisterGate>
+    </>
+  );
+}
+
+function RegisterForm() {
   const [done, setDone] = useState(false);
+  const [needLogin, setNeedLogin] = useState(false); // 등록 중 401(로그인 만료·없음)
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
@@ -23,12 +37,19 @@ export default function MerchantRegisterPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setNeedLogin(false);
     setBusy(true);
     try {
       const res = await registerMerchant({ name: name.trim(), address: address.trim(), ...(proof ? { revenueProof: proof } : {}) });
       saveCtx({ merchantName: res.name, phone: phone.trim(), category, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
       setDone(true);
     } catch (err) {
+      // 로그인이 풀렸거나 없는 경우: 말없이 로그인 화면으로 보내지 않고 이유를 알려 준다
+      if (err instanceof ApiError && err.status === 401) {
+        setNeedLogin(true);
+        setError("로그인이 필요해요. 로그인한 뒤 다시 등록해 주세요");
+        return;
+      }
       setError(err instanceof ApiError ? err.message : "알 수 없는 오류가 발생했습니다");
     } finally {
       setBusy(false);
@@ -39,7 +60,6 @@ export default function MerchantRegisterPage() {
   if (done) {
     return (
       <>
-        <Header title="가맹점 등록" back="/merchant/login" />
         <div className="space-y-4 px-5 pb-5">
           <section className="card text-center">
             <div className="text-lg font-bold">가맹점이 등록되었어요</div>
@@ -53,7 +73,6 @@ export default function MerchantRegisterPage() {
 
   return (
     <>
-      <Header title="가맹점 등록" back="/merchant/login" />
       <form onSubmit={submit} className="space-y-3 px-5 pb-5">
         <label className="block"><span className="label">가맹점명</span><input className="field" required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="block"><span className="label">주소</span><input className="field" required maxLength={200} value={address} onChange={(e) => setAddress(e.target.value)} /></label>
@@ -76,6 +95,7 @@ export default function MerchantRegisterPage() {
         </div>
         <p className="note">연락처, 업종, 위치는 이 기기에만 저장되고 서버로 전송되지 않아요.</p>
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">{error}</p>}
+        {needLogin && <Link href="/login?next=/merchant/register" className="btn btn-outline">로그인하러 가기</Link>}
         <button type="submit" disabled={busy || !name.trim() || !address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "등록 중…" : "등록"}</button>
       </form>
     </>
