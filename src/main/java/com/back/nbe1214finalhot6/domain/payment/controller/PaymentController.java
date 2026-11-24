@@ -4,6 +4,8 @@ import com.back.nbe1214finalhot6.common.idempotency.IdempotencyKeys;
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
 import com.back.nbe1214finalhot6.common.security.OwnedResources;
 import com.back.nbe1214finalhot6.domain.auth.security.AuthUser;
+import com.back.nbe1214finalhot6.domain.auth.service.PinService;
+import com.back.nbe1214finalhot6.domain.payment.dto.PayRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.service.PaymentCancelService;
@@ -28,14 +30,22 @@ public class PaymentController {
   private final PaymentQueryService paymentQueryService;
   private final PaymentCancelService paymentCancelService;
   private final OwnedResources ownedResources; //인증인가
+  private final PinService pinService;
 
-  @Operation(summary = "QR 결제", description = "멱등키 헤더로 중복 결제를 방지하며 QR 결제를 요청한다")
+  @Operation(
+      summary = "QR 결제",
+      description =
+          "멱등키 헤더로 중복 결제를 방지하며 QR 결제를 요청한다. 결제를 시작하기 전에 PIN(숫자 6자리)을 검증하고, "
+              + "틀리면 400(AUTH-005, 남은 횟수), 5회 틀려 잠겼으면 409(AUTH-006)이며 이때는 결제 기록도 QR 사용 처리도 일어나지 않는다. "
+              + "같은 멱등키로 결제를 다시 보내면 PIN 도 다시 보내야 한다(재조회 API 는 PIN 이 필요 없다)")
   @PostMapping
   public ApiResponse<PaymentResponse> pay(
           @RequestHeader("Idempotency-Key") String keyHeader,
-          @RequestBody @Valid PaymentRequest request,
+          @RequestBody @Valid PayRequest request,
           @AuthenticationPrincipal AuthUser user) {
     String key = IdempotencyKeys.validate(keyHeader);
+    // PIN 이 틀리면 여기서 끝난다. 결제 기록도, QR 사용 처리도 일어나지 않는다
+    pinService.verify(user.userId(), request.pin());
     Long walletId = ownedResources.walletIdOf(user);
     PaymentRequest trusted =
             new PaymentRequest(walletId, request.qrToken(), request.cashbackUsed());
