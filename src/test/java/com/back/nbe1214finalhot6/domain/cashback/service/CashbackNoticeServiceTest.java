@@ -15,6 +15,7 @@ import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackNoticeReposi
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,6 +70,84 @@ class CashbackNoticeServiceTest {
     assertThat(notice.stopAt()).isNull();
     assertThat(notice.createdAt()).isEqualTo(LocalDateTime.of(2026, 11, 18, 9, 0));
     assertThat(noticeRepository.findAll().get(0).getPolicyId()).isEqualTo(reduced.policyId());
+  }
+
+  private long insertPolicy(String rate, LocalDateTime startsAt, LocalDateTime endsAt) {
+    return jdbcTemplate.queryForObject(
+        "insert into cashback_policy (rate, starts_at, ends_at, created_at) values (?, ?, ?, ?) returning id",
+        Long.class,
+        new BigDecimal(rate),
+        startsAt,
+        endsAt,
+        startsAt);
+  }
+
+  private void insertPolicyNotice(long policyId, LocalDateTime startsAt) {
+    jdbcTemplate.update(
+        "insert into cashback_notice (type, content, effective_from, policy_id, created_at) values (?, ?, ?, ?, ?)",
+        "POLICY_CHANGE",
+        "예고",
+        startsAt.toLocalDate(),
+        policyId,
+        startsAt);
+  }
+
+  // 목적: 그 달의 첫 인하는 새 요율과 직전 요율(그 달 월 예산의 기본 요율)이 공지에 함께 나오는지 확인한다.
+  @Test
+  @DisplayName("첫 인하 공지는 새 요율과 월 기본 요율을 직전 요율로 담는다")
+  void policyChange_previousRateIsBaseRate() {
+    reduce("0.02", LocalDateTime.of(2026, 11, 20, 12, 0));
+
+    NoticeResponse notice = noticeService.list(null, 0, 20).content().get(0);
+
+    assertThat(notice.rate()).isEqualByComparingTo("0.02");
+    assertThat(notice.previousRate()).isEqualByComparingTo("0.03");
+  }
+
+  // 목적: 같은 달에 구간이 이어지면 직전 요율이 직전 구간의 요율이고, 구간이 달을 넘어 이어져도(달 경계) 새 달의 첫 인하는 새 달의 기본 요율을 직전 요율로 쓰는지
+  // 확인한다.
+  @Test
+  @DisplayName("직전 요율은 같은 달의 직전 구간이고 달 경계를 넘지 않는다")
+  void policyChange_previousRateChainAndMonthBoundary() {
+    budgetService.putMonthly(2026, 12, new MonthlyBudgetRequest(1_000_000L, new BigDecimal("0.04")));
+    LocalDateTime nov10 = LocalDateTime.of(2026, 11, 10, 0, 0);
+    LocalDateTime nov20 = LocalDateTime.of(2026, 11, 20, 0, 0);
+    LocalDateTime dec1 = LocalDateTime.of(2026, 12, 1, 0, 0);
+    LocalDateTime jan1 = LocalDateTime.of(2027, 1, 1, 0, 0);
+    long first = insertPolicy("0.02", nov10, nov20);
+    long second = insertPolicy("0.015", nov20, dec1);
+    long december = insertPolicy("0.03", dec1, jan1);
+    insertPolicyNotice(first, nov10);
+    insertPolicyNotice(second, nov20);
+    insertPolicyNotice(december, dec1);
+
+    List<NoticeResponse> notices = noticeService.list(null, 0, 20).content();
+
+    NoticeResponse forFirst = byRate(notices, "0.02");
+    NoticeResponse forSecond = byRate(notices, "0.015");
+    NoticeResponse forDecember = byRate(notices, "0.03");
+    assertThat(forFirst.previousRate()).isEqualByComparingTo("0.03"); // 그 달 첫 구간: 월 기본 요율
+    assertThat(forSecond.previousRate()).isEqualByComparingTo("0.02"); // 직전 구간
+    assertThat(forDecember.previousRate()).isEqualByComparingTo("0.04"); // 11월 구간이 아니라 12월 기본 요율
+  }
+
+  private NoticeResponse byRate(List<NoticeResponse> notices, String rate) {
+    return notices.stream()
+        .filter(n -> n.rate() != null && n.rate().compareTo(new BigDecimal(rate)) == 0)
+        .findFirst()
+        .orElseThrow();
+  }
+
+  // 목적: 요율과 무관한 공지(정책이 연결되지 않은 공지)는 요율 필드가 null 인지 확인한다.
+  @Test
+  @DisplayName("정책이 없는 공지는 요율 필드가 null 이다")
+  void nonPolicyNotice_ratesNull() {
+    insertNotice("BUDGET_NOTICE", "소진 예고", LocalDateTime.of(2026, 11, 17, 9, 0));
+
+    NoticeResponse notice = noticeService.list(null, 0, 20).content().get(0);
+
+    assertThat(notice.rate()).isNull();
+    assertThat(notice.previousRate()).isNull();
   }
 
   // 목적: 즉시 적용(적용 시각이 지금)인 인하도 공지를 남기는지, 예고 일수가 0 인 기본 설정에서 적용 시작일이 오늘이 되는지 확인한다.

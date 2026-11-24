@@ -5,10 +5,21 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackNotice;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
 import com.back.nbe1214finalhot6.domain.cashback.entity.NoticeType;
+import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackNoticeRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -29,6 +40,8 @@ public class CashbackNoticeService {
   static final int MAX_PAGE_SIZE = 100;
 
   private final CashbackNoticeRepository noticeRepository;
+  private final CashbackPolicyRepository policyRepository;
+  private final CashbackMonthlyBudgetRepository monthlyBudgetRepository;
 
   /**
    * 요율 인하로 새 구간이 만들어졌을 때 정책 변경 예고를 한 건 등록한다. 같은 정책에는 한 번만 만들어진다(유니크 제약).
@@ -77,6 +90,58 @@ public class CashbackNoticeService {
         type == null
             ? noticeRepository.findAll(pageable)
             : noticeRepository.findByType(type, pageable);
-    return PageResponse.from(result.map(NoticeResponse::from));
+    return PageResponse.from(toResponses(result));
+  }
+
+  /**
+   * 정책 변경 예고에는 새 요율과 직전 요율을 채운다. 새 요율은 공지에 연결된 정책의 요율이고, 직전 요율은 그 정책이 시작하는 시각에 끝난 같은 달의 구간의
+   * 요율이다. 같은 달에 앞선 구간이 없으면 그 달 월 예산의 기본 요율이다. 정책을 한 번에 읽어 공지마다 조회하지 않는다.
+   */
+  private Page<NoticeResponse> toResponses(Page<CashbackNotice> page) {
+    Set<Long> policyIds =
+        page.getContent().stream()
+            .map(CashbackNotice::getPolicyId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+    if (policyIds.isEmpty()) {
+      return page.map(NoticeResponse::from);
+    }
+    Map<Long, CashbackPolicy> policies =
+        policyRepository.findAllById(policyIds).stream()
+            .collect(Collectors.toMap(CashbackPolicy::getId, Function.identity()));
+    Set<LocalDateTime> startTimes =
+        policies.values().stream().map(CashbackPolicy::getStartsAt).collect(Collectors.toSet());
+    Map<LocalDateTime, CashbackPolicy> endedAt =
+        policyRepository.findByEndsAtIn(startTimes).stream()
+            .collect(Collectors.toMap(CashbackPolicy::getEndsAt, Function.identity(), (a, b) -> a));
+    Map<YearMonth, BigDecimal> baseRates = new HashMap<>();
+    return page.map(
+        notice -> {
+          CashbackPolicy policy =
+              notice.getPolicyId() == null ? null : policies.get(notice.getPolicyId());
+          if (policy == null) {
+            return NoticeResponse.from(notice);
+          }
+          return NoticeResponse.of(
+              notice, policy.getRate(), previousRate(policy, endedAt, baseRates));
+        });
+  }
+
+  private BigDecimal previousRate(
+      CashbackPolicy policy,
+      Map<LocalDateTime, CashbackPolicy> endedAt,
+      Map<YearMonth, BigDecimal> baseRates) {
+    YearMonth month = YearMonth.from(policy.getStartsAt());
+    CashbackPolicy previous = endedAt.get(policy.getStartsAt());
+    if (previous != null && YearMonth.from(previous.getStartsAt()).equals(month)) {
+      return previous.getRate();
+    }
+    return baseRates.computeIfAbsent(
+        month,
+        m ->
+            monthlyBudgetRepository
+                .findByBudgetYearAndBudgetMonth(m.getYear(), m.getMonthValue())
+                .map(CashbackMonthlyBudget::getBaseRate)
+                .orElse(null));
   }
 }
