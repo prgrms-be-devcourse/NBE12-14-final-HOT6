@@ -11,6 +11,7 @@ const TYPES: { type: ReconciliationType; label: string; note: string }[] = [
   { type: "DEVMONEY_BALANCE", label: "데브머니 잔액", note: "지갑 데브머니 = 원장 합" },
   { type: "CASHBACK_BALANCE", label: "캐시백 잔액", note: "지갑 캐시백 = 원장 합" },
   { type: "CASHBACK_EARNING", label: "캐시백 적립 건", note: "적립 건 상태 = 원장 기록" },
+  { type: "CASHBACK_BUDGET", label: "캐시백 예산", note: "월·연 예산의 확보·지급 = 적립 건 합계" },
   { type: "CHARGE_TRANSFER", label: "충전", note: "충전액 = 계좌 차감 = 지갑 입금" },
   { type: "REFUND_TRANSFER", label: "환불", note: "환불액 = 지갑 차감 = 계좌 입금" },
   { type: "DAILY_NET_SALES", label: "일 순매출", note: "장부 순매출 = 결제 − 취소" },
@@ -70,7 +71,13 @@ export default function AdminSettlePage() {
       const fresh = await runReconciliation(reconDate || undefined);
       setResults((prev) => [...fresh, ...prev]);
       const bad = fresh.filter((r) => r.status !== "MATCHED").length;
-      setReconMsg({ ok: bad === 0, text: bad === 0 ? `${fresh.length}종류가 모두 일치해요` : `${fresh.length}종류 중 ${bad}종류가 불일치이거나 오류예요` });
+      const missing = TYPES.length - fresh.length;
+      if (missing > 0) {
+        // 서버가 일부 종류를 돌려주지 않았다. 일치한다고 보이면 안 된다
+        setReconMsg({ ok: false, text: `${TYPES.length}종류 중 ${fresh.length}종류만 결과가 왔어요. 나머지 ${missing}종류는 실행되지 않았어요` });
+      } else {
+        setReconMsg({ ok: bad === 0, text: bad === 0 ? `${fresh.length}종류가 모두 일치해요` : `${fresh.length}종류 중 ${bad}종류가 불일치이거나 오류예요` });
+      }
     } catch (e) {
       setReconMsg({ ok: false, text: errText(e, "대사를 실행하지 못했어요") });
     } finally {
