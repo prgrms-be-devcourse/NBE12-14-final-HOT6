@@ -76,6 +76,9 @@ public class SecurityConfig {
                     // 내 정보 조회는 역할 구분 없이 로그인만 하면 된다(운영자 포함)
                     .requestMatchers(HttpMethod.GET, "/api/users/me")
                     .authenticated()
+                    // PIN 검증은 이용자(OWNER 포함)만 쓴다. 운영자는 못 쓴다
+                    .requestMatchers(HttpMethod.POST, "/api/users/pin/verify")
+                    .hasRole("USER")
                     // 나머지는 로그인만 하면 된다
                     .anyRequest()
                     .authenticated());

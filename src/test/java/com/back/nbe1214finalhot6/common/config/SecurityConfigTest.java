@@ -118,6 +118,8 @@ class SecurityConfigTest {
         Arguments.of("POST", "/api/payments/1/cancel", 401, 403, 200, 403),
         // 내 정보 조회는 모든 로그인 역할이 쓴다(운영자 포함)
         Arguments.of("GET", "/api/users/me", 401, 200, 200, 200),
+        // PIN 검증은 이용자(OWNER 포함)만, 운영자는 못 쓴다
+        Arguments.of("POST", "/api/users/pin/verify", 401, 200, 200, 403),
         // 규칙에 없는 경로는 로그인만 하면 된다(ADMIN 포함)
         Arguments.of("GET", "/api/probe/other", 401, 200, 200, 200));
   }
