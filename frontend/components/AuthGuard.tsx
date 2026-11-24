@@ -28,5 +28,7 @@ export default function AuthGuard({ audience, publicPaths = [], children }: { au
     if (!current || !canEnter(current.role, audience)) router.replace(LOGIN_PATH[audience]);
   }, [mounted, isPublic, audience, pathname, router]);
 
-  return mounted && allowed ? <>{children}</> : null;
+  // 공개 경로는 로그인 여부와 상관없으므로 서버에서도 바로 그린다. 서버에서 null 이면 그 페이지가 렌더링에서 빠져
+  // Next.js 가 즉시 이동(instant navigation)을 검증하지 못한다. 보호된 경로만 세션 확인 뒤에 보여 준다.
+  return isPublic || (mounted && allowed) ? <>{children}</> : null;
 }

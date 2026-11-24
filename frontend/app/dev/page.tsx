@@ -4,10 +4,10 @@ type Item = { href: string; label: string; star?: boolean };
 const LANES: { title: string; note?: string; items: Item[] }[] = [
   { title: "회원 앱 · 가입 / 로그인", items: [
     { href: "/signup", label: "① 회원가입", star: true }, { href: "/pin-setup", label: "② 간편비밀번호 설정" },
-    { href: "/login", label: "③ 로그인", star: true }, { href: "/pin", label: "④ 간편비밀번호 입력" }, { href: "/locked", label: "⑤ 잠금 · 이메일 인증" } ] },
+    { href: "/login", label: "③ 로그인", star: true }, { href: "/pin", label: "④ 간편비밀번호 입력" }, { href: "/locked", label: "⑤ 잠금 안내" } ] },
   { title: "회원 앱 · 지갑 / 충전 / 환불", items: [
-    { href: "/wallet", label: "⑥ 지갑 홈", star: true }, { href: "/wallet/charge", label: "⑦ 충전 금액 입력", star: true },
-    { href: "/wallet/pg?amount=50000", label: "⑧ PG 결제" }, { href: "/wallet?charged=50000", label: "⑨ 충전 후 지갑 홈", star: true }, { href: "/wallet/refund", label: "⑩ 지갑 환불" } ] },
+    { href: "/wallet", label: "⑥ 지갑 홈", star: true }, { href: "/wallet/charge", label: "⑦ 충전 (바로 충전)", star: true },
+    { href: "/wallet?charged=50000", label: "⑨ 충전 후 지갑 홈", star: true }, { href: "/wallet/refund", label: "⑩ 지갑 환불" } ] },
   { title: "회원 앱 · 결제 / 캐시백", items: [
     { href: "/pay/scan", label: "⑪ QR 스캔 · 미리보기", star: true }, { href: "/stores", label: "가맹점 찾기 (추가)" }, { href: "/pay/receipt", label: "⑫ 결제 완료 · 영수증", star: true },
     { href: "/pay/history", label: "⑬ 결제 내역 · 취소" }, { href: "/cashback", label: "⑭ 내 캐시백" }, { href: "/cashback/accruals", label: "⑮ 캐시백 적립내역" } ] },

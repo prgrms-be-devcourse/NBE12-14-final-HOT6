@@ -3,21 +3,41 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-type Props = { mode: "set" | "enter"; doneHref: string; lockedHref?: string };
+// ok=false 이면 message 를 보여 주고, locked 면 잠금 화면으로 보낸다
+export type PinResult = { ok: true } | { ok: false; message: string; locked?: boolean };
+type Props = {
+  mode: "set" | "enter";
+  doneHref: string;
+  lockedHref?: string;
+  // 6자리를 다 입력했을 때(set 은 두 번 일치했을 때) 서버 호출을 맡긴다. 없으면 바로 이동한다
+  onSubmit?: (pin: string) => Promise<PinResult>;
+};
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
-const MAX_FAIL = 5;
 
-export default function PinPad({ mode, doneHref, lockedHref = "/locked" }: Props) {
+export default function PinPad({ mode, doneHref, lockedHref = "/locked", onSubmit }: Props) {
   const router = useRouter();
   const [pin, setPin] = useState("");
   const [first, setFirst] = useState<string | null>(null);
-  const [fails, setFails] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const submit = async (value: string) => {
+    if (!onSubmit) return router.push(doneHref);
+    setBusy(true);
+    const res = await onSubmit(value);
+    if (res.ok) return router.push(doneHref);
+    if (res.locked) return router.push(lockedHref);
+    setBusy(false);
+    if (mode === "set") setFirst(null);
+    setError(res.message);
+  };
+
   const press = (k: string) => {
+    if (busy) return;
     if (k === "⌫") return setPin((p) => p.slice(0, -1));
     if (!k || pin.length >= 6) return;
+    setError("");
     const next = pin + k;
     setPin(next);
     if (next.length < 6) return;
@@ -26,16 +46,11 @@ export default function PinPad({ mode, doneHref, lockedHref = "/locked" }: Props
       setPin("");
       if (mode === "set") {
         if (first === null) return setFirst(next);
-        if (first === next) return router.push(doneHref);
+        if (first === next) return void submit(next);
         setFirst(null);
         return setError("처음 입력과 일치하지 않습니다. 다시 설정해 주세요");
       }
-      // 데모: 000000 은 항상 실패
-      if (next !== "000000") return router.push(doneHref);
-      const f = fails + 1;
-      setFails(f);
-      if (f >= MAX_FAIL) return router.push(lockedHref);
-      setError(`일치하지 않습니다 (실패 ${f} / ${MAX_FAIL})`);
+      void submit(next);
     }, 150);
   };
 
@@ -57,7 +72,7 @@ export default function PinPad({ mode, doneHref, lockedHref = "/locked" }: Props
           />
         ))}
       </div>
-      <p className="mb-4 h-5 text-center text-[13px] font-medium text-red-700" role="alert">
+      <p className="mb-4 min-h-5 text-center text-[13px] font-medium text-red-700" role="alert">
         {error && `! ${error}`}
       </p>
       <div className="grid grid-cols-3 gap-2.5">
@@ -66,16 +81,14 @@ export default function PinPad({ mode, doneHref, lockedHref = "/locked" }: Props
             key={i}
             type="button"
             onClick={() => press(k)}
-            disabled={!k}
+            disabled={!k || busy}
             className="rounded-xl border border-zinc-300 bg-white py-4 text-xl font-medium shadow-sm active:bg-brand-50 disabled:invisible"
           >
             {k}
           </button>
         ))}
       </div>
-      {mode === "enter" && (
-        <p className="note mt-4 text-center">데모: 000000 을 입력하면 실패 처리됩니다.</p>
-      )}
+      {busy && <p className="note mt-4 text-center" role="status">확인하는 중이에요…</p>}
     </div>
   );
 }
