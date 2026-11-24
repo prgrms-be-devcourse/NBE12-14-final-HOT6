@@ -73,6 +73,9 @@ public class SecurityConfig {
                         "/api/qr/**",
                         "/api/wallet/**")
                     .hasRole("USER")
+                    // 내 정보 조회는 역할 구분 없이 로그인만 하면 된다(운영자 포함)
+                    .requestMatchers(HttpMethod.GET, "/api/users/me")
+                    .authenticated()
                     // 나머지는 로그인만 하면 된다
                     .anyRequest()
                     .authenticated());
