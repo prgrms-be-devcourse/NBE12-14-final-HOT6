@@ -87,7 +87,7 @@ MVP 이후로 미룬다. 시간이 남으면 진행한다.
 | H1 | 정산·대사 요약 | 후순위 | 최근 대사 결과(불일치 건수), 정산 건수와 금액, 월 지급 현황(지급 완료, 대기, 실패 건수) |
 | H2 | 캐시백 그래프 화면 연동 | 후순위 | 데이터와 계산은 B([cashback 기획 3-6](cashback-mh-1118.md#3-6-대시보드-그래프-3개)), 화면 구성은 D 제안. 분담은 B와 협의 |
 
-### 2-5. 가맹점 전용 지갑
+### 2-6. 가맹점 전용 지갑
 
 | 번호 | 기능 | 기획서 | API·형태 | 단계 | 메모 |
 |---|---|---|---|---|---|
@@ -161,7 +161,7 @@ MVP 이후로 미룬다. 시간이 남으면 진행한다.
 | 입금 | `MerchantWallet`에 정산 지급 입금. `(타입, 월 정산 건 ID)` 유니크로 중복 입금을 막는다 |
 | 트랜잭션 | 가맹점 건마다 건 생성, 입금, 출금과 완료(`PAID`)를 각각 별도 트랜잭션으로 처리한다. 서비스는 트랜잭션을 열지 않고, 건 생성과 출금은 `MonthlySettlementProcessor`가 맡는다. 한 건이 실패해도 다른 건은 유지되고, 실패한 건은 대기로 남아 다음 실행에서 재시도한다 |
 | 출금 | 지급 직후 자동으로 `MerchantAccount`로 이동한다. 지갑 차감, 계좌 잔액 증가, 원장 기록(`PAYOUT_TO_ACCOUNT`), `PAID` 변경을 한 트랜잭션에서 처리하고, 같은 월 정산 건의 중복 출금은 원장의 `(타입, 참조 ID)` 유니크가 막는다. 출금이 실패하면 입금은 지갑 잔액으로 남고, 다음 실행에서는 입금을 건너뛰고 출금만 다시 한다 |
-| 실행 방식 | 평소에는 배치가 자동 실행한다. 일·월 정산 모두 서비스 메서드(`settle(날짜)`, `settle(월)`)로 월·날짜를 지정해 실행할 수 있고, 재실행해도 결과가 같다. ADMIN 전용 수동 실행 엔드포인트는 후순위다. 서버가 한 달 넘게 꺼져 있으면 전월보다 앞선 달은 자동 대상이 아니므로 이 수동 실행이 복구 수단이 된다 |
+| 실행 방식 | 평소에는 배치가 자동 실행한다. 일·월 정산 모두 서비스 메서드(`settle(날짜)`, `settle(월)`)로 월·날짜를 지정해 실행할 수 있고, 재실행해도 결과가 같다. 운영자(ADMIN)는 수동 실행 API(S7, #175)로 이 메서드를 호출한다. 서버가 한 달 넘게 꺼져 있으면 전월보다 앞선 달은 자동 대상이 아니므로 이 수동 실행이 복구 수단이 된다 |
 
 ### 3-6. 가맹점 전용 지갑과 계좌
 
@@ -194,24 +194,116 @@ MVP 이후로 미룬다. 시간이 남으면 진행한다.
 
 | 상대 | 연동 |
 |---|---|
-| A (결제) | `QrService.getPaymentTarget(qrToken)`(Q5)와 `QrService.markUsed(qrToken, requestedAt)`(Q4) 제공. 실패 시 `BusinessException`(`QR-001~003`). 결제 쪽의 `QrMockService`는 A가 실제 서비스로 교체를 마쳤다(#55, PR #101). 사장님 결제 내역과 일 정산이 같은 집계 기준을 쓴다. 결제·취소 금액을 정산 입력으로 읽는다. 정산이 `payment`의 `completedAt`·`canceledAt`·`amount`를 직접 조회하므로 결제 쪽에서 가맹점 매출 기록(`recordPayment` 등)을 호출할 필요가 없다(2026-11-22 A에게 확인 답변). 취소는 전액 취소만 구현하므로 취소 금액은 `amount`와 같다. 취소는 `status=CANCELED`로 바꾸면서 `canceledAt`을 채우고 `completedAt`은 지우지 않으며, 두 시각 모두 주입된 Clock(KST)으로 기록한다. 취소 구현(#86)은 아직 머지 전이며, 머지되면 실제 코드로 다시 확인한다 |
+| A (결제) | `QrService.getPaymentTarget(qrToken)`(Q5)와 `QrService.markUsed(qrToken, requestedAt)`(Q4) 제공. 실패 시 `BusinessException`(`QR-001~003`). 결제 쪽의 `QrMockService`는 A가 실제 서비스로 교체를 마쳤다(#55, PR #101). 사장님 결제 내역과 일 정산이 같은 집계 기준을 쓴다. 결제·취소 금액을 정산 입력으로 읽는다. 정산이 `payment`의 `completedAt`·`canceledAt`·`amount`를 직접 조회하므로 결제 쪽에서 가맹점 매출 기록(`recordPayment` 등)을 호출할 필요가 없다(2026-11-22 A에게 확인 답변). 취소는 전액 취소만 구현하므로 취소 금액은 `amount`와 같다. 취소는 `status=CANCELED`로 바꾸면서 `canceledAt`을 채우고 `completedAt`은 지우지 않으며, 두 시각 모두 주입된 Clock(KST)으로 기록한다. 취소 구현(#86)은 머지되었고, 정산 집계 기준과 맞는 것을 실제 코드로 확인했다 |
 | B (캐시백) | 가맹점의 `cashbackEligible`을 제공한다. QR 스캔 조회에 요율과 남은 한도를 받는다(T1). 캐시백 대사(3번)에서 B의 적립 건 상태를 읽는다(예산은 비교하지 않음). 가맹점 지급은 결제 총액 기준이며, 캐시백 사용분의 재원은 대사 단계에서 B와 다룬다. 캐시백 회수는 이용자 지갑 쪽 문제이며 가맹점 정산에는 영향이 없다. 대시보드 그래프 데이터는 B의 시계열 API(T6)를 쓴다 |
 | C (회원·지갑) | 점주(OWNER) 권한과 로그인 사용자 ID는 C의 인증으로 처리하며, 점주 기능은 토큰의 회원으로 가맹점을 찾는다(#150). 지갑 원장과 계좌 원장을 대사에서 읽는다(결제·취소 원장 type과 부호는 [3-4](#3-4-원장-대사)). 결제 T2의 락 순서는 결제 → QR → 지갑 → 예산이며, 지갑은 `debitPayment`와 `creditPaymentCancel`을 제공한다. 가맹점 쪽 지갑과 계좌는 D가 만들며, C의 `Wallet`, `Account`는 수정하지 않는다 |
 
 ## 5. 데이터 모델
 
-DB는 PostgreSQL 기준이다.
+DB는 PostgreSQL 기준이다. 2026-11-24 dev의 엔티티 코드와 맞췄다.
 
-| 테이블 | 용도 | 변경 |
-|---|---|---|
-| `merchant` | 가맹점 | 구현 완료. 이름, 주소, 소유자 ID, 적립 대상 여부, 생성 시각. 위경도는 지도 이슈에서 nullable로 추가 |
-| `qr_code` | 동적 QR | 구현 완료. 토큰(UUID, 유니크), 가맹점 ID, 금액(1원~100만원), 상태(DB에는 대기/사용됨만, 만료는 계산), 만료 시각, 생성 시각, 사용 시각 |
-| `daily_settlement` | 일 정산 (엔티티 `DailySettlement`) | 신규. 가맹점 ID, 정산 날짜, 결제 합, 취소 합, 순매출, 전일 이월, 정산 확정액, 다음 날 이월, `(가맹점, 날짜)` 유니크. 구현 완료(#114) |
-| `monthly_settlement` | 월 정산·지급 (엔티티 `MonthlySettlement`) | 신규. 가맹점 ID, 정산월(해당 월 1일), 지급액, 상태(대기/지급 완료), 지급 시각, 생성 시각, `(가맹점, 정산월)` 유니크. 구현 완료(#115) |
-| `merchant_wallet` | 가맹점 전용 지갑 | 신규(D). 가맹점 ID(유니크), 잔액(음수 불가) |
-| `merchant_wallet_transaction` | 가맹점 지갑 거래 이력 | 신규(D). 타입(정산 지급, 계좌로 출금), 부호 있는 금액, 거래 후 잔액, 참조 ID(월 정산 건 ID), 생성 시각, `(타입, 참조 ID)` 유니크 |
-| `merchant_account` | 가맹점용 모의계좌 | 신규(D). 가맹점 ID(유니크), 잔액(0원으로 시작) |
-| `reconciliation_result` | 대사 결과 (엔티티 `ReconciliationResult`) | 신규(기획서 8절). 대사 종류, 대상 날짜, 상태(일치/불일치/오류), 검사 건수, 불일치 건수, 불일치 대상 ID, 오류 메시지, 실행 시각. 같은 날짜를 다시 실행하면 이력으로 쌓으므로 유니크는 두지 않는다. 구현 완료(#140, #146) |
+### 5-1. 테이블 목록
+
+| 테이블 | 용도 | 상태 | 변경 |
+|---|---|---|---|
+| `merchant` | 가맹점 | 구현 | 이름, 주소, 소유자 ID, 적립 대상 여부, 생성 시각. 소유자 ID는 유니크(점주당 가맹점 1개, #150)이고, 공공데이터 적재분을 위해 null을 허용한다. 위경도는 지도 이슈에서 nullable로 추가 |
+| `qr_code` | 동적 QR | 구현 | 토큰(UUID, 유니크), 가맹점 ID, 금액(1원~100만원), 상태(DB에는 대기/사용됨만, 만료는 계산), 만료 시각, 생성 시각, 사용 시각 |
+| `daily_settlement` | 일 정산 | 구현(#114) | 신규. 가맹점 ID, 정산 날짜, 결제 합, 취소 합, 순매출, 전일 이월, 정산 확정액, 다음 날 이월, 생성 시각. `(가맹점, 날짜)` 유니크 |
+| `monthly_settlement` | 월 정산·지급 | 구현(#115) | 신규. 가맹점 ID, 정산월(해당 월 1일), 지급액, 상태(대기/지급 완료), 생성 시각, 지급 시각. `(가맹점, 정산월)` 유니크 |
+| `merchant_wallet` | 가맹점 전용 지갑 | 구현(#81) | 신규. 가맹점 ID(유니크), 잔액(음수 불가, DB 제약이 아니라 서비스에서 검사), 갱신 시각 |
+| `merchant_wallet_transaction` | 가맹점 지갑 원장 | 구현(#81, #115) | 신규. 지갑 ID, 타입(정산 지급, 계좌로 출금), 부호 있는 금액, 거래 후 잔액, 참조 ID(월 정산 건 ID), 생성 시각. `(타입, 참조 ID)` 유니크, `(지갑, 생성 시각)` 인덱스. 모든 컬럼이 수정 불가(INSERT only) |
+| `merchant_account` | 가맹점용 모의계좌 | 구현(#81) | 신규. 가맹점 ID(유니크), 잔액(0원으로 시작), 생성 시각 |
+| `reconciliation_result` | 대사 결과 | 구현(#140, #146) | 신규(기획서 8절). 대사 종류(10종), 대상 날짜, 상태(일치/불일치/오류), 검사 건수, 불일치 건수, 불일치 대상 ID(최대 2000자), 오류 메시지(최대 500자), 실행 시각. 같은 날짜를 다시 실행하면 이력으로 쌓으므로 유니크는 두지 않고, 대상 날짜에 인덱스를 둔다 |
+
+### 5-2. 관계
+
+```mermaid
+erDiagram
+  MERCHANT ||--o{ QR_CODE : "QR 발급"
+  MERCHANT ||--o{ DAILY_SETTLEMENT : "일 정산"
+  MERCHANT ||--o{ MONTHLY_SETTLEMENT : "월 정산"
+  MERCHANT ||--|| MERCHANT_WALLET : "등록 시 생성"
+  MERCHANT ||--|| MERCHANT_ACCOUNT : "등록 시 생성"
+  MERCHANT_WALLET ||--o{ MERCHANT_WALLET_TRANSACTION : "원장"
+  MONTHLY_SETTLEMENT ||--o{ MERCHANT_WALLET_TRANSACTION : "입금·출금(ref_key)"
+
+  MERCHANT {
+    bigint id PK
+    bigint owner_id UK "null 허용"
+    varchar name "100"
+    varchar address "200"
+    boolean cashback_eligible
+    timestamp created_at
+  }
+  QR_CODE {
+    bigint id PK
+    varchar token UK "UUID 36"
+    bigint merchant_id
+    bigint amount
+    varchar status "WAITING, USED"
+    timestamp expires_at
+    timestamp created_at
+    timestamp used_at "null"
+  }
+  DAILY_SETTLEMENT {
+    bigint id PK
+    bigint merchant_id "복합 유니크(merchant_id, settlement_date)"
+    date settlement_date
+    bigint payment_total
+    bigint cancel_total
+    bigint net_sales
+    bigint carry_in
+    bigint confirmed_amount
+    bigint carry_out
+    timestamp created_at
+  }
+  MONTHLY_SETTLEMENT {
+    bigint id PK
+    bigint merchant_id "복합 유니크(merchant_id, settlement_month)"
+    date settlement_month "해당 월 1일"
+    bigint payout_amount
+    varchar status "PENDING, PAID"
+    timestamp created_at
+    timestamp paid_at "null"
+  }
+  MERCHANT_WALLET {
+    bigint id PK
+    bigint merchant_id UK
+    bigint balance
+    timestamp updated_at
+  }
+  MERCHANT_WALLET_TRANSACTION {
+    bigint id PK
+    bigint wallet_id "인덱스(wallet_id, created_at)"
+    varchar type "SETTLEMENT_PAYOUT, PAYOUT_TO_ACCOUNT"
+    bigint ref_key "월 정산 건 ID, 복합 유니크(type, ref_key)"
+    bigint amount "부호 있음"
+    bigint balance_after
+    timestamp created_at
+  }
+  MERCHANT_ACCOUNT {
+    bigint id PK
+    bigint merchant_id UK
+    bigint balance
+    timestamp created_at
+  }
+  RECONCILIATION_RESULT {
+    bigint id PK
+    varchar type "대사 종류 10종"
+    date target_date "인덱스"
+    varchar status "MATCHED, MISMATCHED, ERROR"
+    bigint checked_count
+    bigint mismatch_count
+    varchar mismatch_refs "null, 2000"
+    varchar error_message "null, 500"
+    timestamp executed_at
+  }
+```
+
+- 외래키 제약은 두지 않고 ID 값으로만 연결한다. 관계선은 코드가 ID를 어떻게 쓰는지를 나타낸다.
+- `reconciliation_result`는 다른 테이블과 연결하지 않는다. 불일치한 대상의 ID는 `mismatch_refs`에 쉼표로 이어 붙인 문자열로 남긴다.
+- 대사 종류는 `ACCOUNT_BALANCE`, `DEVMONEY_BALANCE`, `CASHBACK_BALANCE`, `CASHBACK_EARNING`, `CASHBACK_BUDGET`, `CHARGE_TRANSFER`, `REFUND_TRANSFER`, `DAILY_NET_SALES`, `SETTLEMENT_CARRY`, `MONTHLY_PAYOUT`이다.
+- 외부 참조(값으로만 읽음): 결제는 `payment`의 `merchant_id`, `amount`, `status`, `completed_at`, `canceled_at`(A)를 정산 입력으로 읽고, 가맹점 소유자는 `users.id`(C)를 `owner_id`에 보관한다.
 
 ## 6. 구현 순서 (제안)
 
