@@ -12,8 +12,7 @@ import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.settlement.dto.MonthlySettlementRunResult;
 import com.back.nbe1214finalhot6.domain.settlement.dto.SettlementRunResult;
 import com.back.nbe1214finalhot6.domain.settlement.exception.SettlementErrorCode;
-import com.back.nbe1214finalhot6.domain.settlement.service.DailySettlementService;
-import com.back.nbe1214finalhot6.domain.settlement.service.MonthlySettlementService;
+import com.back.nbe1214finalhot6.domain.settlement.service.SettlementRunService;
 import com.back.nbe1214finalhot6.support.WithAuthUser;
 import java.time.Clock;
 import java.time.Instant;
@@ -46,14 +45,13 @@ class SettlementAdminControllerTest {
 
   @Autowired private MockMvc mockMvc;
   @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
-  @MockitoBean private DailySettlementService dailySettlementService;
-  @MockitoBean private MonthlySettlementService monthlySettlementService;
+  @MockitoBean private SettlementRunService runService;
 
   @Test
   @DisplayName("날짜를 지정하면 그 날짜의 일 정산을 실행하고 결과를 반환한다")
   void 일정산_날짜지정() throws Exception {
     LocalDate date = LocalDate.of(2026, 11, 20);
-    given(dailySettlementService.settle(date)).willReturn(new SettlementRunResult(date, 2, 1, 0));
+    given(runService.runDaily(date)).willReturn(new SettlementRunResult(date, 2, 1, 0));
 
     mockMvc
         .perform(post("/api/admin/settlements/daily/run").param("date", "2026-11-20"))
@@ -68,7 +66,7 @@ class SettlementAdminControllerTest {
   @DisplayName("날짜를 생략하면 어제의 일 정산을 실행한다")
   void 일정산_날짜생략() throws Exception {
     LocalDate yesterday = LocalDate.of(2026, 11, 22);
-    given(dailySettlementService.settle(yesterday))
+    given(runService.runDaily(yesterday))
         .willReturn(new SettlementRunResult(yesterday, 1, 0, 0));
 
     mockMvc
@@ -81,7 +79,7 @@ class SettlementAdminControllerTest {
   @DisplayName("오늘 이후 날짜면 400 STL-001 로 응답한다")
   void 일정산_오늘이후() throws Exception {
     LocalDate today = LocalDate.of(2026, 11, 23);
-    given(dailySettlementService.settle(today))
+    given(runService.runDaily(today))
         .willThrow(new BusinessException(SettlementErrorCode.SETTLEMENT_DATE_NOT_ALLOWED));
 
     mockMvc
@@ -103,7 +101,7 @@ class SettlementAdminControllerTest {
   @DisplayName("달을 지정하면 그 달의 월 정산을 실행하고 결과를 반환한다")
   void 월정산_달지정() throws Exception {
     YearMonth month = YearMonth.of(2026, 9);
-    given(monthlySettlementService.settle(month))
+    given(runService.runMonthly(month))
         .willReturn(new MonthlySettlementRunResult(month, 3, 3, 0));
 
     mockMvc
@@ -119,7 +117,7 @@ class SettlementAdminControllerTest {
   @DisplayName("달을 생략하면 지난달의 월 정산을 실행한다")
   void 월정산_달생략() throws Exception {
     YearMonth lastMonth = YearMonth.of(2026, 10);
-    given(monthlySettlementService.settle(lastMonth))
+    given(runService.runMonthly(lastMonth))
         .willReturn(new MonthlySettlementRunResult(lastMonth, 0, 0, 0));
 
     mockMvc
@@ -129,10 +127,23 @@ class SettlementAdminControllerTest {
   }
 
   @Test
+  @DisplayName("해당 월의 일 정산이 끝나지 않았으면 409 STL-005 로 응답한다")
+  void 월정산_일정산미완료() throws Exception {
+    YearMonth october = YearMonth.of(2026, 10);
+    given(runService.runMonthly(october))
+        .willThrow(new BusinessException(SettlementErrorCode.DAILY_SETTLEMENT_INCOMPLETE));
+
+    mockMvc
+        .perform(post("/api/admin/settlements/monthly/run").param("month", "2026-10"))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("STL-005"));
+  }
+
+  @Test
   @DisplayName("이번 달 이후면 400 STL-003 으로 응답한다")
   void 월정산_이번달이후() throws Exception {
     YearMonth thisMonth = YearMonth.of(2026, 11);
-    given(monthlySettlementService.settle(thisMonth))
+    given(runService.runMonthly(thisMonth))
         .willThrow(new BusinessException(SettlementErrorCode.SETTLEMENT_MONTH_NOT_ALLOWED));
 
     mockMvc
