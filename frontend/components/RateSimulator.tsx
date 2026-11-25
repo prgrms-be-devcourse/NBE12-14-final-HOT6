@@ -11,12 +11,11 @@ const PRESETS = [5, 10, 15, 20];
 const Y_TICKS = [0, 0.25, 0.5, 0.75, 1];
 // 가정(서버 값이 아니다): 요율이 기본 요율 대비 1% 오를 때마다 하루 지급이 이 비율(%)만큼 는다고 본다
 const ELASTICITY = 0.3;
-// 긴급 중단선 = 대비금의 절반(서버 설정 cashback.emergency-ratio 의 기본값)
-const EMERGENCY_RATIO = 0.5;
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 const line = (pts: [number, number][]) => pts.map(([a, b], i) => `${i ? "L" : "M"}${a.toFixed(1)} ${b.toFixed(1)}`).join(" ");
-const manwon = (n: number) => `${Math.round(n / 10_000).toLocaleString("ko-KR")}만`;
+// 1만 원 미만은 원 단위로, 그 이상은 만 단위(소수 첫째 자리까지)로 줄여 쓴다
+const shortWon = (n: number) => (n < 10_000 ? `${Math.round(n).toLocaleString("ko-KR")}원` : `${(Math.round(n / 1_000) / 10).toLocaleString("ko-KR")}만`);
 const dayOf = (iso: string) => Number(iso.slice(8, 10));
 
 type Props = {
@@ -26,9 +25,11 @@ type Props = {
   points: BudgetTimePoint[]; // 이번 달 일별 남은 예산(서버 값, 오늘까지)
   today: number; // 오늘 날짜(일)
   daysInMonth: number;
+  noticeDays: number; // 적립 중단 공지 후 중단까지의 일수(서버 설정)
+  emergencyRatio: number; // 긴급 중단선 = 대비금 × 비율(서버 설정)
 };
 
-export default function RateSimulator({ rate, onRate, budget, points, today, daysInMonth }: Props) {
+export default function RateSimulator({ rate, onRate, budget, points, today, daysInMonth, noticeDays, emergencyRatio }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
 
@@ -64,7 +65,7 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
   const parsed = Number(rate);
   const r = rate.trim() && Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), 100) : 0;
   const reserve = budget.contingencyAmount;
-  const stop = reserve * EMERGENCY_RATIO;
+  const stop = reserve * emergencyRatio;
 
   const actual = line(range(1, today).map((d) => [x(d), y(actualRemaining(d))]));
   const futureDays = range(today, daysInMonth);
@@ -140,7 +141,7 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
           {Y_TICKS.map((t) => (
             <g key={t}>
               <line x1={PAD.l} x2={W - PAD.r} y1={y(budgetTotal * t)} y2={y(budgetTotal * t)} className="stroke-slate-200" strokeWidth={1} />
-              <text x={PAD.l - 8} y={y(budgetTotal * t) + 4} textAnchor="end" className="fill-slate-500" fontSize={12}>{manwon(budgetTotal * t)}</text>
+              <text x={PAD.l - 8} y={y(budgetTotal * t) + 4} textAnchor="end" className="fill-slate-500" fontSize={12}>{shortWon(budgetTotal * t)}</text>
             </g>
           ))}
           {xTicks.map((d) => (
@@ -148,9 +149,9 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
           ))}
 
           <line x1={PAD.l} x2={W - PAD.r} y1={y(reserve)} y2={y(reserve)} className="stroke-amber-600" strokeWidth={1.5} strokeDasharray="6 4" />
-          <text x={W - PAD.r - 4} y={y(reserve) - 6} textAnchor="end" className="fill-amber-800" fontSize={12} fontWeight={700}>대비금 {manwon(reserve)}</text>
+          <text x={W - PAD.r - 4} y={y(reserve) - 6} textAnchor="end" className="fill-amber-800" fontSize={12} fontWeight={700}>대비금 {shortWon(reserve)}</text>
           <line x1={PAD.l} x2={W - PAD.r} y1={y(stop)} y2={y(stop)} className="stroke-red-600" strokeWidth={1.5} strokeDasharray="6 4" />
-          <text x={W - PAD.r - 4} y={y(stop) + 15} textAnchor="end" className="fill-red-700" fontSize={12} fontWeight={700}>긴급 중단 {manwon(stop)}</text>
+          <text x={W - PAD.r - 4} y={y(stop) + 15} textAnchor="end" className="fill-red-700" fontSize={12} fontWeight={700}>긴급 중단 {shortWon(stop)}</text>
 
           <line x1={x(today)} x2={x(today)} y1={PAD.t} y2={H - PAD.b} className="stroke-slate-400" strokeWidth={1} strokeDasharray="2 3" />
           <text x={x(today) - 6} y={PAD.t + 10} textAnchor="end" className="fill-slate-600" fontSize={12}>오늘 {dayLabel(today)}</text>
@@ -197,7 +198,7 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
 
       {danger && (
         <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">
-          {dayLabel(reachReserve!)}에 대비금에 닿아 3일 안에 적립 중단 공지가 필요해요. 요율을 낮추는 것을 검토해 주세요.
+          {dayLabel(reachReserve!)}에 대비금에 닿아 {noticeDays}일 안에 적립 중단 공지가 필요해요. 요율을 낮추는 것을 검토해 주세요.
         </p>
       )}
       <p className="note">

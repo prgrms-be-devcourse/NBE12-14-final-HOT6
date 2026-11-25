@@ -11,7 +11,7 @@ const SCENE_MS = 5200;
 
 const STEPS: Record<Role, Step[]> = {
   user: [
-    { title: "데브머니 충전", desc: "모의 계좌에서 원하는 금액만큼 데브머니를 충전해요. 지갑에는 최대 100만원까지 보유할 수 있어요." },
+    { title: "데브머니 충전", desc: "모의 계좌에서 원하는 금액만큼 데브머니를 충전해요. 지갑에는 보유 한도까지만 담을 수 있어요." },
     { title: "QR 스캔", desc: "가맹점의 QR을 카메라로 비추면 가맹점과 결제 금액을 바로 읽어요. QR은 3분 안에 사용해야 해요." },
     { title: "결제 전에 미리 확인", desc: "데브머니와 캐시백이 얼마씩 쓰이고, 캐시백이 얼마나 적립될지, 이번 달 적립 한도가 얼마나 남는지를 결제 전에 보여 드려요." },
     { title: "승인하고 영수증으로 확정", desc: "간편비밀번호 6자리로 승인하면 적용된 요율과 지급 예정일이 영수증에 그대로 남아서, 약속한 금액이 바뀌지 않아요." },
@@ -269,7 +269,7 @@ function UserScene({ index }: { index: number }) {
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
             <div className="demo-fill h-full rounded-full bg-emerald-600" style={{ "--from": "10%", "--to": "14.6%", "--t": "1.4s", "--d": "1.4s" } as React.CSSProperties} />
           </div>
-          <div className="note mt-1.5">월 적립 한도 30,000원 중 적립 예정 포함</div>
+          <div className="note mt-1.5">이번 달 적립 한도 중 적립 예정 포함</div>
         </div>
         <Delay d={0.6} className="demo-a flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3">
           <div>

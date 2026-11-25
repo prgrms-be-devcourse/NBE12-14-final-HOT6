@@ -21,6 +21,8 @@ export type Notice = {
 };
 
 export const getCashbackSummary = () => api<CashbackSummary>("/cashback/summary");
+export type PayoutRules = { payoutDelayDays: number };
+export const getPayoutRules = () => api<PayoutRules>("/cashback/rules");
 export const getMonthlyLimit = () => api<MonthlyLimit>("/cashback/monthly-limit");
 export const getEarnings = (status?: EarningStatus, page = 0, size = 20) =>
   api<PageResponse<Earning>>(`/cashback/earnings?page=${page}&size=${size}${status ? `&status=${status}` : ""}`);

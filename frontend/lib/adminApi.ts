@@ -23,6 +23,10 @@ export type Forecast = {
 };
 
 const BASE = "/admin/cashback";
+
+// 서버 설정값(운영 화면의 안내 문구가 쓴다)
+export type CashbackRules = { contingencyRate: number; emergencyRatio: number; noticeDays: number; payoutDelayDays: number };
+export const getCashbackRules = () => api<CashbackRules>(`${BASE}/rules`);
 export const getMonthlyBudget = (year: number, month: number) => api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}`);
 export const getPolicyHistory = (page = 0, size = 10) => api<PageResponse<PolicyHistory>>(`${BASE}/policies/history?page=${page}&size=${size}`);
 export const getForecast = () => api<Forecast>(`${BASE}/forecast`);
@@ -37,7 +41,8 @@ export const thisYearMonth = () => {
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 };
 export const STATUS_TEXT: Record<BudgetStatus, string> = { ACTIVE: "정상 적립", NOTICED: "중단 공지 중", STOPPED: "적립 중단", CLOSED: "마감" };
-export const manwon = (n: number) => Math.round(n / 10_000);
+// 그래프 금액 단위. 1만 원에 못 미치는 작은 예산도 보이도록, 가장 큰 값이 1만 원 미만이면 원 단위로 쓴다
+export const moneyUnit = (max: number) => (max >= 10_000 ? { label: "만원", div: 10_000 } : { label: "원", div: 1 });
 export const md = (iso: string | null) => (iso ? `${iso.slice(5, 7)}.${iso.slice(8, 10)}` : "-");
 
 // 연·월 예산 (/api/admin/cashback/budget/**)

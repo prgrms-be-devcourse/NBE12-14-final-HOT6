@@ -1,6 +1,8 @@
 import { ICONS } from "@/components/icons";
 import { signed } from "@/lib/format";
-import type { Tx, TxKind } from "@/lib/mock";
+
+export type TxKind = "charge" | "refund" | "payment" | "cashback";
+export type Tx = { id: string; title: string; date: string; amount: number; kind: TxKind; isNew?: boolean };
 
 // 입금(충전)=파랑, 출금(환불·결제)=빨강, 캐시백=초록
 const STYLE: Record<TxKind, { icon: React.ReactNode; chip: string; amount: string; label: string }> = {
