@@ -22,7 +22,7 @@ export default function MerchantPaidPage() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
-    setToken(loadCtx().qrToken ?? "");
+    setToken(loadCtx().merchantQrToken ?? "");
   }, []);
 
   const status = res?.status;
