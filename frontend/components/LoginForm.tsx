@@ -54,6 +54,7 @@ export default function LoginForm({ audience, next }: { audience: Audience; next
       </label>
       <label className="block">
         <span className="label">비밀번호</span>
+        {/* 로그인은 비밀번호 관리 도구를 사용하는 사용자의 편의성을 위해 붙여넣기를 막지 않는다 (가입 화면만 막는다) */}
         <input className="field" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
       </label>
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{error}</p>}
