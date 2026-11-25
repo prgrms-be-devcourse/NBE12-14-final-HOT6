@@ -61,10 +61,10 @@ function Planner({ year, thisMonth, savedAnnual, monthly, onFlash, onSaved }: Pl
   const [error, setError] = useState("");
 
   const byMonth = new Map(monthly.map((m) => [m.budgetMonth, m]));
-  // 지난 달이거나 예약·지급이 시작된 달은 서버가 배정 변경을 거절한다
+  // 지난 달이거나 예약·지급·이월이 시작된 달은 서버(changeAllocated)가 배정 변경을 거절한다
   const isLocked = (i: number) => {
     const m = byMonth.get(i + 1);
-    return i + 1 < thisMonth || (!!m && m.reservedAmount + m.paidAmount > 0);
+    return i + 1 < thisMonth || (!!m && m.reservedAmount + m.paidAmount + m.carriedOutAmount > 0);
   };
 
   const sum = alloc.reduce((a, b) => a + b, 0);
@@ -115,7 +115,28 @@ function Planner({ year, thisMonth, savedAnnual, monthly, onFlash, onSaved }: Pl
       .filter((c) => !isLocked(c.i) && c.v !== c.old && (c.exists || c.v > 0))
       .sort((a, b) => a.v - a.old - (b.v - b.old));
     if (changes.length === 0) { onFlash("바뀐 배정이 없습니다"); return; }
-    void run(async () => { for (const c of changes) await putMonthlyBudget(year, c.i + 1, c.v, rate); }, `${changes.length}개 달의 예산 배정이 저장되었습니다`);
+    void saveChanges(changes, rate);
+  };
+
+  // 순차 저장 중 한 달이 실패해도 앞서 저장된 달은 화면에 반영하고, 어디까지 저장됐는지 알려 준다
+  const saveChanges = async (changes: { i: number; v: number }[], rate: number | undefined) => {
+    setBusy(true);
+    setError("");
+    let saved = 0;
+    try {
+      for (const c of changes) {
+        await putMonthlyBudget(year, c.i + 1, c.v, rate);
+        saved += 1;
+      }
+      onFlash(`${changes.length}개 달의 예산 배정이 저장되었습니다`);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : "처리하지 못했어요";
+      const failed = MONTH_LABELS[changes[saved].i];
+      setError(saved === 0 ? reason : `${saved}개 달은 저장했지만 ${failed}부터는 저장하지 못했어요. ${reason}`);
+    } finally {
+      if (saved > 0) onSaved();
+      setBusy(false);
+    }
   };
 
   const move = () => run(() => transferBudget(year, month, moveAmount), `${MONTH_LABELS[month - 1]}의 남은 예산 ${won(moveAmount)}을 다음 달로 이월했습니다`);
