@@ -3,9 +3,12 @@
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/devpay_test
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: create
     show-sql: false
 
 # 테스트 전용 JWT 서명 키(32바이트 이상). 운영 키와 무관하다.
