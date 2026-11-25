@@ -40,7 +40,7 @@ function WalletBody() {
             {ICONS.chevronDown}
           </Link>
         </div>
-        <Link href="/cashback/accruals?from=wallet" className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2.5">
+        <Link href="/cashback" className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2.5">
           <span className="text-[13px] text-slate-500">캐시백 잔액</span>
           <span className="flex items-center gap-1">
             {w ? <Amount value={w.cashbackBalance} kind={w.cashbackBalance < 0 ? "out" : "cashback"} size="md" /> : <span className="note">…</span>}

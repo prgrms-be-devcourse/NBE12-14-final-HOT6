@@ -13,8 +13,6 @@ import { fmt, getCashbackHistory, PAGE_SIZE, type CashbackItem } from "@/lib/his
 import type { UserPaymentItem } from "@/lib/types";
 import { useLoad } from "@/lib/useLoad";
 
-export const CASHBACK_TITLE = "캐시백 내역";
-
 const FILTERS: { label: string; match: (item: CashbackItem) => boolean }[] = [
   { label: "전체", match: () => true },
   { label: "예정", match: (i) => i.kind === "earning" && i.earning.status === "PENDING" },
@@ -67,9 +65,9 @@ function CashbackCard({ item, onOpen }: { item: CashbackItem; onOpen: (receipt: 
   );
 }
 
-// 캐시백 내역. 하단 캐시백 탭(/cashback)과 홈의 캐시백 잔액(/cashback/accruals)에서 같은 화면을 쓴다.
-// back 이 없으면 탭의 첫 화면이라 뒤로 가기를 두지 않는다. showLimit 이면 맨 위에 이번 달 적립 한도를 보여 준다
-export default function CashbackHistory({ back, showLimit = false }: { back?: string; showLimit?: boolean }) {
+// 캐시백 화면(/cashback): 맨 위에 이번 달 적립 한도, 아래에 캐시백 내역.
+// 하단 캐시백 탭, 홈의 캐시백 잔액, 마이페이지의 캐시백 내역이 모두 이 화면으로 들어온다
+export default function CashbackHistory() {
   const [filter, setFilter] = useState(0);
   const [page, setPage] = useState(0);
   const [sel, setSel] = useState<Receipt | null>(null);
@@ -85,7 +83,7 @@ export default function CashbackHistory({ back, showLimit = false }: { back?: st
 
   return (
     <>
-      <Header title={CASHBACK_TITLE} back={back} right={s ? `${s.year}년 ${s.month}월` : ""} />
+      <Header title="캐시백 내역" right={s ? `${s.year}년 ${s.month}월` : ""} />
       <div className="px-5 pb-4">
         {notice && (
           <Link href="/cashback/notices" className="mb-3 block rounded-xl border border-amber-500 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
@@ -94,7 +92,7 @@ export default function CashbackHistory({ back, showLimit = false }: { back?: st
             <span className="ml-1 underline">전체 보기</span>
           </Link>
         )}
-        {showLimit && <MonthlyCashbackCard summary={s} />}
+        <MonthlyCashbackCard summary={s} />
         <div className="grid grid-cols-3 gap-2 text-center">
           {[["적립 예정", s ? won(s.pendingAmount) : "–"], ["지급 완료", s ? won(s.paidAmount) : "–"], ["제외", s ? `${s.excludedCount}건` : "–"]].map(([k, v]) => (
             <div key={k} className="card-gray !p-3">

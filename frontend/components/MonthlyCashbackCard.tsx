@@ -5,7 +5,7 @@ import { getMonthlyLimit, type CashbackSummary } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
 
-// 하단 캐시백 탭 맨 위의 이번 달 적립액과 월 적립 한도
+// 캐시백 화면 맨 위의 이번 달 적립액과 월 적립 한도
 export default function MonthlyCashbackCard({ summary: s }: { summary: CashbackSummary | null }) {
   const limit = useLoad(getMonthlyLimit, []);
   const l = limit.data;

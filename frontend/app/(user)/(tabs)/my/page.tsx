@@ -12,7 +12,7 @@ import { getMyInfo } from "@/lib/userApi";
 const MENUS = [
   { href: "/wallet/history", label: "이용내역" },
   { href: "/pay/history", label: "결제 내역" },
-  { href: "/cashback/accruals?from=my", label: "캐시백 내역" },
+  { href: "/cashback", label: "캐시백 내역" },
   { href: "/cashback/notices", label: "알림 (정책 변경 예고)" },
 ];
 
