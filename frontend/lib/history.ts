@@ -6,7 +6,7 @@ import { getWalletTransactions } from "@/lib/walletApi";
 // 이용내역·캐시백 내역은 서로 다른 API 의 목록을 시간순으로 섞어 보여 준다.
 // 합친 목록을 주는 API 가 없어 전부 받아 온 뒤 화면에서 정렬하고 쪽을 나눈다.
 
-export const PAGE_SIZE = 10;
+export const PAGE_SIZE = 20; // 내역 한 쪽에 보여 주는 건수
 const FETCH_SIZE = 100; // 서버가 허용하는 한 번의 최대 건수
 
 export const fmt = (iso?: string | null) => (iso ? `${iso.slice(5, 7)}.${iso.slice(8, 10)} ${iso.slice(11, 16)}` : "-");

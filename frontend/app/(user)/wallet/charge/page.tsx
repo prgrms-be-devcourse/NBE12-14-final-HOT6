@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import ChargeLimitNote from "@/components/ChargeLimitNote";
 import Header from "@/components/Header";
 import { ApiError } from "@/lib/api";
 import { getMyWallet } from "@/lib/endpoints";
@@ -58,13 +59,14 @@ export default function ChargePage() {
           <div className="flex items-center gap-2">
             <input id="amt" inputMode="numeric" className="field text-right text-lg font-medium" value={amount.toLocaleString("ko-KR")} onChange={(e) => set(e.target.value)} />
             <span>원</span>
+            <button type="button" onClick={() => setAmount(0)} className="btn btn-outline btn-sm !w-auto shrink-0">지우기</button>
           </div>
           <div className="mt-2 flex gap-2">
             {[10000, 50000, 100000].map((v) => (
               <button key={v} type="button" onClick={() => setAmount((a) => a + v)} className="chip">+{v.toLocaleString("ko-KR")}</button>
             ))}
           </div>
-          {w && <p className="note mt-2">이번 달 충전 {won(w.chargedThisMonth)} / {won(w.monthlyChargeLimit)} · 남은 한도 {won(monthlyLeft)}</p>}
+          {w && <ChargeLimitNote wallet={w} className="mt-2" />}
         </div>
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{error}</p>}
         <div>

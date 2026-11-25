@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import Amount from "@/components/Amount";
+import ChargeLimitNote from "@/components/ChargeLimitNote";
 import Header from "@/components/Header";
+import { HelpButton, HelpTip } from "@/components/Help";
 import { ICONS } from "@/components/icons";
 import Progress from "@/components/Progress";
 import { getCashbackSummary, getMonthlyLimit } from "@/lib/cashbackApi";
@@ -26,6 +28,7 @@ function WalletBody() {
   const wallet = useLoad(getMyWallet, []);
   const summary = useLoad(getCashbackSummary, []);
   const limit = useLoad(getMonthlyLimit, []);
+  const [help, setHelp] = useState(false);
   const w = wallet.data;
 
   return (
@@ -40,6 +43,18 @@ function WalletBody() {
             {ICONS.chevronDown}
           </Link>
         </div>
+        {w && <ChargeLimitNote wallet={w} className="mt-2 border-t border-slate-200 pt-2.5" />}
+        <div className="mt-4 flex gap-2.5">
+          <Link href="/wallet/charge" className="btn btn-primary">충전</Link>
+          <Link href="/wallet/refund" className="btn btn-danger">환불</Link>
+        </div>
+      </section>
+
+      <section className="card mt-3">
+        <div className="flex justify-between">
+          <span className="font-bold">캐시백 적립</span>
+          <span className="text-[13px]">{limit.data ? `${limit.data.usedAmount.toLocaleString("ko-KR")} / ${won(limit.data.limit)}` : "…"}</span>
+        </div>
         <Link href="/cashback" className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2.5">
           <span className="text-[13px] text-slate-500">캐시백 잔액</span>
           <span className="flex items-center gap-1">
@@ -51,25 +66,17 @@ function WalletBody() {
         {w && w.cashbackBalance < 0 && (
           <p className="note mt-1">캐시백 잔액이 음수예요. 다음 적립분으로 먼저 채워지고, 그동안은 캐시백을 쓸 수 없어요.</p>
         )}
-        <div className="mt-2 flex items-baseline justify-between">
-          <span className="text-[13px] text-slate-500">적립 예정</span>
+        <div className="mt-2 flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <span className="text-[13px] leading-[18px] text-slate-500">적립 예정</span>
+            <HelpButton open={help} onClick={() => setHelp((v) => !v)} controls="pending-help" label="적립 예정 안내 보기" />
+          </span>
           {summary.data ? <Amount value={summary.data.pendingAmount} kind="wait" size="md" /> : <span className="note">…</span>}
         </div>
-        <p className="note mt-0.5">적립 예정은 지급되기 전까지 쓸 수 없어요</p>
-        <div className="mt-4 flex gap-2.5">
-          <Link href="/wallet/charge" className="btn btn-primary">충전</Link>
-          <Link href="/wallet/refund" className="btn btn-danger">환불</Link>
-        </div>
-      </section>
-
-      <section className="card mt-3">
-        <div className="flex justify-between">
-          <span className="font-bold">이번 달 캐시백 적립</span>
-          <span className="text-[13px]">{limit.data ? `${limit.data.usedAmount.toLocaleString("ko-KR")} / ${won(limit.data.limit)}` : "…"}</span>
-        </div>
+        <HelpTip id="pending-help" open={help} className="mt-2">적립 예정은 지급되기 전까지 쓸 수 없어요</HelpTip>
         {limit.data && (
           <>
-            <div className="mt-2.5"><Progress value={limit.data.usedAmount} max={limit.data.limit} /></div>
+            <div className="mt-3"><Progress value={limit.data.usedAmount} max={limit.data.limit} /></div>
             <div className="mt-3 flex items-baseline justify-between rounded-lg bg-emerald-50 px-3 py-2">
               <span className="text-[13px] font-semibold text-emerald-800">월 적립 한도 잔여</span>
               <span className="amt-cb text-base font-bold">{won(limit.data.remaining)}</span>

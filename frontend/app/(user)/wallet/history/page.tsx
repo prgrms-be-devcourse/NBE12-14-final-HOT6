@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import Header from "@/components/Header";
+import { HelpButton, HelpTip } from "@/components/Help";
 import HistoryCard from "@/components/HistoryCard";
 import Pager from "@/components/Pager";
 import PaymentCard from "@/components/PaymentCard";
@@ -64,16 +65,14 @@ function UsageHistory() {
               {t.label}
             </button>
             {i === 1 && (
-              <button type="button" onClick={() => setHelp((v) => !v)} aria-expanded={help} aria-controls="devmoney-help" aria-label="데브머니 내역 안내 보기" className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border border-slate-300 text-[11px] font-bold leading-none text-slate-500 ${help ? "bg-slate-100" : "bg-white"}`}>
-                ?
-              </button>
+              <HelpButton open={help} onClick={() => setHelp((v) => !v)} controls="devmoney-help" label="데브머니 내역 안내 보기" />
             )}
           </div>
         ))}
       </div>
-      <p id="devmoney-help" hidden={!help} className="mx-5 mt-3 rounded-xl border-2 border-dashed border-slate-400 bg-brand-600/[0.08] px-3 py-2 text-[11px] leading-normal text-slate-600">
+      <HelpTip id="devmoney-help" open={help} className="mx-5 mt-3">
         데브머니 내역은 지갑에서 충전과 환불만 노출
-      </p>
+      </HelpTip>
 
       <div className="px-5 pb-4 pt-3">
         <div className="mb-4 flex gap-2" role="group" aria-label="내역 필터">
