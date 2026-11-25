@@ -40,7 +40,7 @@ export default function MerchantQrPage() {
       const res = await createDynamicQr(amount);
       setQr(res);
       setStatus("WAITING");
-      saveCtx({ qrToken: res.token });
+      saveCtx({ merchantQrToken: res.token });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "QR을 만들지 못했어요");
     } finally {

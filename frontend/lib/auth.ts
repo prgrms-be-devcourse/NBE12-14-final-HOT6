@@ -1,6 +1,6 @@
 // 로그인 세션. 액세스 토큰과 만료 시각, 역할을 브라우저 localStorage 에 둔다.
 // 역할은 화면 이동에만 쓴다. 접근 통제는 서버가 토큰으로 판단한다.
-import { clearQrToken } from "@/lib/devContext";
+import { clearQrTokens } from "@/lib/devContext";
 
 export type Role = "USER" | "OWNER" | "ADMIN";
 export type Audience = "user" | "merchant" | "admin";
@@ -40,6 +40,7 @@ function decode(token: string): { role: Role; userId: number } | null {
 export function saveLogin(res: LoginResponse): Session | null {
   const claims = decode(res.accessToken);
   if (!claims) return null;
+  clearQrTokens(); // 로그아웃 없이 다른 계정으로 바로 로그인해도 이전 사용자의 QR 이 남지 않게 한다
   const session: Session = { accessToken: res.accessToken, expiresAt: Date.now() + res.expiresIn * 1000, ...claims };
   try {
     localStorage.setItem(KEY, JSON.stringify(session));
@@ -89,5 +90,5 @@ export function clearSession() {
 // 사용자가 로그아웃을 눌렀을 때. 세션과 함께 이전에 입력한 QR 도 지운다(만료로 세션이 지워질 때는 QR 을 그대로 둔다).
 export function logout() {
   clearSession();
-  clearQrToken();
+  clearQrTokens();
 }
