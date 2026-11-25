@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ICONS } from "@/components/icons";
-import { clearSession } from "@/lib/auth";
 
 const TABS = [
   { href: "/merchant/qr", label: "QR 생성", icon: ICONS.qr, match: ["/merchant/qr", "/merchant/paid"] },
-  { href: "/merchant/payments", label: "매출·정산", icon: ICONS.receipt, match: ["/merchant/payments", "/merchant/daily", "/merchant/monthly"] },
-  { href: "/merchant/edit", label: "내 가맹점", icon: ICONS.store, match: ["/merchant/edit"] },
-  { href: "/merchant/login", label: "로그아웃", icon: ICONS.logout, match: [] as string[] },
+  { href: "/merchant/payments", label: "결제 내역", icon: ICONS.receipt, match: ["/merchant/payments"] },
+  { href: "/merchant/daily", label: "정산", icon: ICONS.chart, match: ["/merchant/daily", "/merchant/monthly"] },
+  { href: "/merchant/edit", label: "마이페이지", icon: ICONS.user, match: ["/merchant/edit"] },
 ];
 
 export default function MerchantNav() {
@@ -19,7 +18,7 @@ export default function MerchantNav() {
       {TABS.map((t) => {
         const on = t.match.some((m) => path.startsWith(m));
         return (
-          <Link key={t.href} href={t.href} onClick={t.href === "/merchant/login" ? clearSession : undefined} aria-current={on ? "page" : undefined} className={`flex flex-col items-center gap-1 pb-2.5 pt-2 text-[12px] tracking-tight ${on ? "border-t-2 border-brand-600 font-bold text-brand-600" : "border-t-2 border-transparent text-slate-500"}`}>
+          <Link key={t.href} href={t.href} aria-current={on ? "page" : undefined} className={`flex flex-col items-center gap-1 pb-2.5 pt-2 text-[12px] tracking-tight ${on ? "border-t-2 border-brand-600 font-bold text-brand-600" : "border-t-2 border-transparent text-slate-500"}`}>
             {t.icon}
             {t.label}
           </Link>

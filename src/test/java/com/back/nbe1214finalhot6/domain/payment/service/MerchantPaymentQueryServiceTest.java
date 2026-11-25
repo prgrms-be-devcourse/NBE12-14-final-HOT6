@@ -237,6 +237,75 @@ class MerchantPaymentQueryServiceTest {
         .doesNotThrowAnyException();
   }
 
+  @Test
+  @DisplayName("결제 번호로 내 가맹점의 결제 한 건을 조회한다")
+  void 한건_조회() {
+    // given
+    Payment payment = completed(MERCHANT, 10_000L, at(D18, 10, 0));
+
+    // when
+    MerchantPaymentItem item = queryService.getOne(MERCHANT, payment.getId());
+
+    // then
+    assertThat(item.paymentId()).isEqualTo(payment.getId());
+    assertThat(item.status()).isEqualTo(PaymentStatus.COMPLETED);
+    assertThat(item.amount()).isEqualTo(10_000L);
+    assertThat(item.walletUsedAmount()).isEqualTo(10_000L);
+    assertThat(item.cashbackUsedAmount()).isZero();
+    assertThat(item.completedAt()).isEqualTo(at(D18, 10, 0));
+    assertThat(item.canceledAt()).isNull();
+  }
+
+  @Test
+  @DisplayName("취소된 결제는 취소 시각과 함께 조회된다")
+  void 취소된_결제_조회() {
+    // given
+    Payment payment = canceled(MERCHANT, 20_000L, at(D18, 10, 0), at(D18, 15, 0));
+
+    // when
+    MerchantPaymentItem item = queryService.getOne(MERCHANT, payment.getId());
+
+    // then
+    assertThat(item.status()).isEqualTo(PaymentStatus.CANCELED);
+    assertThat(item.completedAt()).isEqualTo(at(D18, 10, 0));
+    assertThat(item.canceledAt()).isEqualTo(at(D18, 15, 0));
+  }
+
+  @Test
+  @DisplayName("다른 가맹점의 결제 번호로 조회하면 PAY-003 이다")
+  void 다른_가맹점의_결제_조회_거절() {
+    // given
+    Payment others = completed(OTHER_MERCHANT, 99_000L, at(D18, 11, 0));
+
+    // then : 없는 번호와 똑같이 응답해서 남의 결제가 있는지 알 수 없다
+    assertNotFound(MERCHANT, others.getId());
+  }
+
+  @Test
+  @DisplayName("없는 결제 번호로 조회하면 PAY-003 이다")
+  void 없는_번호_조회_거절() {
+    assertNotFound(MERCHANT, 999_999L);
+  }
+
+  @Test
+  @DisplayName("처리 중이거나 실패한 결제는 목록처럼 조회되지 않고 PAY-003 이다")
+  void 완료되지_않은_결제_조회_거절() {
+    // given
+    Payment processing = unfinished(MERCHANT, 5_000L, PaymentStatus.PROCESSING);
+    Payment failed = unfinished(MERCHANT, 7_000L, PaymentStatus.FAILED);
+
+    // then
+    assertNotFound(MERCHANT, processing.getId());
+    assertNotFound(MERCHANT, failed.getId());
+  }
+
+  private void assertNotFound(Long merchantId, Long paymentId) {
+    assertThatThrownBy(() -> queryService.getOne(merchantId, paymentId))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(PaymentErrorCode.PAYMENT_NOT_FOUND);
+  }
+
   private static long total(List<MerchantSales> sales) {
     return sales.stream().filter(s -> MERCHANT.equals(s.merchantId())).mapToLong(MerchantSales::total).sum();
   }

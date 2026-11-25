@@ -180,4 +180,91 @@ class MerchantPaymentControllerTest {
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.code").value("COM-005"));
   }
+
+  @Test
+  @DisplayName("한 건 조회는 200 과 결제 정보를 반환하고 결제한 이용자의 정보는 담지 않는다")
+  void 한건_조회성공() throws Exception {
+    MerchantPaymentItem item =
+        new MerchantPaymentItem(
+            34L,
+            PaymentStatus.CANCELED,
+            850_000L,
+            850_000L,
+            0L,
+            LocalDateTime.of(2026, 11, 25, 14, 30),
+            LocalDateTime.of(2026, 11, 25, 14, 35));
+    given(queryService.getOne(3L, 34L)).willReturn(item);
+
+    mockMvc
+        .perform(get("/api/merchants/me/payments/34"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success").value(true))
+        .andExpect(jsonPath("$.data.paymentId").value(34))
+        .andExpect(jsonPath("$.data.status").value("CANCELED"))
+        .andExpect(jsonPath("$.data.amount").value(850_000))
+        .andExpect(jsonPath("$.data.walletUsedAmount").value(850_000))
+        .andExpect(jsonPath("$.data.cashbackUsedAmount").value(0))
+        .andExpect(jsonPath("$.data.completedAt").value("2026-11-25T14:30:00"))
+        .andExpect(jsonPath("$.data.canceledAt").value("2026-11-25T14:35:00"))
+        .andExpect(jsonPath("$.data.walletId").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("한 건 조회의 가맹점 번호는 요청이 아니라 로그인한 점주의 가맹점으로 정한다")
+  void 한건_내_가맹점으로_조회() throws Exception {
+    // when : 남의 가맹점 번호(99)를 쿼리로 보내 본다
+    mockMvc
+        .perform(get("/api/merchants/me/payments/34").param("merchantId", "99"))
+        .andExpect(status().isOk());
+
+    // then : 99 가 아니라 내 가맹점 3 으로 조회했다
+    verify(queryService).getOne(3L, 34L);
+  }
+
+  @Test
+  @DisplayName("결제가 없거나 다른 가맹점의 결제이면 404 (PAY-003)")
+  void 한건_결제없음_404() throws Exception {
+    given(queryService.getOne(3L, 34L))
+        .willThrow(new BusinessException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+
+    mockMvc
+        .perform(get("/api/merchants/me/payments/34"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.success").value(false))
+        .andExpect(jsonPath("$.code").value("PAY-003"));
+  }
+
+  @Test
+  @DisplayName("한 건 조회에서 내 가맹점이 없으면 404 (MER-001)")
+  void 한건_가맹점없음_404() throws Exception {
+    given(ownedResources.merchantIdOf(any()))
+        .willThrow(new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+
+    mockMvc
+        .perform(get("/api/merchants/me/payments/34"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("MER-001"));
+  }
+
+  @Test
+  @WithAuthUser(role = UserRole.USER)
+  @DisplayName("한 건 조회를 점주가 아닌 이용자(USER)가 호출하면 403 (COM-008)")
+  void 한건_이용자_403() throws Exception {
+    mockMvc
+        .perform(get("/api/merchants/me/payments/34"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("COM-008"));
+
+    verify(queryService, never()).getOne(anyLong(), anyLong());
+  }
+
+  @Test
+  @WithAnonymousUser
+  @DisplayName("한 건 조회에서 토큰이 없으면 401 (COM-005)")
+  void 한건_토큰없음_401() throws Exception {
+    mockMvc
+        .perform(get("/api/merchants/me/payments/34"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("COM-005"));
+  }
 }

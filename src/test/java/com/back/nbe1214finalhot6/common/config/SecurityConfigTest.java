@@ -122,6 +122,7 @@ class SecurityConfigTest {
         Arguments.of("GET", "/api/merchants/me/settlements/daily", 401, 403, 200, 403),
         Arguments.of("GET", "/api/merchants/me/settlements/monthly", 401, 403, 200, 403),
         Arguments.of("GET", "/api/merchants/me/payments", 401, 403, 200, 403),
+        Arguments.of("GET", "/api/merchants/me/payments/1", 401, 403, 200, 403),
         // 결제 취소는 점주만
         Arguments.of("POST", "/api/payments/1/cancel", 401, 403, 200, 403),
         // 내 정보 조회는 모든 로그인 역할이 쓴다(운영자 포함)
