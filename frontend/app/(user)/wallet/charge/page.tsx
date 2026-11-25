@@ -59,12 +59,12 @@ export default function ChargePage() {
           <div className="flex items-center gap-2">
             <input id="amt" inputMode="numeric" className="field text-right text-lg font-medium" value={amount.toLocaleString("ko-KR")} onChange={(e) => set(e.target.value)} />
             <span>원</span>
-            <button type="button" onClick={() => setAmount(0)} className="btn btn-outline btn-sm !w-auto shrink-0">지우기</button>
           </div>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {[10000, 50000, 100000].map((v) => (
               <button key={v} type="button" onClick={() => setAmount((a) => a + v)} className="chip">+{v.toLocaleString("ko-KR")}</button>
             ))}
+            <button type="button" onClick={() => setAmount(0)} className="chip">지우기</button>
           </div>
           {w && <ChargeLimitNote wallet={w} className="mt-2" />}
         </div>
