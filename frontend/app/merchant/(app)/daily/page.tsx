@@ -13,8 +13,23 @@ type Load = { kind: "loading" } | { kind: "error"; message: string } | { kind: "
 
 const RECENT = 7;
 
+// 하루치 정산의 계산 내역. 가장 최근 정산 카드와 "최근 정산" 목록의 펼침에서 같이 쓴다
+function SettlementBreakdown({ d }: { d: DailySettlementResponse }) {
+  return (
+    <dl className="space-y-1.5 text-sm">
+      <div className="flex justify-between"><dt>결제</dt><dd>{won(d.paymentTotal)}</dd></div>
+      <div className="flex justify-between"><dt>− 취소</dt><dd className="amt-out">{won(d.cancelTotal)}</dd></div>
+      <div className="flex justify-between border-t border-slate-200 pt-1.5 font-semibold"><dt>= 순매출</dt><dd className="amt-in">{won(d.netSales)}</dd></div>
+      <div className="flex justify-between text-zinc-500"><dt>전일 이월</dt><dd>{won(d.carryIn)}</dd></div>
+      <div className="flex justify-between font-semibold"><dt>확정 정산액</dt><dd>{won(d.confirmedAmount)}</dd></div>
+      <div className="flex justify-between text-zinc-500"><dt>다음 날 이월</dt><dd>{won(d.carryOut)}</dd></div>
+    </dl>
+  );
+}
+
 export default function MerchantDailyPage() {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
+  const [openDate, setOpenDate] = useState<string | null>(null); // 상세를 펼친 정산 날짜 (한 번에 하나)
 
   useEffect(() => {
     let alive = true;
@@ -50,14 +65,7 @@ export default function MerchantDailyPage() {
         {latest && (
           <section className="card">
             <div className="flex items-center justify-between"><span className="font-medium">{latest.settlementDate} 일 정산</span><span className="badge badge-ok">생성됨</span></div>
-            <dl className="mt-3 space-y-1.5 text-sm">
-              <div className="flex justify-between"><dt>결제</dt><dd>{won(latest.paymentTotal)}</dd></div>
-              <div className="flex justify-between"><dt>− 취소</dt><dd className="amt-out">{won(latest.cancelTotal)}</dd></div>
-              <div className="flex justify-between border-t border-slate-200 pt-1.5 font-semibold"><dt>= 순매출</dt><dd className="amt-in">{won(latest.netSales)}</dd></div>
-              <div className="flex justify-between text-zinc-500"><dt>전일 이월</dt><dd>{won(latest.carryIn)}</dd></div>
-              <div className="flex justify-between font-semibold"><dt>확정 정산액</dt><dd>{won(latest.confirmedAmount)}</dd></div>
-              <div className="flex justify-between text-zinc-500"><dt>다음 날 이월</dt><dd>{won(latest.carryOut)}</dd></div>
-            </dl>
+            <div className="mt-3"><SettlementBreakdown d={latest} /></div>
             <p className="note mt-2">취소로 순매출이 마이너스가 되면 확정액은 0원이고, 부족분은 다음 날로 이월돼요.</p>
           </section>
         )}
@@ -65,12 +73,21 @@ export default function MerchantDailyPage() {
           <>
             <h2 className="px-1.5 pt-2 text-base font-medium">최근 정산</h2>
             <ul>
-              {rows.slice(1, RECENT + 1).map((d) => (
-                <li key={d.settlementDate} className="flex justify-between border-t border-zinc-200 px-1.5 py-2.5">
-                  <span>{d.settlementDate}</span>
-                  <span className="font-medium">{won(d.confirmedAmount)}</span>
-                </li>
-              ))}
+              {rows.slice(1, RECENT + 1).map((d) => {
+                const open = openDate === d.settlementDate;
+                return (
+                  <li key={d.settlementDate} className="border-t border-zinc-200">
+                    <button type="button" onClick={() => setOpenDate(open ? null : d.settlementDate)} aria-expanded={open} className="flex w-full items-center justify-between px-1.5 py-2.5 text-left">
+                      <span>{d.settlementDate}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="font-medium">{won(d.confirmedAmount)}</span>
+                        <span aria-hidden className="text-slate-400">{open ? "▴" : "▾"}</span>
+                      </span>
+                    </button>
+                    {open && <div className="px-1.5 pb-3"><SettlementBreakdown d={d} /></div>}
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}

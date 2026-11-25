@@ -17,6 +17,17 @@ export function loadCtx(): DevContext {
   }
 }
 
+// 로그아웃할 때 이전 사용자가 입력한 QR 가 다음 로그인에 남지 않도록 QR 토큰만 지운다.
+export function clearQrToken() {
+  try {
+    const ctx = loadCtx();
+    delete ctx.qrToken;
+    localStorage.setItem(KEY, JSON.stringify(ctx));
+  } catch {
+    /* 저장 불가 환경 */
+  }
+}
+
 export function saveCtx(patch: Partial<DevContext>) {
   try {
     localStorage.setItem(KEY, JSON.stringify({ ...loadCtx(), ...patch }));

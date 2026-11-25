@@ -1,5 +1,7 @@
 // 로그인 세션. 액세스 토큰과 만료 시각, 역할을 브라우저 localStorage 에 둔다.
 // 역할은 화면 이동에만 쓴다. 접근 통제는 서버가 토큰으로 판단한다.
+import { clearQrToken } from "@/lib/devContext";
+
 export type Role = "USER" | "OWNER" | "ADMIN";
 export type Audience = "user" | "merchant" | "admin";
 
@@ -82,4 +84,10 @@ export function clearSession() {
   } catch {
     /* 저장 불가 환경 */
   }
+}
+
+// 사용자가 로그아웃을 눌렀을 때. 세션과 함께 이전에 입력한 QR 도 지운다(만료로 세션이 지워질 때는 QR 을 그대로 둔다).
+export function logout() {
+  clearSession();
+  clearQrToken();
 }

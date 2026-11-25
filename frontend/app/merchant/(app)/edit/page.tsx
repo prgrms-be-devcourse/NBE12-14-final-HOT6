@@ -7,6 +7,7 @@ import MapPicker, { type LatLng } from "@/components/MapPicker";
 import { ApiError } from "@/lib/api";
 import { loadCtx, saveCtx } from "@/lib/devContext";
 import { getMyMerchant, updateMerchant } from "@/lib/endpoints";
+import { PHONE_RULE } from "@/lib/signupDraft";
 
 export default function MerchantEditPage() {
   const [editing, setEditing] = useState(false);
@@ -58,6 +59,7 @@ export default function MerchantEditPage() {
     }
   };
   const ro = !editing;
+  const phoneInvalid = f.phone !== "" && !PHONE_RULE.test(f.phone); // 비워도 되지만 입력하면 회원가입과 같은 규칙을 따른다
   const input = (k: keyof typeof f, label: string) => (
     <label className="block"><span className="label">{label}</span>
       <input className={`field ${ro ? "bg-slate-50 text-slate-600" : ""}`} readOnly={ro} value={f[k]} onChange={(e) => setF((x) => ({ ...x, [k]: e.target.value }))} /></label>
@@ -73,7 +75,10 @@ export default function MerchantEditPage() {
         </div>
         {input("name", "가맹점명")}
         {input("address", "주소")}
-        {input("phone", "연락처 (이 기기에만 저장돼요)")}
+        <label className="block"><span className="label">연락처 (이 기기에만 저장돼요)</span>
+          <input className={`field ${ro ? "bg-slate-50 text-slate-600" : ""}`} readOnly={ro} type="tel" inputMode="numeric" autoComplete="tel" placeholder="01012345678" maxLength={11} value={f.phone} aria-invalid={editing && phoneInvalid ? true : undefined} onChange={(e) => setF((x) => ({ ...x, phone: e.target.value.replace(/\D/g, "").slice(0, 11) }))} />
+          {editing && phoneInvalid && <span className="note mt-1 block !text-red-600">하이픈 없이 숫자만 입력해 주세요 (예: 01012345678)</span>}
+        </label>
         <div>
           <span className="label">지도 (이 기기에만 저장돼요)</span>
           {ready && <MapPicker value={pos} onChange={editing ? setPos : undefined} />}
@@ -81,7 +86,7 @@ export default function MerchantEditPage() {
         </div>
         {msg && <p role={msg.ok ? "status" : "alert"} className={`rounded-lg px-3 py-2 text-[13px] font-medium ${msg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-600"}`}>{msg.text}</p>}
         {editing
-          ? <div className="flex gap-2.5"><button type="button" onClick={() => setEditing(false)} className="btn btn-outline">취소</button><button type="button" onClick={save} disabled={busy || !f.name.trim() || !f.address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "저장 중…" : "저장"}</button></div>
+          ? <div className="flex gap-2.5"><button type="button" onClick={() => setEditing(false)} className="btn btn-outline">취소</button><button type="button" onClick={save} disabled={busy || !f.name.trim() || !f.address.trim() || phoneInvalid} className="btn btn-primary disabled:opacity-40">{busy ? "저장 중…" : "저장"}</button></div>
           : <button type="button" onClick={() => setEditing(true)} disabled={!loaded} className="btn btn-outline disabled:opacity-40">수정</button>}
 
         <Link href="/merchant/qr" className="btn btn-primary">QR 생성하러 가기</Link>
