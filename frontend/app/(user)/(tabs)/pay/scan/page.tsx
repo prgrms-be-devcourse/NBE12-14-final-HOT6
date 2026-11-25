@@ -29,7 +29,7 @@ export default function ScanPage() {
   const [cashbackInput, setCashbackInput] = useState(""); // 비우면 0 (캐시백을 쓰지 않고 데브머니로만 결제)
   const lastToken = useRef(""); // 마지막으로 조회한 QR (바뀌었는지 비교한다)
 
-  const lookup = (t: string) => {
+  const lookup = (t: string, restored = false) => {
     const v = t.trim();
     if (!v) return;
     // 다른 QR 이면 이전 QR 에서 입력한 캐시백을 지운다 (남아 있으면 새 결제금액을 넘어 결제 버튼이 막힌다)
@@ -43,7 +43,18 @@ export default function ScanPage() {
         setLoad({ kind: "ok", qr });
         saveCtx({ qrToken: v });
       })
-      .catch((e) => setLoad({ kind: "error", message: e instanceof ApiError ? e.message : "QR 정보를 불러오지 못했어요" }));
+      .catch((e) => {
+        // 쓸 수 없는 QR(이미 사용·만료 등)은 저장해 두지 않는다. 이전에 저장된 번호를 되살렸다가 실패한 거면 조용히 비운다
+        saveCtx({ qrToken: undefined });
+        if (restored) {
+          lastToken.current = "";
+          setToken("");
+          setInput("");
+          setLoad({ kind: "idle" });
+          return;
+        }
+        setLoad({ kind: "error", message: e instanceof ApiError ? e.message : "QR 정보를 불러오지 못했어요" });
+      });
   };
 
   useEffect(() => {
@@ -52,7 +63,7 @@ export default function ScanPage() {
     const t = fromUrl || c.qrToken || "";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
     setInput(t);
-    if (t) lookup(t);
+    if (t) lookup(t, !fromUrl);
   }, []);
 
   // 얼마를 쓸 수 있는지 미리 보여 주려고 내 지갑을 읽는다
@@ -97,6 +108,9 @@ export default function ScanPage() {
   const tone = earning ? "ok" : devMoney === 0 || previewLoad.loading ? "muted" : REASON_TONE[reason];
   const rate = p?.appliedRate ?? 0;
   const monthlyRemaining = p?.monthlyLimitRemaining ?? 0;
+  // 이번 결제까지 반영한 월 한도 사용 비율(%). 70% 미만 초록, 90% 미만 노랑, 그 이상 빨강
+  const usedPct = p ? Math.min(100, Math.max(0, ((LIMITS.monthlyCashback - (monthlyRemaining - (earning ? p.expectedAmount : 0))) / LIMITS.monthlyCashback) * 100)) : 0;
+  const usedTone = usedPct >= 90 ? { bar: "bg-red-500", text: "text-red-700" } : usedPct >= 70 ? { bar: "bg-amber-400", text: "text-amber-700" } : { bar: "bg-emerald-500", text: "text-emerald-700" };
   const overLimit = amount > LIMITS.perPayment;
   const valid = !!qr && !expired && !!wallet && devMoneyShort === 0 && amount > 0 && !overLimit && cashbackOk;
 
@@ -211,7 +225,6 @@ export default function ScanPage() {
                 earning
                   ? { label: `예상 캐시백 (${pctText(rate)})`, value: `+${p!.expectedAmount.toLocaleString("ko-KR")}원`, tone: "pending" }
                   : { label: "이번 결제는 적립 없음", value: "0원" },
-                { label: "월 적립 한도 잔여", value: p ? won(monthlyRemaining - (earning ? p.expectedAmount : 0)) : "-" },
               ]}
             />
             <section className="card">
@@ -220,18 +233,31 @@ export default function ScanPage() {
                 <span className="badge">예상</span>
               </div>
               {previewLoad.error && <p role="alert" className="mt-1 text-[13px] text-red-600">{previewLoad.error}</p>}
-              {!previewLoad.error && (
-                <p role="status" className={`mt-2 rounded-lg border px-3 py-2 text-[13px] font-medium ${REASON_TONE_CLASS[tone]}`}>
-                  {earning
-                    ? REASON_TEXT.NONE
-                    : devMoney === 0 ? "캐시백으로만 결제하면 적립되지 않아요." : previewLoad.loading ? "계산 중이에요…" : REASON_TEXT[reason]}
-                </p>
-              )}
-              <dl className="mt-2 space-y-1.5 text-[13px]">
-                <div className="flex justify-between"><dt className="text-slate-500">적용 요율 (접수 시각 기준)</dt><dd className="font-bold tabular-nums">{pctText(rate)}</dd></div>
-                {earning && <div className="flex justify-between"><dt className="text-slate-500">계산 근거</dt><dd className="font-medium tabular-nums">{devMoney.toLocaleString("ko-KR")} × {pctText(rate)} = {p!.expectedAmount.toLocaleString("ko-KR")}원</dd></div>}
-                <div className="flex justify-between"><dt className="text-slate-500">월 적립 한도 잔여</dt><dd className="font-medium tabular-nums">{p ? won(monthlyRemaining) : "-"}{earning && ` → ${won(monthlyRemaining - p!.expectedAmount)}`}</dd></div>
-              </dl>
+              <div className="mt-3 divide-y divide-slate-100 text-[13px]">
+                {!previewLoad.error && (
+                  <div className="flex items-center justify-between gap-3 pb-2.5">
+                    <span className="text-slate-500">적립 여부</span>
+                    <span role="status" className={`rounded-lg border px-2.5 py-1 text-right text-[13px] font-semibold ${REASON_TONE_CLASS[tone]}`}>
+                      {earning
+                        ? REASON_TEXT.NONE
+                        : devMoney === 0 ? "캐시백으로만 결제하면 적립되지 않아요." : previewLoad.loading ? "계산 중이에요…" : REASON_TEXT[reason]}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="text-slate-500">적용 요율 (접수 시각 기준)</span>
+                  <span className="text-[18px] font-bold tabular-nums text-blue-700">{pctText(rate)}</span>
+                </div>
+                <div className="pt-2.5">
+                  <div className="mb-1.5 flex items-center justify-between gap-3">
+                    <span className="text-slate-500">월 적립 한도 잔여</span>
+                    <span className={`font-semibold tabular-nums ${usedTone.text}`}>{p ? `${won(monthlyRemaining)}${earning ? ` → ${won(monthlyRemaining - p.expectedAmount)}` : ""}` : "-"}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded bg-slate-100" role="img" aria-label="이번 달 적립 한도 사용 비율">
+                    <div className={`h-full rounded ${usedTone.bar}`} style={{ width: `${usedPct}%` }} />
+                  </div>
+                </div>
+              </div>
               <p className="note mt-2">예상 금액이며 소수점 이하는 버려요. 결제 접수 시각의 요율로 확정돼요.</p>
             </section>
 

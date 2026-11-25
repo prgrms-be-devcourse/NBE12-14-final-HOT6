@@ -10,6 +10,7 @@ import { ApiError } from "@/lib/api";
 import { getPaymentByKey, pay } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { paymentErrorText } from "@/lib/paymentErrors";
+import { saveCtx } from "@/lib/devContext";
 import { clearPending, loadPending, type PendingPayment } from "@/lib/pendingPayment";
 import { dropPin, peekPin } from "@/lib/pinStore";
 import { REASON_TEXT, pctText, type ExclusionCode } from "@/lib/cashbackApi";
@@ -47,6 +48,8 @@ function ReceiptBody() {
   // 결과가 정해지면(성공·실패) 메모리에 둔 간편비밀번호를 지운다. 결과를 모르는 동안은 다시 결제할 수 있게 둔다
   const show = (s: State) => {
     if (s.kind === "ok" || s.kind === "error") dropPin();
+    // 결제가 끝났으면 쓴 QR 번호를 지운다. 다시 QR 결제 화면에 들어왔을 때 이전 번호가 남아 있지 않게 한다 (실패는 같은 QR로 다시 시도할 수 있게 둔다)
+    if (s.kind === "ok" && (s.res.status === "COMPLETED" || s.res.status === "CANCELED")) saveCtx({ qrToken: undefined });
     if (alive.current) setState(s);
   };
 
@@ -149,8 +152,7 @@ function ReceiptBody() {
 
   const rows: [string, string][] = [
     ["적용요율", r.appliedRate != null ? pctText(r.appliedRate) : "-"],
-    ["계산식", r.appliedRate != null && r.cashbackEarnedAmount ? `${r.walletUsedAmount.toLocaleString("ko-KR")} × ${pctText(r.appliedRate)}` : "-"],
-    ["지급 예정일", r.cashbackPayableAt ? r.cashbackPayableAt.slice(0, 10) : "-"],
+    ["지급 예정일", r.cashbackPayableAt ? `${r.cashbackPayableAt.slice(0, 10)} (결제 다음 날부터 3일 뒤)` : "-"],
     ["결제 시각", fmt(r.completedAt)],
     ...(r.status === "CANCELED" ? ([["취소 시각", fmt(r.canceledAt)]] as [string, string][]) : []),
   ];
@@ -163,19 +165,21 @@ function ReceiptBody() {
       <h1 className="mt-3 text-center text-xl font-bold">{STATUS_LABEL[r.status]}</h1>
       <p className="amt-out mt-1 text-center text-[36px] font-extrabold tabular-nums tracking-tight">{won(r.amount)}</p>
       <section className="card mt-6">
-        <div className="mb-3 font-bold">확정 영수증</div>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="font-bold">확정 영수증</span>
+          <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[13px] font-bold tabular-nums text-slate-800">결제번호 PAY-{String(r.paymentId).padStart(4, "0")}</span>
+        </div>
         <SignBoard
           label="결제 분기"
           rows={[
             { label: "데브머니 사용", value: won(r.walletUsedAmount) },
             { label: "캐시백 사용", value: won(r.cashbackUsedAmount) },
-            { label: "적립 캐시백", value: r.cashbackEarnedAmount ? `+${won(r.cashbackEarnedAmount)}` : "없음", tone: "pending" },
+            { label: "적립 예정 캐시백", value: r.cashbackEarnedAmount ? `+${won(r.cashbackEarnedAmount)}` : "없음", tone: "pending" },
           ]}
         />
         <dl className="mt-1">{rows.map(([k, v]) => <div key={k} className="flex justify-between border-t border-zinc-100 py-2 text-sm"><dt className="text-zinc-500">{k}</dt><dd className="font-medium tabular-nums">{v}</dd></div>)}</dl>
         {excluded && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">적립 제외 · {REASON_TEXT[reason as ExclusionCode] ?? reason}</p>}
         <p className="note mt-2">소수점 이하는 버림 · 접수 시각 기준 요율로 확정</p>
-        <p className="note mt-1">결제번호 PAY-{String(r.paymentId).padStart(4, "0")}</p>
       </section>
       {/* 결제 취소는 가맹점주 기능이라 사용자 화면에는 두지 않는다 */}
       <div className="mt-5 flex gap-2.5">
