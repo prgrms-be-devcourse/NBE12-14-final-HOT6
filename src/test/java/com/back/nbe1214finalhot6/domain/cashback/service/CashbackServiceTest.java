@@ -130,17 +130,35 @@ class CashbackServiceTest {
     assertThat(result.exclusionReason()).isEqualTo(CashbackExclusionReason.NOT_ELIGIBLE);
   }
 
-  // 목적: 월 한도를 넘는 적립은 전액 제외되고(부분 적립 없음) 한도·예산이 그대로인지 확인한다. 1,700,000 × 3% = 51,000 > 50,000.
+  // 목적: 적립액이 남은 월 한도보다 크면 남은 한도만큼만 적립(부분 적립)하고 한도·예산도 그만큼만 확보하는지 확인한다.
+  // 1,700,000 × 3% = 51,000 > 50,000 이므로 50,000 만 적립한다.
   @Test
-  @DisplayName("월 한도를 넘으면 적립하지 않고 아무것도 확보하지 않는다")
-  void reserve_monthlyLimitExceeded() {
+  @DisplayName("월 한도를 넘으면 남은 한도만큼만 적립하고 그만큼만 확보한다")
+  void reserve_monthlyLimitExceeded_partial() {
     CashbackReserveResponse result = service.reserve(request(1L, true, 1_700_000L, AT));
+
+    assertThat(result.earnedAmount()).isEqualTo(50_000L);
+    assertThat(result.exclusionReason()).isEqualTo(CashbackExclusionReason.NONE);
+    assertThat(result.monthlyLimitRemaining()).isZero();
+    assertThat(limitService.usedAmount(WALLET, NOV)).isEqualTo(50_000L);
+    assertThat(monthlyReserved()).isEqualTo(50_000L);
+    CashbackEarning earning = earningRepository.findByPaymentId(1L).orElseThrow();
+    assertThat(earning.getStatus()).isEqualTo(EarningStatus.PENDING);
+    assertThat(earning.getAmount()).isEqualTo(50_000L);
+  }
+
+  // 목적: 남은 한도가 0 이면 부분 적립이 아니라 MONTHLY_LIMIT_EXCEEDED 로 제외되고 아무것도 확보하지 않는지 확인한다.
+  @Test
+  @DisplayName("남은 한도가 없으면 적립하지 않고 제외한다")
+  void reserve_noRemainingLimit_excluded() {
+    service.reserve(request(1L, true, 1_700_000L, AT)); // 한도 50,000 을 다 쓴다
+
+    CashbackReserveResponse result = service.reserve(request(2L, true, 10_000L, AT));
 
     assertThat(result.earnedAmount()).isZero();
     assertThat(result.exclusionReason()).isEqualTo(CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED);
-    assertThat(result.monthlyLimitRemaining()).isEqualTo(50_000L);
-    assertThat(limitService.usedAmount(WALLET, NOV)).isZero();
-    assertThat(monthlyReserved()).isZero();
+    assertThat(limitService.usedAmount(WALLET, NOV)).isEqualTo(50_000L);
+    assertThat(monthlyReserved()).isEqualTo(50_000L);
   }
 
   // 목적: 한도가 운영자 설정에서 오는지, 딱 한도까지는 적립되고 그 뒤는 제외되는지(경계) 확인한다.
@@ -149,14 +167,54 @@ class CashbackServiceTest {
   void reserve_usesOperatorLimit() {
     settingAdminService.put(SettingKey.CASHBACK_USER_MONTHLY_LIMIT.name(), 1_000L);
 
-    // 한도 1,000원: 900 적립 후 남은 100원보다 큰 102 는 제외, 99 는 적립
+    // 한도 1,000원: 900 적립 후 남은 100원보다 큰 102 는 100 만 적립(부분), 한도를 다 쓰면 그다음은 제외
     assertThat(service.reserve(request(1L, true, 30_000L, AT)).earnedAmount()).isEqualTo(900L);
-    CashbackReserveResponse exact = service.reserve(request(2L, true, 3_400L, AT));
-    assertThat(exact.earnedAmount()).isZero();
-    assertThat(exact.exclusionReason()).isEqualTo(CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED);
-    assertThat(exact.monthlyLimitRemaining()).isEqualTo(100L);
-    assertThat(service.reserve(request(3L, true, 3_333L, AT)).earnedAmount()).isEqualTo(99L);
-    assertThat(limitService.usedAmount(WALLET, NOV)).isEqualTo(999L);
+    CashbackReserveResponse partial = service.reserve(request(2L, true, 3_400L, AT));
+    assertThat(partial.earnedAmount()).isEqualTo(100L);
+    assertThat(partial.exclusionReason()).isEqualTo(CashbackExclusionReason.NONE);
+    assertThat(partial.monthlyLimitRemaining()).isZero();
+    CashbackReserveResponse none = service.reserve(request(3L, true, 3_333L, AT));
+    assertThat(none.earnedAmount()).isZero();
+    assertThat(none.exclusionReason()).isEqualTo(CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED);
+    assertThat(limitService.usedAmount(WALLET, NOV)).isEqualTo(1_000L);
+  }
+
+  // 목적: 개인 한도로 줄인 금액이 월 예산에 들어가면 그 금액으로 적립하고, 예산 남은 금액보다 크면 예산에 맞춰 더 줄이지 않고
+  // 전액 제외하며 확보한 개인 한도를 되돌리는지 확인한다(부분 적립은 개인 한도에만 적용).
+  @Test
+  @DisplayName("한도로 줄인 금액이 예산보다 크면 더 줄이지 않고 제외하고 한도를 되돌린다")
+  void reserve_partialByLimit_budgetNeverReduced() {
+    settingAdminService.put(SettingKey.CASHBACK_USER_MONTHLY_LIMIT.name(), 500L);
+
+    // 30,000 × 3% = 900 → 한도로 500 → 예산 400 보다 크다
+    budgetService.putMonthly(2026, 11, new MonthlyBudgetRequest(400L, null));
+    CashbackReserveResponse excluded = service.reserve(request(1L, true, 30_000L, AT));
+
+    assertThat(excluded.earnedAmount()).isZero();
+    assertThat(excluded.exclusionReason()).isEqualTo(CashbackExclusionReason.BUDGET_EXHAUSTED);
+    assertThat(limitService.usedAmount(WALLET, NOV)).isZero();
+    assertThat(monthlyReserved()).isZero();
+
+    // 예산이 한도로 줄인 금액 이상이면 그 금액으로 적립한다
+    budgetService.putMonthly(2026, 11, new MonthlyBudgetRequest(600L, null));
+    CashbackReserveResponse partial = service.reserve(request(2L, true, 30_000L, AT));
+
+    assertThat(partial.earnedAmount()).isEqualTo(500L);
+    assertThat(limitService.usedAmount(WALLET, NOV)).isEqualTo(500L);
+    assertThat(monthlyReserved()).isEqualTo(500L);
+  }
+
+  // 목적: 개인 한도가 충분한데 예산이 적립액보다 모자란 경우에도 예산에 맞춰 줄이지 않고 전액 제외하는지 확인한다.
+  @Test
+  @DisplayName("예산이 모자라면 적립액을 줄이지 않고 전액 제외한다")
+  void reserve_budgetShort_notReduced() {
+    budgetService.putMonthly(2026, 11, new MonthlyBudgetRequest(400L, null));
+
+    CashbackReserveResponse result = service.reserve(request(1L, true, 30_000L, AT)); // 900
+
+    assertThat(result.earnedAmount()).isZero();
+    assertThat(result.exclusionReason()).isEqualTo(CashbackExclusionReason.BUDGET_EXHAUSTED);
+    assertThat(monthlyReserved()).isZero();
   }
 
   // 목적: 예산이 모자라면 먼저 차감한 월 한도를 되돌리고 BUDGET_EXHAUSTED 로 제외되는지 확인한다.

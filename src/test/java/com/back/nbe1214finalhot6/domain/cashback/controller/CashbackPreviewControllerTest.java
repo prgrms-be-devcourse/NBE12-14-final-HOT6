@@ -57,7 +57,7 @@ class CashbackPreviewControllerTest {
     given(cashbackService.preview(new CashbackPreviewRequest(1L, true, 12_000L)))
         .willReturn(
             new CashbackPreviewResponse(
-                true, false, new BigDecimal("0.03"), 360L, 4_000L, CashbackExclusionReason.NONE));
+                true, false, new BigDecimal("0.03"), 360L, 4_000L, CashbackExclusionReason.NONE, false));
 
     mockMvc
         .perform(get(URL).param("merchantId", "7").param("walletUsedAmount", "12000"))
@@ -94,7 +94,7 @@ class CashbackPreviewControllerTest {
     given(cashbackService.preview(new CashbackPreviewRequest(1L, true, 12_000L)))
         .willReturn(
             new CashbackPreviewResponse(
-                true, false, new BigDecimal("0.03"), 360L, 4_000L, CashbackExclusionReason.NONE));
+                true, false, new BigDecimal("0.03"), 360L, 4_000L, CashbackExclusionReason.NONE, false));
 
     mockMvc
         .perform(
