@@ -14,7 +14,17 @@ export const NAME_RULE = /^([가-힣]+|[A-Za-z]+( [A-Za-z]+)*)$/; // 한글만 �
 // 입력하는 순간 지우는 문자. 한글을 조합하는 중에 나오는 낱자(천지인의 점 포함)는 남겨 두고, 제출할 때 NAME_RULE 로 거른다
 const NAME_BLOCKED = /[^가-힣ㄱ-ㅎㅏ-ㅣ\u318D\u119E\u11A2A-Za-z ]/g;
 const HAS_HANGUL = /[가-힣ㄱ-ㅎㅏ-ㅣ]/;
+export const isMixedName = (v: string) => HAS_HANGUL.test(v) && /[A-Za-z]/.test(v);
+// 넣을 수 없는 문자를 지운 이름과, 지운 것이 있으면 그 이유(notice)를 돌려준다
 export const cleanName = (v: string) => {
-  const name = v.replace(NAME_BLOCKED, "").replace(/ {2,}/g, " ").replace(/^ /, "");
-  return HAS_HANGUL.test(name) ? name.replace(/ /g, "") : name; // 띄어쓰기는 영문 이름만
+  const allowed = v.replace(NAME_BLOCKED, "");
+  const spaced = allowed.replace(/ {2,}/g, " ").replace(/^ /, "");
+  const name = HAS_HANGUL.test(spaced) ? spaced.replace(/ /g, "") : spaced; // 띄어쓰기는 영문 이름만
+  const removed = (v.match(NAME_BLOCKED) ?? []).join("").replace(/\s/g, ""); // 탭 같은 다른 공백은 띄어쓰기로 안내한다
+  const notice = /\p{N}/u.test(removed) ? "숫자는 입력할 수 없어요"
+    : /[\p{L}\p{M}]/u.test(removed) ? "악센트 문자나 다른 언어의 문자는 입력할 수 없어요"
+    : removed ? "기호는 입력할 수 없어요"
+    : name !== v ? "띄어쓰기는 영문 이름의 단어 사이에 한 칸만 할 수 있어요"
+    : "";
+  return { name, notice };
 };
