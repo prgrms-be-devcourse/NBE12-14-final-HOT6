@@ -7,6 +7,7 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
+import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
@@ -80,6 +81,20 @@ public class MerchantService {
         .isCashbackEligible();
   }
 
+  /**
+   * 영업 중인 가맹점인지 확인한다. 해지 신청 뒤(CLOSING)와 해지 뒤(CLOSED)에는 결제와 QR 을 막으려고 다른 도메인이 부른다.
+   *
+   * @throws BusinessException 없으면 MER-001, 해지 진행 중이면 MER-003, 해지됐으면 MER-004
+   */
+  @Transactional(readOnly = true)
+  public void assertActive(Long merchantId) {
+    MerchantStatus status =
+        merchantRepository
+            .findStatusById(merchantId)
+            .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+    MerchantStatusGuard.assertActive(status);
+  }
+
   @Transactional(readOnly = true)
   public MerchantResponse get(Long merchantId) {
     return merchantRepository
@@ -107,7 +122,7 @@ public class MerchantService {
 
     return PageResponse.from(
         merchantRepository
-            .findByNameContainingIgnoreCase(name.strip(), pageable)
+            .findByStatusAndNameContainingIgnoreCase(MerchantStatus.ACTIVE, name.strip(), pageable)
             .map(MerchantResponse::from));
   }
 }
