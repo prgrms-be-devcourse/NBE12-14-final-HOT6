@@ -52,13 +52,14 @@ class MerchantClosureControllerTest {
   @DisplayName("미리보기는 200 과 정산 현황, 신청 가능 여부를 반환한다")
   void 미리보기_성공() throws Exception {
     given(closureService.preview(3L))
-        .willReturn(new ClosurePreviewResponse(MerchantStatus.ACTIVE, 50_000, 8_000, 3_000, true, 0));
+        .willReturn(new ClosurePreviewResponse(MerchantStatus.ACTIVE, 50_000, 30_000, 8_000, 3_000, true, 0));
 
     mockMvc
         .perform(get("/api/merchants/me/closure/preview"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.status").value("ACTIVE"))
         .andExpect(jsonPath("$.data.unpaidAmount").value(50_000))
+        .andExpect(jsonPath("$.data.offsettableAmount").value(30_000))
         .andExpect(jsonPath("$.data.carryDebt").value(8_000))
         .andExpect(jsonPath("$.data.accountBalance").value(3_000))
         .andExpect(jsonPath("$.data.closable").value(true))
