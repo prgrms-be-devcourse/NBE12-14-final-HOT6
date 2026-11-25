@@ -165,6 +165,67 @@ class AuthControllerTest {
         body("홍길동", "user@example.com", "Password1!", "01012345678", pin), "pin");
   }
 
+  // 반각·전각 숫자와 로마 숫자 문자까지, 이름의 어느 위치에 있어도 거절
+  @ParameterizedTest
+  @ValueSource(strings = {"홍길동1", "1홍길동", "홍2동", "12345", "홍길동１", "헨리Ⅷ"})
+  @DisplayName("이름에 숫자가 있으면 400")
+  void invalid_nameWithNumber(String name) throws Exception {
+    expectInvalidName(name);
+  }
+
+  // 연속한 공백, 전각 공백(U+3000), 줄 바꿈 없는 공백(U+00A0), 탭은 거절
+  @ParameterizedTest
+  @ValueSource(strings = {"John  Smith", "홍\u3000길동", "홍\u00a0길동", "홍\\t길동", "   "})
+  @DisplayName("단어 사이 한 칸이 아닌 공백이나 공백뿐인 이름은 400")
+  void invalid_nameWithWrongSpace(String name) throws Exception {
+    expectInvalidName(name);
+  }
+
+  // 기호, 악센트 문자, 한글·영문이 아닌 문자, 전각 영문, 완성되지 않은 낱자
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "Anne-Marie", "O'Brien", "J.Smith", "홍길동!", "홍_길동", "José", "Zoë", "山田太郎", "Ｊohn", "ㅎㄱㄷ", "홍길ㄷ"
+      })
+  @DisplayName("이름에 한글과 영문이 아닌 문자가 있으면 400")
+  void invalid_nameWithOtherCharacter(String name) throws Exception {
+    expectInvalidName(name);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"홍Gildong", "Gildong홍", "홍 Gildong", "John 홍"})
+  @DisplayName("한글과 영문을 섞은 이름은 400")
+  void invalid_nameMixed(String name) throws Exception {
+    expectInvalidName(name);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"홍 길동", "남궁 민수"})
+  @DisplayName("한글 이름에 띄어쓰기가 있으면 400")
+  void invalid_koreanNameWithSpace(String name) throws Exception {
+    expectInvalidName(name);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {"홍길동", "남궁민수", "뷁", "JohnSmith", "John Smith", "Martin Luther King", " 홍길동 "})
+  @DisplayName("한글만 또는 영문(단어 사이 공백 포함)으로 된 이름은 검증을 통과한다")
+  void valid_name(String name) throws Exception {
+    mockMvc
+        .perform(
+            post("/api/users/signup")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body(name, "user@example.com", "Password1!", "01012345678", "123456")))
+        .andExpect(status().is2xxSuccessful());
+
+    verify(authService).signup(any());
+  }
+
+  private void expectInvalidName(String name) throws Exception {
+    expectBadRequest(
+        body(name, "user@example.com", "Password1!", "01012345678", "123456"), "name");
+  }
+
   // 길이 제한(이름 100자, 이메일 100자, 비밀번호 15자)을 넘으면 거절되는지 확인
   @Test
   @DisplayName("길이 제한을 넘으면 400 (이름 101자, 이메일 101자, 비밀번호 16자)")
