@@ -2,17 +2,14 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
-import AccountTxList from "@/components/AccountTxList";
+import { Suspense } from "react";
 import Amount from "@/components/Amount";
 import Header from "@/components/Header";
 import Progress from "@/components/Progress";
-import TxList from "@/components/TxList";
 import { getCashbackSummary, getMonthlyLimit } from "@/lib/cashbackApi";
 import { getMyWallet } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
-import { getAccountBalance } from "@/lib/walletApi";
 
 // 충전·환불을 마치고 돌아오면 ?charged=금액 / ?refunded=금액 으로 완료 안내를 띄운다
 function doneBanner(params: URLSearchParams) {
@@ -26,14 +23,12 @@ function doneBanner(params: URLSearchParams) {
 function WalletBody() {
   const banner = doneBanner(useSearchParams());
   const wallet = useLoad(getMyWallet, []);
-  const account = useLoad(getAccountBalance, []);
-  const [showAccount, setShowAccount] = useState(false);
   const summary = useLoad(getCashbackSummary, []);
   const limit = useLoad(getMonthlyLimit, []);
   const w = wallet.data;
 
   return (
-    <div className="px-5">
+    <div className="px-5 pb-4">
       {banner && <p role="status" className="mb-3 rounded-lg bg-brand-600 py-2.5 text-center text-[13px] font-bold text-white">{banner}</p>}
       {wallet.error && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{wallet.error}</p>}
       <section className="card !p-5">
@@ -51,10 +46,6 @@ function WalletBody() {
           {summary.data ? <Amount value={summary.data.pendingAmount} kind="wait" size="md" /> : <span className="note">…</span>}
         </div>
         <p className="note mt-0.5">적립 예정은 지급되기 전까지 쓸 수 없어요</p>
-        <div className="mt-2 flex items-baseline justify-between border-t border-slate-200 pt-2.5">
-          <span className="text-[13px] text-slate-500">모의계좌 잔액</span>
-          {account.data ? <Amount value={account.data.balance} size="md" /> : account.error ? <span className="note">불러오지 못했어요</span> : <span className="note">…</span>}
-        </div>
         <div className="mt-4 flex gap-2.5">
           <Link href="/wallet/charge" className="btn btn-primary">충전</Link>
           <Link href="/wallet/refund" className="btn btn-danger">환불</Link>
@@ -78,12 +69,6 @@ function WalletBody() {
         )}
         {limit.error && <p role="alert" className="mt-2 text-[13px] text-red-600">{limit.error}</p>}
       </section>
-
-      <div className="mx-1.5 mb-2 mt-6 flex gap-2" role="tablist" aria-label="내역 종류">
-        <button type="button" role="tab" aria-selected={!showAccount} onClick={() => setShowAccount(false)} className={`chip ${!showAccount ? "chip-on" : ""}`}>지갑 거래내역</button>
-        <button type="button" role="tab" aria-selected={showAccount} onClick={() => setShowAccount(true)} className={`chip ${showAccount ? "chip-on" : ""}`}>모의계좌 내역</button>
-      </div>
-      <div className="pb-4">{showAccount ? <AccountTxList /> : <TxList />}</div>
     </div>
   );
 }
