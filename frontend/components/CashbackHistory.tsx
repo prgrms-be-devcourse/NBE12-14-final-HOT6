@@ -7,7 +7,7 @@ import HistoryCard from "@/components/HistoryCard";
 import MonthlyCashbackCard from "@/components/MonthlyCashbackCard";
 import Pager from "@/components/Pager";
 import ReceiptModal from "@/components/ReceiptModal";
-import { EXCLUSION_TEXT, STATUS_BADGE, STATUS_LABEL, getCashbackSummary, getNotices, mmdd, pctText, type Earning } from "@/lib/cashbackApi";
+import { EXCLUSION_TEXT, STATUS_BADGE, STATUS_LABEL, getCashbackSummary, getNotices, mmdd, pctText, type Earning, type EarningStatus } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
 import { fmt, getCashbackHistory, PAGE_SIZE, type CashbackItem } from "@/lib/history";
 import type { UserPaymentItem } from "@/lib/types";
@@ -31,12 +31,12 @@ function earningDetail(e: Earning) {
   return extra ? `${fmt(e.requestedAt)} · ${extra}` : fmt(e.requestedAt);
 }
 
-type Receipt = { payment: UserPaymentItem; payableAt?: string | null };
+type Receipt = { payment: UserPaymentItem; payableAt?: string | null; paidAt?: string | null; earningStatus?: EarningStatus };
 
 // 누르면 그 적립·사용이 생긴 결제의 영수증을 연다
 function CashbackCard({ item, onOpen }: { item: CashbackItem; onOpen: (receipt: Receipt) => void }) {
-  const { payment, payableAt } = item;
-  const open = payment ? () => onOpen({ payment, payableAt }) : undefined;
+  const { payment, payableAt, paidAt, earningStatus } = item;
+  const open = payment ? () => onOpen({ payment, payableAt, paidAt, earningStatus }) : undefined;
   if (item.kind === "use") {
     return (
       <HistoryCard
@@ -122,7 +122,7 @@ export default function CashbackHistory() {
         </ul>
         <Pager page={current} totalPages={totalPages} onChange={setPage} />
       </div>
-      {sel && <ReceiptModal payment={sel.payment} payableAt={sel.payableAt} onClose={close} />}
+      {sel && <ReceiptModal {...sel} onClose={close} />}
     </>
   );
 }

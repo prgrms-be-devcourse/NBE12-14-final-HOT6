@@ -6,7 +6,7 @@ import Pager from "@/components/Pager";
 import PaymentCard from "@/components/PaymentCard";
 import ReceiptModal from "@/components/ReceiptModal";
 import { getMyPayments } from "@/lib/endpoints";
-import { PAGE_SIZE } from "@/lib/history";
+import { getEarningStatuses, PAGE_SIZE } from "@/lib/history";
 import { useLoad } from "@/lib/useLoad";
 import type { UserPaymentItem } from "@/lib/types";
 
@@ -24,8 +24,9 @@ export default function PayHistoryPage() {
   const [sel, setSel] = useState<UserPaymentItem | null>(null);
   const close = useCallback(() => setSel(null), []);
   const f = FILTERS[tab];
-  const load = useLoad(() => getMyPayments(f.status, page, PAGE_SIZE), [tab, page]);
-  const data = load.data?.payments;
+  // 적립 상태는 영수증의 적립 라벨에 쓴다
+  const load = useLoad(() => Promise.all([getMyPayments(f.status, page, PAGE_SIZE), getEarningStatuses()]), [tab, page]);
+  const data = load.data?.[0].payments;
 
   const pick = (i: number) => {
     setTab(i);
@@ -59,7 +60,7 @@ export default function PayHistoryPage() {
 
         {data && <Pager page={page} totalPages={data.totalPages} onChange={setPage} />}
       </div>
-      {sel && <ReceiptModal payment={sel} onClose={close} />}
+      {sel && <ReceiptModal payment={sel} earningStatus={load.data?.[1].get(sel.paymentId)} onClose={close} />}
     </>
   );
 }

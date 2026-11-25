@@ -10,7 +10,6 @@ import PaymentCard from "@/components/PaymentCard";
 import ReceiptModal from "@/components/ReceiptModal";
 import { won } from "@/lib/format";
 import { fmt, getUsageHistory, PAGE_SIZE, type UsageItem } from "@/lib/history";
-import type { UserPaymentItem } from "@/lib/types";
 import { useLoad } from "@/lib/useLoad";
 
 type Filter = { label: string; match: (item: UsageItem) => boolean };
@@ -44,7 +43,7 @@ function UsageHistory() {
   const [filter, setFilter] = useState(0);
   const [page, setPage] = useState(0);
   const [help, setHelp] = useState(false);
-  const [sel, setSel] = useState<UserPaymentItem | null>(null);
+  const [sel, setSel] = useState<Extract<UsageItem, { kind: "payment" }> | null>(null);
   const close = useCallback(() => setSel(null), []);
   const load = useLoad(getUsageHistory, []);
 
@@ -98,7 +97,7 @@ function UsageHistory() {
         <ul className="space-y-2.5">
           {rows.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map((item) =>
             item.kind === "payment" ? (
-              <PaymentCard key={item.key} payment={item.payment} onClick={() => setSel(item.payment)} />
+              <PaymentCard key={item.key} payment={item.payment} onClick={() => setSel(item)} />
             ) : (
               <HistoryCard
                 key={item.key}
@@ -114,7 +113,7 @@ function UsageHistory() {
         </ul>
         <Pager page={current} totalPages={totalPages} onChange={setPage} />
       </div>
-      {sel && <ReceiptModal payment={sel} onClose={close} />}
+      {sel && <ReceiptModal payment={sel.payment} earningStatus={sel.earningStatus} onClose={close} />}
     </>
   );
 }
