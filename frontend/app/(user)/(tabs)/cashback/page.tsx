@@ -42,7 +42,7 @@ export default function CashbackPage() {
             </>
           )}
           {s && <p className="mt-1 text-[13px]">적립 예정 {won(s.pendingAmount)} · 지급 완료 {won(s.paidAmount)}</p>}
-          <Link href="/cashback/accruals" className="btn btn-outline btn-sm mt-3">적립 내역 보기 →</Link>
+          <Link href="/cashback/accruals" className="btn btn-outline btn-sm mt-3">캐시백 내역 보기 →</Link>
         </section>
         <h2 className="px-1.5 pt-2 text-base font-medium">최근 적립</h2>
         {recent.data && recent.data.content.length === 0 && <p className="note px-1.5">아직 적립 내역이 없어요.</p>}

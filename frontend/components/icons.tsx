@@ -24,6 +24,8 @@ export const ICONS = {
   arrowIn: svg(<path d="M12 5v14M6 13l6 6 6-6" />, 18),
   arrowOut: svg(<path d="M12 19V5M6 11l6-6 6 6" />, 18),
   arrowRight: svg(<path d="M5 12h14M13 6l6 6-6 6" />, 16),
+  chevronDown: svg(<path d="m6 9.5 6 6 6-6" />, 18),
+  chevronRight: svg(<path d="m9.5 6 6 6-6 6" />, 16),
   trendUp: svg(<path d="M4 17 10 11l4 4 6-7M15 8h5v5" />, 16),
   star: svg(<path d="m12 4 2.4 5 5.4.7-4 3.7 1 5.4-4.8-2.7-4.8 2.7 1-5.4-4-3.7 5.4-.7Z" />, 18),
   scale: svg(<><path d="M12 4v16M7 20h10" /><path d="M5 8h14" /><path d="M5 8l-2.5 6a3 3 0 0 0 5 0L5 8ZM19 8l-2.5 6a3 3 0 0 0 5 0L19 8Z" /></>, 20),

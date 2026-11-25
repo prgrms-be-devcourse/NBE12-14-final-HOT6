@@ -1,24 +1,77 @@
 "use client";
 
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import Header from "@/components/Header";
+import HistoryCard from "@/components/HistoryCard";
+import Pager from "@/components/Pager";
+import { EXCLUSION_TEXT, STATUS_BADGE, STATUS_LABEL, getCashbackSummary, mmdd, type Earning } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
-import { EXCLUSION_TEXT, STATUS_BADGE, STATUS_LABEL, getCashbackSummary, getEarnings, mmdd, type EarningStatus } from "@/lib/cashbackApi";
+import { fmt, getCashbackHistory, PAGE_SIZE, type CashbackItem } from "@/lib/history";
 import { useLoad } from "@/lib/useLoad";
 
-const FILTERS: { label: string; status?: EarningStatus }[] = [
-  { label: "전체" }, { label: "예정", status: "PENDING" }, { label: "지급완료", status: "PAID" }, { label: "제외", status: "EXCLUDED" },
+const TITLE = "캐시백 내역";
+
+const FILTERS: { label: string; match: (item: CashbackItem) => boolean }[] = [
+  { label: "전체", match: () => true },
+  { label: "예정", match: (i) => i.kind === "earning" && i.earning.status === "PENDING" },
+  { label: "지급완료", match: (i) => i.kind === "earning" && i.earning.status === "PAID" },
+  { label: "사용", match: (i) => i.kind === "use" },
+  { label: "제외", match: (i) => i.kind === "earning" && i.earning.status === "EXCLUDED" },
 ];
 
-export default function AccrualsPage() {
-  const [f, setF] = useState(FILTERS[0]);
-  const summary = useLoad(() => getCashbackSummary(), []);
-  const list = useLoad(() => getEarnings(f.status, 0, 50), [f.status]);
+// 적립 건의 아랫줄: 접수 시각 뒤에 지급 예정일·지급일·제외 사유를 붙인다
+function earningDetail(e: Earning) {
+  const extra =
+    e.status === "PENDING" && e.payableAt ? `지급 예정 ${mmdd(e.payableAt)}`
+    : e.status === "PAID" && e.paidAt ? `지급 완료 ${mmdd(e.paidAt)}`
+    : e.status === "EXCLUDED" ? EXCLUSION_TEXT[e.exclusionReason ?? "NONE"]
+    : "";
+  return extra ? `${fmt(e.requestedAt)} · ${extra}` : fmt(e.requestedAt);
+}
+
+function CashbackCard({ item }: { item: CashbackItem }) {
+  if (item.kind === "use") {
+    return (
+      <HistoryCard
+        title={item.title}
+        amount={`-${won(item.amount)}`}
+        amountClass={item.canceled ? "text-slate-400 line-through" : "amt-out"}
+        detail={fmt(item.at)}
+        badge={item.canceled ? "취소" : "사용"}
+        badgeClass={item.canceled ? "badge-bad" : ""}
+      />
+    );
+  }
+  const e = item.earning;
+  const earned = e.status === "PENDING" || e.status === "PAID";
+  return (
+    <HistoryCard
+      title={item.title}
+      amount={earned ? `+${won(e.amount)}` : won(e.amount)}
+      amountClass={earned ? "amt-cb" : e.status === "EXCLUDED" ? "text-slate-400" : "text-slate-400 line-through"}
+      detail={earningDetail(e)}
+      badge={STATUS_LABEL[e.status]}
+      badgeClass={STATUS_BADGE[e.status]}
+    />
+  );
+}
+
+function CashbackHistory() {
+  // 홈의 캐시백 잔액에서 들어오면 뒤로 가기가 홈으로 돌아간다
+  const back = useSearchParams().get("from") === "wallet" ? "/wallet" : "/cashback";
+  const [filter, setFilter] = useState(0);
+  const [page, setPage] = useState(0);
+  const summary = useLoad(getCashbackSummary, []);
+  const load = useLoad(getCashbackHistory, []);
   const s = summary.data;
+  const rows = load.data?.filter(FILTERS[filter].match) ?? [];
+  const totalPages = Math.ceil(rows.length / PAGE_SIZE);
+  const current = Math.min(page, Math.max(0, totalPages - 1));
 
   return (
     <>
-      <Header title="캐시백 적립내역" back="/cashback" right={s ? `${s.year}년 ${s.month}월` : ""} />
+      <Header title={TITLE} back={back} right={s ? `${s.year}년 ${s.month}월` : ""} />
       <div className="px-5 pb-4">
         <div className="grid grid-cols-3 gap-2 text-center">
           {[["적립 예정", s ? won(s.pendingAmount) : "–"], ["지급 완료", s ? won(s.paidAmount) : "–"], ["제외", s ? `${s.excludedCount}건` : "–"]].map(([k, v]) => (
@@ -28,30 +81,35 @@ export default function AccrualsPage() {
             </div>
           ))}
         </div>
-        <div className="my-4 flex gap-2" role="tablist">
-          {FILTERS.map((x) => (
-            <button key={x.label} type="button" role="tab" aria-selected={f.label === x.label} onClick={() => setF(x)} className={`chip ${f.label === x.label ? "chip-on" : ""}`}>
+        <div className="my-4 flex flex-wrap gap-2" role="group" aria-label="내역 필터">
+          {FILTERS.map((x, i) => (
+            <button key={x.label} type="button" aria-pressed={filter === i} onClick={() => { setFilter(i); setPage(0); }} className={`chip ${filter === i ? "chip-on" : ""}`}>
               {x.label}
             </button>
           ))}
         </div>
-        {list.error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-[13px] text-red-700">{list.error}</p>}
-        {list.data && list.data.content.length === 0 && <p className="note">내역이 없어요.</p>}
-        <ul>
-          {list.data?.content.map((a) => (
-            <li key={a.earningId} className="flex items-center justify-between border-t border-zinc-200 px-1.5 py-2.5">
-              <div>
-                <div className="font-medium">결제 #{a.paymentId}</div>
-                <div className="note">{mmdd(a.requestedAt)} {a.status === "EXCLUDED" ? `제외: ${EXCLUSION_TEXT[a.exclusionReason ?? "NONE"]}` : ""}</div>
-              </div>
-              <div className="text-right">
-                <div className={`font-semibold ${a.status === "EXCLUDED" ? "text-slate-400" : "amt-cb"}`}>+{a.amount}원</div>
-                <span className={`badge ${STATUS_BADGE[a.status]}`}>{STATUS_LABEL[a.status]}</span>
-              </div>
-            </li>
-          ))}
+
+        {load.loading && !load.data && <p role="status" className="note py-6 text-center">내역을 불러오는 중이에요…</p>}
+        {load.error && (
+          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">
+            {load.error} <button type="button" onClick={load.reload} className="underline">다시 불러오기</button>
+          </p>
+        )}
+        {load.data && rows.length === 0 && <p className="note py-6 text-center">내역이 없어요</p>}
+
+        <ul className="space-y-2.5">
+          {rows.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map((item) => <CashbackCard key={item.key} item={item} />)}
         </ul>
+        <Pager page={current} totalPages={totalPages} onChange={setPage} />
       </div>
     </>
+  );
+}
+
+export default function CashbackHistoryPage() {
+  return (
+    <Suspense fallback={<Header title={TITLE} back="/cashback" />}>
+      <CashbackHistory />
+    </Suspense>
   );
 }

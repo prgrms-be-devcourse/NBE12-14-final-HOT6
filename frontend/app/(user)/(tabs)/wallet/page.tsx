@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Amount from "@/components/Amount";
 import Header from "@/components/Header";
+import { ICONS } from "@/components/icons";
 import Progress from "@/components/Progress";
 import { getCashbackSummary, getMonthlyLimit } from "@/lib/cashbackApi";
 import { getMyWallet } from "@/lib/endpoints";
@@ -33,11 +34,20 @@ function WalletBody() {
       {wallet.error && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{wallet.error}</p>}
       <section className="card !p-5">
         <span className="text-[13px] font-medium text-slate-500">데브머니 잔액</span>
-        <div className="mt-0.5">{w ? <Amount value={w.devMoney} size="xl" /> : <span className="note">불러오는 중…</span>}</div>
-        <div className="mt-2 flex items-baseline justify-between border-t border-slate-200 pt-2.5">
-          <span className="text-[13px] text-slate-500">캐시백 잔액</span>
-          {w ? <Amount value={w.cashbackBalance} kind={w.cashbackBalance < 0 ? "out" : "cashback"} size="md" /> : <span className="note">…</span>}
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          {w ? <Amount value={w.devMoney} size="xl" /> : <span className="note">불러오는 중…</span>}
+          <Link href="/wallet/history" aria-label="이용내역 보기" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-300 text-slate-700 hover:bg-slate-50">
+            {ICONS.chevronDown}
+          </Link>
         </div>
+        <Link href="/cashback/accruals?from=wallet" className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2.5">
+          <span className="text-[13px] text-slate-500">캐시백 잔액</span>
+          <span className="flex items-center gap-1">
+            {w ? <Amount value={w.cashbackBalance} kind={w.cashbackBalance < 0 ? "out" : "cashback"} size="md" /> : <span className="note">…</span>}
+            <span className="text-slate-500">{ICONS.chevronRight}</span>
+            <span className="sr-only">캐시백 내역 보기</span>
+          </span>
+        </Link>
         {w && w.cashbackBalance < 0 && (
           <p className="note mt-1">캐시백 잔액이 음수예요. 다음 적립분으로 먼저 채워지고, 그동안은 캐시백을 쓸 수 없어요.</p>
         )}

@@ -10,9 +10,9 @@ import { useLoad } from "@/lib/useLoad";
 import { getMyInfo } from "@/lib/userApi";
 
 const MENUS = [
-  { href: "/wallet", label: "지갑 거래내역" },
+  { href: "/wallet/history", label: "이용내역" },
   { href: "/pay/history", label: "결제 내역" },
-  { href: "/cashback/accruals", label: "캐시백 적립내역" },
+  { href: "/cashback/accruals", label: "캐시백 내역" },
   { href: "/cashback/notices", label: "알림 (정책 변경 예고)" },
 ];
 
