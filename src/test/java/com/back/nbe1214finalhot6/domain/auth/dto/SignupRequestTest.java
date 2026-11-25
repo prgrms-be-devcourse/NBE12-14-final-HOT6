@@ -34,6 +34,17 @@ class SignupRequestTest {
     assertThat(request.email()).isNull();
   }
 
+  // 이름은 앞뒤 공백만 지우고 단어 사이 공백은 유지
+  @Test
+  @DisplayName("이름의 앞뒤 공백을 제거하고 사이 공백은 유지한다")
+  void name_stripped() {
+    SignupRequest request =
+        new SignupRequest(
+            " John Smith  ", "user@example.com", "Password1!", "01012345678", "123456");
+
+    assertThat(request.name()).isEqualTo("John Smith");
+  }
+
   // 이메일 외 필드는 변경 없음
   @Test
   @DisplayName("이메일 외 필드는 그대로 유지된다")

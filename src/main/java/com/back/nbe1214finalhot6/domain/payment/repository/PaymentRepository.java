@@ -71,4 +71,11 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
       @Param("statuses") Collection<PaymentStatus> statuses,
       @Param("canceled") PaymentStatus canceled,
       Pageable pageable);
+
+
+  // ---- 이용자 결제 내역 ----
+
+  // 내 지갑의 결제 목록. 상태 필터는 목록으로 받고, 정렬은 호출한 쪽의 Pageable 로 정한다
+  Page<Payment> findByWalletIdAndStatusIn(
+      Long walletId, Collection<PaymentStatus> statuses, Pageable pageable);
 }

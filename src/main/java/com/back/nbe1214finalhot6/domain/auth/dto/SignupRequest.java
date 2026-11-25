@@ -9,7 +9,13 @@ import java.util.Locale;
 
 @Schema(description = "회원가입 요청")
 public record SignupRequest(
-    @NotBlank @Size(max = 100) // 외국인의 경우 이름이 길어 가입이 어렵다는 리뷰를 고려한 길이
+    @Schema(description = "회원 이름. 한글(완성형, 공백 없음) 또는 영문(단어 사이 공백 한 칸)", example = "홍길동")
+        @NotBlank
+        @Size(max = 100) // 외국인의 경우 이름이 길어 가입이 어렵다는 리뷰를 고려한 길이
+        @Pattern(
+            // 한글만 또는 영문만. 숫자, 기호, 악센트 문자, 한글·영문 혼용은 거절. 빈 값은 @NotBlank 가 거절
+            regexp = "^(?:[가-힣]++|[A-Za-z]++(?: [A-Za-z]++)*+)?$",
+            message = "이름은 한글 또는 영문 중 하나로만 입력해야 하며, 띄어쓰기는 영문 이름에서 단어 사이 한 칸만 가능합니다.")
         String name,
     @Schema(description = "회원 이메일", example = "user@example.com") @NotBlank @Email @Size(max = 100)
         String email,
@@ -29,8 +35,9 @@ public record SignupRequest(
         @Pattern(regexp = "\\d{6}") // 6자리 숫자
         String pin) {
 
-  // 이메일 앞뒤 공백 제거, 소문자변환
+  // 이름 앞뒤 공백 제거, 이메일 앞뒤 공백 제거와 소문자변환
   public SignupRequest {
+    name = name == null ? null : name.strip();
     email = email == null ? null : email.strip().toLowerCase(Locale.ROOT);
   }
 }

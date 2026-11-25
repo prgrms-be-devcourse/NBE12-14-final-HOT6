@@ -310,7 +310,7 @@ A·B와 합의했고 구현을 마쳤다(이슈 #27, 이슈 #68).
     - 결제 시 PIN 검증(U6): 결제 요청(`PayRequest`)에 6자리 `pin`이 필수이고, `PaymentController`가 멱등키 검사 뒤 PIN을 검증한 다음 결제 파사드를 호출한다. 이 변경은 C가 직접 했다(A의 파일). 재조회(by-key)는 PIN을 요구하지 않는다(이슈 #187)
     - 인증·권한(U4)은 반영을 마쳤다. 결제 경로는 `walletId`를 요청이 아니라 토큰의 회원으로 찾고(`OwnedResources`), 임시 `permitAll`은 없다(A 기획서 합의 #7, #8, #15)
 - **B (캐시백)**
-    - 캐시백 지급: B의 스케줄러가 건별 트랜잭션 안에서 `credit(walletId, amount, CASHBACK_EARN, 적립 건 ID)`를 호출한다([cashback 기획 3-3](cashback-mh-1118.md)). 구현을 마쳤고 B가 확인했다(이슈 #27, 닫음)
+    - 캐시백 지급: B의 스케줄러가 건별 트랜잭션 안에서 `credit(walletId, amount, CASHBACK_EARN, 적립 건 ID)`를 호출한다([cashback 기획 4-3](cashback-mh-1118.md)). 구현을 마쳤고 B가 확인했다(이슈 #27, 닫음)
     - 캐시백 회수: 지급된 캐시백의 결제가 취소되면 `debit(walletId, amount, CASHBACK_CLAWBACK, 적립 건 ID, true)`를 호출한다. 회수 전에 같은 적립 건의 지급 기록을 지갑이 확인하지는 않는다(B가 `PAID`인 건만 회수)
     - 이용자 월 한도·적립 내역 조회는 B가 API까지 제공한다. C가 B를 호출하지 않아서 의존이 한 방향으로 유지된다(이슈 #27)
     - 음수 캐시백은 B가 보내는 캐시백 입금으로만 상계되고, 충전한 금액으로는 상계하지 않는다. 탈퇴할 때도 음수를 감수하기로 팀에서 합의했다. 남은 양수 캐시백 자체의 소멸 여부는 MVP 이후다(이슈 #27)
