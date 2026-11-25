@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useState } from "react";
 import Header from "@/components/Header";
 import { HelpButton, HelpTip } from "@/components/Help";
 import HistoryCard from "@/components/HistoryCard";
@@ -34,8 +34,12 @@ const TABS: { label: string; filters: Filter[] }[] = [
   },
 ];
 
-// 홈의 데브머니 잔액 옆 버튼으로 들어오는 이용내역. 결제를 누르면 영수증이 열린다
+const TITLE = "이용내역";
+
+// 홈의 데브머니 잔액 옆 버튼과 마이페이지에서 들어오는 이용내역. 결제를 누르면 영수증이 열린다
 function UsageHistory() {
+  // 뒤로 가기는 들어온 화면으로 돌아간다. 마이페이지에서 오면 ?from=my 가 붙는다
+  const back = useSearchParams().get("from") === "my" ? "/my" : "/wallet";
   const [tab, setTab] = useState(0);
   const [filter, setFilter] = useState(0);
   const [page, setPage] = useState(0);
@@ -57,7 +61,7 @@ function UsageHistory() {
 
   return (
     <>
-      <Header title="이용내역" back="/wallet" />
+      <Header title={TITLE} back={back} />
       <div className="-mt-4 grid grid-cols-2 border-b border-slate-200 text-[13px]" role="tablist" aria-label="이용내역 종류">
         {TABS.map((t, i) => (
           <div key={t.label} className={`flex h-11 items-center justify-center gap-1.5 border-b-[3px] ${tab === i ? "border-brand-600" : "border-transparent"}`}>
@@ -118,5 +122,9 @@ function UsageHistory() {
 export default function UsageHistoryPage() {
   // 새로 들어올 때는 전체 내역 탭부터 보이고, 뒤로 가기로 돌아오면 보던 상태를 유지한다
   const { bfcacheId } = useRouter();
-  return <UsageHistory key={bfcacheId} />;
+  return (
+    <Suspense fallback={<Header title={TITLE} back="/wallet" />}>
+      <UsageHistory key={bfcacheId} />
+    </Suspense>
+  );
 }
