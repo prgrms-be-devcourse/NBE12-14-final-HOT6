@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import Header from "@/components/Header";
 import Field from "@/components/Field";
-import { loadSignupDraft, PASSWORD_RULE, PHONE_RULE, saveSignupDraft } from "@/lib/signupDraft";
+import { cleanName, loadSignupDraft, NAME_RULE, PASSWORD_RULE, PHONE_RULE, saveSignupDraft } from "@/lib/signupDraft";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function SignupPage() {
   const [tried, setTried] = useState(false);
 
   const errors = {
-    name: name.trim() ? "" : "이름을 입력해 주세요",
+    name: !name.trim() ? "이름을 입력해 주세요" : NAME_RULE.test(name.trim()) ? "" : "이름은 한글 또는 영문 중 하나로만 입력해 주세요",
     email: /^\S+@\S+\.\S+$/.test(email.trim()) ? "" : "이메일 형식을 확인해 주세요",
     phone: PHONE_RULE.test(phone) ? "" : "하이픈 없이 숫자만 입력해 주세요 (예: 01012345678)",
     password: PASSWORD_RULE.test(password) ? "" : "8~15자, 영문·숫자·특수문자(!@#%^&*)를 모두 포함해 주세요",
@@ -41,7 +41,7 @@ export default function SignupPage() {
     <>
       <Header title="회원가입" right="1 / 2" />
       <form className="space-y-3 px-5" onSubmit={next} noValidate>
-        <Field label="이름" value={name} onChange={setName} autoComplete="name" maxLength={100} error={show("name")} />
+        <Field label="이름" value={name} onChange={(v) => setName(cleanName(v))} autoComplete="name" maxLength={100} hint="한글 또는 영문 (띄어쓰기는 영문 이름만)" error={show("name")} />
         <Field label="이메일" type="email" value={email} onChange={setEmail} autoComplete="email" inputMode="email" error={show("email")} />
         <Field label="전화번호" value={phone} onChange={(v) => setPhone(v.replace(/\D/g, "").slice(0, 11))} inputMode="numeric" autoComplete="tel" placeholder="01012345678" hint="하이픈 없이 숫자만 입력" error={show("phone")} />
         <Field label="비밀번호" type="password" value={password} onChange={setPassword} autoComplete="new-password" maxLength={15} hint="8~15자 · 영문, 숫자, 특수문자(!@#%^&*) 포함" error={show("password")} />
