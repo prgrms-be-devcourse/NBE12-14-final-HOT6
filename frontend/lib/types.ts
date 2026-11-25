@@ -91,6 +91,20 @@ export type QrCreateResponse = { token: string; amount: number; expiresAt: strin
 export type QrScanResponse = { merchantId: number; merchantName: string; amount: number; cashbackEligible: boolean; expiresAt: string };
 export type QrStatusResponse = { status: QrStatus; expiresAt: string };
 
+// 이용자의 결제 내역 한 건 (GET /api/payments). merchantName 은 가맹점을 찾지 못하면 null, 취소되지 않았으면 canceledAt 이 null
+export type UserPaymentItem = {
+  paymentId: number;
+  merchantName: string | null;
+  status: PaymentStatus;
+  amount: number;
+  walletUsedAmount: number;
+  cashbackUsedAmount: number;
+  cashbackEarnedAmount: number | null;
+  completedAt: string | null;
+  canceledAt: string | null;
+};
+export type UserPaymentsResponse = { payments: PageResponse<UserPaymentItem> };
+
 // 점주의 결제 내역·매출. 결제는 완료한 날, 취소는 취소한 날에 센다 (일 정산과 같은 기준). 결제한 이용자 정보는 없다
 export type MerchantPaymentItem = {
   paymentId: number;
