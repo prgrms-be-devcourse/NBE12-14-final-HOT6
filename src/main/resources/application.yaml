@@ -40,3 +40,13 @@ cashback:
   init:
     enabled: true
     annual-budget: 100000000
+
+# 서버가 시작할 때 최초 운영자 계정을 한 번 만든다. 값은 환경 변수(.env)로만 받고 기본값은 비워 둔다.
+# 다섯 값이 모두 있을 때만 만들고, 같은 이메일·전화번호가 이미 있으면 건드리지 않는다.
+auth:
+  init:
+    admin-email: ${ADMIN_EMAIL:}
+    admin-password: ${ADMIN_PASSWORD:}
+    admin-name: ${ADMIN_NAME:}
+    admin-phone: ${ADMIN_PHONE:}
+    admin-pin: ${ADMIN_PIN:}

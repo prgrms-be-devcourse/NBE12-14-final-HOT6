@@ -69,6 +69,7 @@ chmod 600 .env
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://<RDS 주소>:5432/devpay` |
 | `DB_PASSWORD` | Terraform에 넣은 DB 비밀번호와 같은 값 |
 | `SPRING_JPA_SHOW_SQL` | 운영에서는 `false` |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, `ADMIN_PHONE`, `ADMIN_PIN` | (선택) 최초 운영자 계정. 다섯 값이 모두 있으면 서버가 시작할 때 한 번 만든다. 회원가입과 같은 규칙이다: 비밀번호는 8~15자(영문·숫자·`!@#%^&*` 포함), 전화번호는 하이픈 없이 숫자만, PIN은 숫자 6자리다. 규칙에 어긋나면 서버가 시작되지 않는다. 같은 이메일·전화번호의 사용자가 있으면 건드리지 않고, 한 번 만든 뒤에는 `.env`에서 지워도 계정은 남는다 |
 
 메모리가 작으므로 백엔드와 프론트를 한 번에 하나씩 빌드합니다.
 
