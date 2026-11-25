@@ -1,13 +1,15 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import Header from "@/components/Header";
 import HistoryCard from "@/components/HistoryCard";
 import Pager from "@/components/Pager";
+import ReceiptModal from "@/components/ReceiptModal";
 import { EXCLUSION_TEXT, STATUS_BADGE, STATUS_LABEL, getCashbackSummary, mmdd, type Earning } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
 import { fmt, getCashbackHistory, PAGE_SIZE, type CashbackItem } from "@/lib/history";
+import type { UserPaymentItem } from "@/lib/types";
 import { useLoad } from "@/lib/useLoad";
 
 const TITLE = "캐시백 내역";
@@ -30,10 +32,16 @@ function earningDetail(e: Earning) {
   return extra ? `${fmt(e.requestedAt)} · ${extra}` : fmt(e.requestedAt);
 }
 
-function CashbackCard({ item }: { item: CashbackItem }) {
+type Receipt = { payment: UserPaymentItem; payableAt?: string | null };
+
+// 누르면 그 적립·사용이 생긴 결제의 영수증을 연다
+function CashbackCard({ item, onOpen }: { item: CashbackItem; onOpen: (receipt: Receipt) => void }) {
+  const { payment, payableAt } = item;
+  const open = payment ? () => onOpen({ payment, payableAt }) : undefined;
   if (item.kind === "use") {
     return (
       <HistoryCard
+        onClick={open}
         title={item.title}
         amount={`-${won(item.amount)}`}
         amountClass={item.canceled ? "text-slate-400 line-through" : "amt-out"}
@@ -47,6 +55,7 @@ function CashbackCard({ item }: { item: CashbackItem }) {
   const earned = e.status === "PENDING" || e.status === "PAID";
   return (
     <HistoryCard
+      onClick={open}
       title={item.title}
       amount={earned ? `+${won(e.amount)}` : won(e.amount)}
       amountClass={earned ? "amt-cb" : e.status === "EXCLUDED" ? "text-slate-400" : "text-slate-400 line-through"}
@@ -62,6 +71,8 @@ function CashbackHistory() {
   const back = useSearchParams().get("from") === "wallet" ? "/wallet" : "/cashback";
   const [filter, setFilter] = useState(0);
   const [page, setPage] = useState(0);
+  const [sel, setSel] = useState<Receipt | null>(null);
+  const close = useCallback(() => setSel(null), []);
   const summary = useLoad(getCashbackSummary, []);
   const load = useLoad(getCashbackHistory, []);
   const s = summary.data;
@@ -98,10 +109,11 @@ function CashbackHistory() {
         {load.data && rows.length === 0 && <p className="note py-6 text-center">내역이 없어요</p>}
 
         <ul className="space-y-2.5">
-          {rows.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map((item) => <CashbackCard key={item.key} item={item} />)}
+          {rows.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map((item) => <CashbackCard key={item.key} item={item} onOpen={setSel} />)}
         </ul>
         <Pager page={current} totalPages={totalPages} onChange={setPage} />
       </div>
+      {sel && <ReceiptModal payment={sel.payment} payableAt={sel.payableAt} onClose={close} />}
     </>
   );
 }

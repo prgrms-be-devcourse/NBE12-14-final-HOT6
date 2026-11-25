@@ -53,10 +53,13 @@ export async function getUsageHistory(): Promise<UsageItem[]> {
   return [...paid, ...moves].sort(newestFirst);
 }
 
-// 캐시백 내역: 적립(예정·지급 완료·취소·회수·제외)과 결제에 쓴 캐시백. 가맹점 이름은 결제 내역에서 가져온다
-export type CashbackItem =
-  | { kind: "earning"; key: string; at: string; title: string; earning: Earning }
-  | { kind: "use"; key: string; at: string; title: string; amount: number; canceled: boolean };
+// 캐시백 내역: 적립(예정·지급 완료·취소·회수·제외)과 결제에 쓴 캐시백. 가맹점 이름과 영수증 내용은 결제 내역에서 가져온다
+// payment 는 그 적립·사용이 생긴 결제. 적립 건의 결제가 결제 내역에 없으면 비어 있다
+// payableAt 은 그 결제의 적립이 아직 지급 전(예정)일 때의 지급 예정일
+export type CashbackItem = { key: string; at: string; title: string; payableAt?: string | null } & (
+  | { kind: "earning"; payment?: UserPaymentItem; earning: Earning }
+  | { kind: "use"; payment: UserPaymentItem; amount: number; canceled: boolean }
+);
 
 const merchantTitle = (p: UserPaymentItem) => p.merchantName ?? "알 수 없는 가맹점";
 
@@ -66,18 +69,20 @@ export async function getCashbackHistory(): Promise<CashbackItem[]> {
     getAllPayments(),
   ]);
   const byId = new Map(payments.map((p) => [p.paymentId, p]));
+  const payableById = new Map(earnings.filter((e) => e.status === "PENDING").map((e) => [e.paymentId, e.payableAt]));
   const earned: CashbackItem[] = earnings.map((earning) => {
     const payment = byId.get(earning.paymentId);
     return {
       kind: "earning", key: `earning-${earning.earningId}`, at: earning.requestedAt,
-      title: payment ? merchantTitle(payment) : `결제 #${earning.paymentId}`, earning,
+      title: payment ? merchantTitle(payment) : `결제 #${earning.paymentId}`, payment, earning,
+      payableAt: payableById.get(earning.paymentId),
     };
   });
   const used: CashbackItem[] = payments
     .filter((p) => p.cashbackUsedAmount > 0)
     .map((p) => ({
-      kind: "use", key: `use-${p.paymentId}`, at: p.completedAt ?? "", title: merchantTitle(p),
-      amount: p.cashbackUsedAmount, canceled: p.status === "CANCELED",
+      kind: "use", key: `use-${p.paymentId}`, at: p.completedAt ?? "", title: merchantTitle(p), payment: p,
+      amount: p.cashbackUsedAmount, canceled: p.status === "CANCELED", payableAt: payableById.get(p.paymentId),
     }));
   return [...earned, ...used].sort(newestFirst);
 }
