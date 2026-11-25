@@ -87,7 +87,12 @@
 | 점주: 결제 내역·취소 | `GET /api/merchants/me/payments`, `POST /api/payments/{id}/cancel` | A가 #202에서 만든 결제 내역·매출 조회 API로 목록과 요약을 보여 주고, 목록에서 바로 취소한다 |
 | 이용자: 가맹점 찾기 | `GET /api/merchants?name=` | 서버 응답에 위치·업종이 없어 지도와 업종 필터는 쓰지 않는다 |
 | 이용자: 결제 화면 | `GET /api/wallet`, `GET /api/cashback/preview` | 데브머니와 결제 가능 캐시백을 표시하고, 잔액이 모자라면 결제 버튼을 막는다. 지갑은 토큰의 회원으로 찾는다 |
-| 운영자: 정산 실행·대사 | `POST /api/admin/settlements/daily/run`·`monthly/run`, `GET`·`POST /api/admin/settlements/reconciliation` | 전체 가맹점의 정산 목록 API가 없어 실행 결과 문구만 표시한다. 서버가 밤에 꺼져 있어 배치가 돌지 않으므로 이 화면에서 낮에 수동 실행하고, 해지 정산 실행 버튼을 추가할 예정이다 |
+| 운영자: 정산 실행·대사 | `POST /api/admin/settlements/daily/run`·`monthly/run`, `GET`·`POST /api/admin/settlements/reconciliation` | 전체 가맹점의 정산 목록 API가 없어 실행 결과 문구만 표시한다 |
+
+| 번호 | 기능 | 단계 | 메모 |
+|---|---|---|---|
+| H1 | 정산·대사 요약 | 후순위 | 최근 대사 결과(불일치 건수), 정산 건수와 금액, 월 지급 현황(지급 완료, 대기, 실패 건수) |
+| H2 | 캐시백 그래프 화면 연동 | 후순위 | 데이터와 계산은 B([cashback 기획 4-6](cashback-mh-1118.md#4-6-대시보드-그래프-3개)), 화면 구성은 D 제안. 분담은 B와 협의 |
 
 ### 2-6. 가맹점 전용 지갑
 
