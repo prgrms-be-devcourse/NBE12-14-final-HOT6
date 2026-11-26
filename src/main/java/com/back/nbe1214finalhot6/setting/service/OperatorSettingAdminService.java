@@ -201,7 +201,7 @@ public class OperatorSettingAdminService {
         historyRepository.save(OperatorSettingHistory.reset(key, current, null, at));
         settingRepository.delete(stored);
       }
-    } else if (current != schedule.getSettingValue()) {
+    } else if (key.capped(current) != schedule.appliedValue()) {
       if (stored == null) {
         settingRepository.save(
             OperatorSetting.create(key, schedule.appliedValue(), null, at));
