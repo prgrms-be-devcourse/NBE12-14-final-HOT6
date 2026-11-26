@@ -36,7 +36,8 @@ const fmt = (iso?: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") :
 function ReceiptBody() {
   const router = useRouter();
   const [state, setState] = useState<State>({ kind: "loading" });
-  const called = useRef(false);
+  // 마지막으로 처리한 결제의 멱등키. 화면 상태가 보존된 채 다시 들어와도 키가 다르면 새 결제로 처리한다
+  const handledKey = useRef<string | null>(null);
   const alive = useRef(true);
   const pending = useRef<PendingPayment | null>(null);
 
@@ -91,13 +92,19 @@ function ReceiptBody() {
     }
   };
 
+  // 화면에 들어올 때마다 대기 중인 결제를 읽는다 (cacheComponents 로 이전 화면 상태가 남아 있을 수 있다)
   useEffect(() => {
-    if (called.current) return;
-    called.current = true;
     const p = loadPending();
     pending.current = p;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 대기 중인 결제는 마운트 후 세션 저장소에서 읽는다
-    if (!p) return setState({ kind: "none" });
+    if (!p) {
+      handledKey.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 대기 중인 결제는 마운트 후 세션 저장소에서 읽는다
+      setState({ kind: "none" });
+      return;
+    }
+    if (handledKey.current === p.key) return; // 이미 처리한 결제(결과를 그대로 보여 준다)
+    handledKey.current = p.key;
+    setState({ kind: "loading" });
     void submit(p);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 한 번만 실행한다
   }, []);
