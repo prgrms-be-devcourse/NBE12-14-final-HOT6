@@ -37,7 +37,10 @@ const fmt = (iso?: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") :
 function ReceiptBody() {
   const router = useRouter();
   const [state, setState] = useState<State>({ kind: "loading" });
-  const called = useRef(false);
+  // 마지막으로 처리한 결제의 멱등키. 화면 상태가 보존된 채 다시 들어와도 키가 다르면 새 결제로 처리한다
+  const handledKey = useRef<string | null>(null);
+  // 결과(성공·실패·시간 초과)를 화면에 아직 못 보여 준 상태. 화면을 벗어나 재조회가 멈췄다면 돌아왔을 때 이어서 확인한다
+  const inFlight = useRef(false);
   const alive = useRef(true);
   const pending = useRef<PendingPayment | null>(null);
   const payoutDelayDays = useLoad(() => getPayoutRules(), []).data?.payoutDelayDays; // 지급 예정일 안내에 쓰는 서버 설정값
@@ -52,7 +55,10 @@ function ReceiptBody() {
     if (s.kind === "ok" || s.kind === "error") dropPin();
     // 결제가 끝났으면 쓴 QR 번호를 지운다. 다시 QR 결제 화면에 들어왔을 때 이전 번호가 남아 있지 않게 한다 (실패는 같은 QR로 다시 시도할 수 있게 둔다)
     if (s.kind === "ok" && (s.res.status === "COMPLETED" || s.res.status === "CANCELED")) saveCtx({ qrToken: undefined });
-    if (alive.current) setState(s);
+    if (alive.current) {
+      setState(s);
+      inFlight.current = s.kind === "loading" || s.kind === "polling";
+    }
   };
 
   // 같은 멱등키로 결과를 다시 조회한다. 서버는 새로 처리하지 않고 저장된 결과만 돌려준다
@@ -93,13 +99,24 @@ function ReceiptBody() {
     }
   };
 
+  // 화면에 들어올 때마다 대기 중인 결제를 읽는다 (cacheComponents 로 이전 화면 상태가 남아 있을 수 있다)
   useEffect(() => {
-    if (called.current) return;
-    called.current = true;
     const p = loadPending();
     pending.current = p;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 대기 중인 결제는 마운트 후 세션 저장소에서 읽는다
-    if (!p) return setState({ kind: "none" });
+    if (!p) {
+      handledKey.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 대기 중인 결제는 마운트 후 세션 저장소에서 읽는다
+      setState({ kind: "none" });
+      return;
+    }
+    if (handledKey.current === p.key) {
+      // 이미 처리한 결제: 결과를 그대로 보여 준다. 결과를 못 받은 채 화면을 벗어났다면 같은 키로 재조회를 이어 간다
+      if (inFlight.current) void poll(p);
+      return;
+    }
+    handledKey.current = p.key;
+    inFlight.current = true;
+    setState({ kind: "loading" });
     void submit(p);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 한 번만 실행한다
   }, []);

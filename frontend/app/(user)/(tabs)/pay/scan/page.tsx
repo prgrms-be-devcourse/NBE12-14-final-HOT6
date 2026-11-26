@@ -62,7 +62,13 @@ export default function ScanPage() {
     const t = fromUrl || c.qrToken || "";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
     setInput(t);
-    if (t) lookup(t, !fromUrl);
+    if (t) return lookup(t, !fromUrl);
+    // 저장된 QR 이 없으면 이전 결제의 QR·입력 상태를 비운다 (화면 상태가 보존된 채 다시 들어올 수 있다)
+    lastToken.current = "";
+    setToken("");
+    setCashbackInput("");
+    setExpired(false);
+    setLoad({ kind: "idle" });
   }, []);
 
   // 얼마를 쓸 수 있는지 미리 보여 주려고 내 지갑을 읽는다
