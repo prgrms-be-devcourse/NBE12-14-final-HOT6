@@ -20,7 +20,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
 
 /**
- * 이용자에게 보이는 공지. 요율·한도 변경과 적립 중단을 알리며 같은 양식(종류, 제목, 본문, 등록일)을 쓴다. 지우지 않고, 알리던 예약이 취소되면 거둔다.
+ * 이용자에게 보이는 공지. 요율·한도 변경과 적립 중단을 알리며 같은 양식(종류, 제목, 본문, 등록일)을 쓴다. 지우지 않고, 알리던 예약이 취소되면 거둔다. 운영자는
+ * 문구와 홈 노출만 고칠 수 있다.
  *
  * <p>자동 공지의 문구에는 날짜만 쓰고 시각은 쓰지 않는다. 이용자 정보를 담지 않는 공통 안내다.
  */
@@ -92,6 +93,10 @@ public class CashbackNotice {
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
+
+  // 운영자가 제목이나 본문을 마지막으로 고친 시각. 고친 적이 없으면 null
+  @Column(name = "updated_at")
+  private LocalDateTime updatedAt;
 
   private CashbackNotice(
       NoticeType type,
@@ -208,6 +213,23 @@ public class CashbackNotice {
   /** 보여 줄 제목. 제목이 없으면 종류의 기본 제목이다. */
   public String displayTitle() {
     return title != null ? title : type.defaultTitle();
+  }
+
+  /**
+   * 운영자가 문구와 홈 노출을 고친다. 알리는 값(요율, 한도)과 적용일은 실제 변경과 어긋나지 않도록 바꾸지 않는다. 제목이나 본문이 실제로 달라졌을 때만 수정 시각을
+   * 남긴다.
+   *
+   * @param homeUntil 홈에 띄우는 마지막 날. showOnHome 이 아니면 저장하지 않는다
+   */
+  public void edit(
+      String title, String content, boolean showOnHome, LocalDate homeUntil, LocalDateTime now) {
+    if (!title.equals(displayTitle()) || !content.equals(this.content)) {
+      this.title = title;
+      this.content = content;
+      this.updatedAt = now;
+    }
+    this.showOnHome = showOnHome;
+    this.homeUntil = showOnHome ? homeUntil : null;
   }
 
   /** 알리던 예약이 취소되어 공지를 거둔다. */

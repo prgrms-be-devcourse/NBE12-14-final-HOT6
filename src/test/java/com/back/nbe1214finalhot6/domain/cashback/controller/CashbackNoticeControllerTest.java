@@ -52,6 +52,7 @@ class CashbackNoticeControllerTest {
             new BigDecimal("0.10"),
             null,
             null,
+            null,
             null);
     given(noticeService.list(NoticeType.POLICY_CHANGE, 1, 5))
         .willReturn(new PageResponse<>(List.of(notice), 1, 5, 6L, 2));
@@ -112,7 +113,8 @@ class CashbackNoticeControllerTest {
                     null,
                     "CASHBACK_USER_MONTHLY_LIMIT",
                     50_000L,
-                    40_000L)));
+                    40_000L,
+                    null)));
 
     mockMvc
         .perform(get("/api/notices/home"))

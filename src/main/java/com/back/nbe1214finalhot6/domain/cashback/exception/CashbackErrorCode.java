@@ -35,7 +35,8 @@ public enum CashbackErrorCode implements ErrorCode {
   BUDGET_ALREADY_STOPPED("CSH-012", HttpStatus.CONFLICT, "이미 중단됐거나 마감된 월 예산입니다"),
 
   // 공지 (CSH-013 은 지급 실행 기록이 쓴다)
-  INVALID_NOTICE("CSH-014", HttpStatus.BAD_REQUEST, "공지 내용이 올바르지 않습니다");
+  INVALID_NOTICE("CSH-014", HttpStatus.BAD_REQUEST, "공지 내용이 올바르지 않습니다"),
+  NOTICE_NOT_FOUND("CSH-015", HttpStatus.NOT_FOUND, "공지를 찾을 수 없습니다");
 
   private final String code;
   private final HttpStatus status;
