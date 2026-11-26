@@ -7,6 +7,7 @@ import { ICONS } from "@/components/icons";
 const ITEMS = [
   { href: "/admin", label: "대시보드", icon: ICONS.chart },
   { href: "/admin/policy", label: "정책 · 예산 관리", icon: ICONS.sliders },
+  { href: "/admin/limits", label: "한도 설정", icon: ICONS.gauge },
   { href: "/admin/payouts", label: "지급 배치", icon: ICONS.payout },
   { href: "/admin/settle", label: "정산 · 원장 대사", icon: ICONS.scale },
 ];
