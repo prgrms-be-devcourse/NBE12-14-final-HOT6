@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 340" width="680" height="340" font-family="Apple SD Gothic Neo, Malgun Gothic, Noto Sans KR, sans-serif">
+<rect width="680" height="340" fill="#ffffff"/>
+<text x="70" y="30" font-size="16" font-weight="600" fill="#1f2430">B. 동시 요청 수별 응답 시간 p50 — 같은 지갑(S3)만 가파르게 오른다</text>
+<line x1="70" x2="650" y1="284.0" y2="284.0" stroke="#e5e7eb"/>
+<text x="62.0" y="288.0" font-size="11" fill="#6b7280" text-anchor="end" font-weight="400">0</text>
+<line x1="70" x2="650" y1="227.0" y2="227.0" stroke="#e5e7eb"/>
+<text x="62.0" y="231.0" font-size="11" fill="#6b7280" text-anchor="end" font-weight="400">100</text>
+<line x1="70" x2="650" y1="170.0" y2="170.0" stroke="#e5e7eb"/>
+<text x="62.0" y="174.0" font-size="11" fill="#6b7280" text-anchor="end" font-weight="400">200</text>
+<line x1="70" x2="650" y1="113.0" y2="113.0" stroke="#e5e7eb"/>
+<text x="62.0" y="117.0" font-size="11" fill="#6b7280" text-anchor="end" font-weight="400">300</text>
+<line x1="70" x2="650" y1="56.0" y2="56.0" stroke="#e5e7eb"/>
+<text x="62.0" y="60.0" font-size="11" fill="#6b7280" text-anchor="end" font-weight="400">400</text>
+<text x="14.0" y="46.0" font-size="11" fill="#6b7280" text-anchor="start" font-weight="400">p50 (ms)</text>
+<text x="166.7" y="304.0" font-size="12" fill="#1f2430" text-anchor="middle" font-weight="400">2개</text>
+<text x="360.0" y="304.0" font-size="12" fill="#1f2430" text-anchor="middle" font-weight="400">10개</text>
+<text x="553.3" y="304.0" font-size="12" fill="#1f2430" text-anchor="middle" font-weight="400">50개</text>
+<text x="360.0" y="330.0" font-size="11" fill="#6b7280" text-anchor="middle" font-weight="400">동시 요청 수</text>
+<polyline points="166.7,260.3 360.0,225.3 553.3,89.4" fill="none" stroke="#dc2626" stroke-width="2.5"  stroke-linejoin="round"/>
+<circle cx="166.7" cy="260.3" r="4" fill="#dc2626"/>
+<circle cx="360.0" cy="225.3" r="4" fill="#dc2626"/>
+<circle cx="553.3" cy="89.4" r="4" fill="#dc2626"/>
+<polyline points="166.7,272.6 360.0,271.0 553.3,254.3" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-dasharray="6 4" stroke-linejoin="round"/>
+<circle cx="166.7" cy="272.6" r="4" fill="#2563eb"/>
+<circle cx="360.0" cy="271.0" r="4" fill="#2563eb"/>
+<circle cx="553.3" cy="254.3" r="4" fill="#2563eb"/>
+<polyline points="166.7,281.0 360.0,279.6 553.3,266.4" fill="none" stroke="#059669" stroke-width="2.5" stroke-dasharray="2 3" stroke-linejoin="round"/>
+<circle cx="166.7" cy="281.0" r="4" fill="#059669"/>
+<circle cx="360.0" cy="279.6" r="4" fill="#059669"/>
+<circle cx="553.3" cy="266.4" r="4" fill="#059669"/>
+<polyline points="166.7,273.6 360.0,274.0 553.3,270.5" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-dasharray="8 3 2 3" stroke-linejoin="round"/>
+<circle cx="166.7" cy="273.6" r="4" fill="#7c3aed"/>
+<circle cx="360.0" cy="274.0" r="4" fill="#7c3aed"/>
+<circle cx="553.3" cy="270.5" r="4" fill="#7c3aed"/>
+<line x1="86" x2="108" y1="68" y2="68" stroke="#dc2626" stroke-width="2.5" />
+<text x="114.0" y="72.0" font-size="12" fill="#1f2430" text-anchor="start" font-weight="400">S3 같은 지갑  (50개: 341ms)</text>
+<line x1="86" x2="108" y1="86" y2="86" stroke="#2563eb" stroke-width="2.5" stroke-dasharray="6 4"/>
+<text x="114.0" y="90.0" font-size="12" fill="#1f2430" text-anchor="start" font-weight="400">S2 같은 QR  (50개: 52ms)</text>
+<line x1="86" x2="108" y1="104" y2="104" stroke="#059669" stroke-width="2.5" stroke-dasharray="2 3"/>
+<text x="114.0" y="108.0" font-size="12" fill="#1f2430" text-anchor="start" font-weight="400">S1 같은 멱등키  (50개: 31ms)</text>
+<line x1="86" x2="108" y1="122" y2="122" stroke="#7c3aed" stroke-width="2.5" stroke-dasharray="8 3 2 3"/>
+<text x="114.0" y="126.0" font-size="12" fill="#1f2430" text-anchor="start" font-weight="400">S4 같은 결제 취소  (50개: 24ms)</text>
+</svg>

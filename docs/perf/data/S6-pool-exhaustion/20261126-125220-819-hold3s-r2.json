@@ -1,0 +1,79 @@
+{
+  "scenario": "S6-pool-exhaustion",
+  "label": "hold3s-r2",
+  "environment": {
+    "commit": "fb820fb",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 2,
+    "executedAt": "2026-11-26T12:52:20.819309",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "holdMillis": 3000,
+    "payments": 3,
+    "reads": 5,
+    "round": 2,
+    "rounds": 3
+  },
+  "wallMs": 3054.7,
+  "counts": {
+    "COMPLETED": 3,
+    "HELD": 1,
+    "OK": 5
+  },
+  "latencyMs": {
+    "n": 9,
+    "min": 2526.93,
+    "p50": 2533.73,
+    "p95": 3006.48,
+    "max": 3006.48
+  },
+  "groups": {
+    "holder": {
+      "counts": {
+        "HELD": 1
+      },
+      "latencyMs": {
+        "n": 1,
+        "min": 3006.48,
+        "p50": 3006.48,
+        "p95": 3006.48,
+        "max": 3006.48
+      }
+    },
+    "pay": {
+      "counts": {
+        "COMPLETED": 3
+      },
+      "latencyMs": {
+        "n": 3,
+        "min": 2819.91,
+        "p50": 2837.52,
+        "p95": 2853.64,
+        "max": 2853.64
+      }
+    },
+    "read": {
+      "counts": {
+        "OK": 5
+      },
+      "latencyMs": {
+        "n": 5,
+        "min": 2526.93,
+        "p50": 2530.32,
+        "p95": 2533.73,
+        "max": 2533.73
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": true,
+    "readOk": 5,
+    "paymentsCompleted": 3,
+    "readP50Ms": 2530.32,
+    "readMaxMs": 2533.73
+  },
+  "exampleMessages": {}
+}

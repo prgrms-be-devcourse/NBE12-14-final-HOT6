@@ -1,0 +1,66 @@
+{
+  "scenario": "S5-lock-hold",
+  "label": "hold1s-r1",
+  "environment": {
+    "commit": "fb820fb",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:51:25.602496",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "holdMillis": 1000,
+    "payments": 5,
+    "payStartDelayMillis": 200,
+    "round": 1,
+    "rounds": 3
+  },
+  "wallMs": 1063.59,
+  "counts": {
+    "COMPLETED": 5,
+    "HELD": 1
+  },
+  "latencyMs": {
+    "n": 6,
+    "min": 819.92,
+    "p50": 842.3,
+    "p95": 1005.47,
+    "max": 1005.47
+  },
+  "groups": {
+    "holder": {
+      "counts": {
+        "HELD": 1
+      },
+      "latencyMs": {
+        "n": 1,
+        "min": 1005.47,
+        "p50": 1005.47,
+        "p95": 1005.47,
+        "max": 1005.47
+      }
+    },
+    "pay": {
+      "counts": {
+        "COMPLETED": 5
+      },
+      "latencyMs": {
+        "n": 5,
+        "min": 819.92,
+        "p50": 842.3,
+        "p95": 863.1,
+        "max": 863.1
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": true,
+    "completed": 5,
+    "balance": 0,
+    "minPayMs": 819.92,
+    "expectedMinWaitMs": 800
+  },
+  "exampleMessages": {}
+}
