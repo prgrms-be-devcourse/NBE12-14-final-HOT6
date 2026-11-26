@@ -1,6 +1,7 @@
 package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import com.back.nbe1214finalhot6.domain.cashback.dto.PayoutRunResponse;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PayoutTrigger;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +26,7 @@ public class CashbackPayoutScheduler {
       fixedDelayString = "${cashback.scheduler.payout-interval-seconds:3600}",
       timeUnit = TimeUnit.SECONDS)
   public void run() {
-    PayoutRunResponse result = payoutService.run();
+    PayoutRunResponse result = payoutService.runAndRecord(PayoutTrigger.SCHEDULED);
     if (result.paid() + result.failed() > 0) {
       log.info(
           "캐시백 지급 배치 paid={} skipped={} failed={}",

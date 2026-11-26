@@ -1,13 +1,24 @@
 package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.PayoutRunDetailResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PayoutRunResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.PayoutRunSummaryResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.PayoutStatusResponse;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PayoutTrigger;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPayoutRunRepository;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackEarning;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PayoutItemResult;
+import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
+import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPayoutRunItemRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackAnnualBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
@@ -53,6 +64,9 @@ class CashbackPayoutServiceTest {
   private static final AtomicLong USER_SEQ = new AtomicLong(System.currentTimeMillis());
 
   @Autowired private CashbackPayoutService payoutService;
+  @Autowired private CashbackPayoutStatusService statusService;
+  @Autowired private CashbackPayoutRunRepository runRepository;
+  @Autowired private CashbackPayoutRunItemRepository runItemRepository;
   @Autowired private CashbackService cashbackService;
   @Autowired private CashbackBudgetService budgetService;
   @Autowired private CashbackEarningRepository earningRepository;
@@ -74,6 +88,8 @@ class CashbackPayoutServiceTest {
 
   @AfterEach
   void cleanUp() {
+    runItemRepository.deleteAll();
+    runRepository.deleteAll();
     earningRepository.deleteAll();
     limitRepository.deleteAll();
     walletTransactionRepository.deleteAll();
@@ -270,5 +286,103 @@ class CashbackPayoutServiceTest {
     assertThat(walletTransactionRepository.count()).isEqualTo(10);
     assertThat(budgetService.getMonthly(2026, 11).paidAmount()).isEqualTo(10 * 360L);
     assertThat(budgetService.getMonthly(2026, 11).reservedAmount()).isZero();
+  }
+
+  private List<PayoutRunSummaryResponse> recentRuns() {
+    return statusService.runs(0, 20).content();
+  }
+
+  // 목적: 지급 대기 집계가 시각이 지난 건과 아직인 건을 나눠 세고, 다음 지급 예정 시각을 알려 주는지 확인한다.
+  @Test
+  @DisplayName("현황은 대기 전체와 지금 지급할 수 있는 건을 나눠 센다")
+  void status_countsPendingAndDue() {
+    CashbackEarning earning = reserve(901L, saveWallet());
+    reserve(902L, saveWallet());
+
+    PayoutStatusResponse before = statusService.status();
+    assertThat(before.pendingCount()).isEqualTo(2);
+    assertThat(before.pendingAmount()).isEqualTo(720L);
+    assertThat(before.dueCount()).isZero();
+    assertThat(before.dueAmount()).isZero();
+    assertThat(before.nextPayableAt()).isEqualTo(earning.getPayableAt());
+
+    passPayableTime();
+
+    PayoutStatusResponse after = statusService.status();
+    assertThat(after.dueCount()).isEqualTo(2);
+    assertThat(after.dueAmount()).isEqualTo(720L);
+    assertThat(after.nextPayableAt()).isNull();
+  }
+
+  // 목적: 수동 실행은 지급할 것이 없어도 기록이 남고, 지급하면 대기에서 빠지며 최근 실행이 앞에 오는지 확인한다.
+  @Test
+  @DisplayName("수동 실행은 항상 기록하고 최근 순으로 보여 준다")
+  void manualRun_isAlwaysRecorded() {
+    reserve(903L, saveWallet());
+    payoutService.runAndRecord(PayoutTrigger.MANUAL);
+    passPayableTime();
+
+    payoutService.runAndRecord(PayoutTrigger.MANUAL);
+
+    assertThat(statusService.status().pendingCount()).isZero();
+    assertThat(recentRuns()).extracting(PayoutRunSummaryResponse::paid).containsExactly(1, 0);
+  }
+
+  // 목적: 자동 실행은 지급도 실패도 없으면 기록하지 않고, 지급이 있으면 기록하는지 확인한다.
+  @Test
+  @DisplayName("자동 실행은 지급이나 실패가 있을 때만 기록한다")
+  void scheduledRun_recordedOnlyWhenSomethingHappened() {
+    reserve(904L, saveWallet());
+    payoutService.runAndRecord(PayoutTrigger.SCHEDULED);
+    assertThat(runRepository.count()).isZero();
+
+    passPayableTime();
+    payoutService.runAndRecord(PayoutTrigger.SCHEDULED);
+
+    assertThat(recentRuns())
+        .singleElement()
+        .satisfies(
+            run -> {
+              assertThat(run.trigger()).isEqualTo(PayoutTrigger.SCHEDULED);
+              assertThat(run.paid()).isEqualTo(1);
+            });
+  }
+
+  // 목적: 상세에 처리한 건이 실패 먼저로 담기고 실패 사유와 지급 합계가 맞는지, 실패한 건은 지급 가능 건으로 남는지 확인한다.
+  @Test
+  @DisplayName("상세는 실패 건과 사유를 먼저 보여 주고 지급 합계를 낸다")
+  void detail_listsFailuresFirst() {
+    Long walletId = saveWallet();
+    CashbackEarning paid = reserve(905L, walletId);
+    CashbackEarning failed = reserve(906L, 999_999_999L); // 없는 지갑이라 입금이 실패한다
+    passPayableTime();
+
+    payoutService.runAndRecord(PayoutTrigger.MANUAL);
+
+    PayoutRunDetailResponse detail = statusService.detail(recentRuns().getFirst().runId());
+    assertThat(detail.paidAmount()).isEqualTo(360L);
+    assertThat(detail.items())
+        .extracting(
+            PayoutRunDetailResponse.Item::earningId, PayoutRunDetailResponse.Item::result)
+        .containsExactly(
+            tuple(failed.getId(), PayoutItemResult.FAILED),
+            tuple(paid.getId(), PayoutItemResult.PAID));
+    PayoutRunDetailResponse.Item failure = detail.items().getFirst();
+    assertThat(failure.errorCode()).startsWith("WAL-");
+    assertThat(failure.errorMessage()).isNotBlank();
+    assertThat(failure.paymentId()).isEqualTo(906L);
+    assertThat(detail.items().getLast().walletId()).isEqualTo(walletId);
+    assertThat(detail.items().getLast().errorCode()).isNull();
+    assertThat(statusService.status().dueCount()).isEqualTo(1);
+  }
+
+  // 목적: 없는 실행의 상세를 조회하면 CSH-013 인지 확인한다.
+  @Test
+  @DisplayName("없는 실행의 상세는 CSH-013 이다")
+  void detail_notFound() {
+    assertThatThrownBy(() -> statusService.detail(999_999L))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(CashbackErrorCode.PAYOUT_RUN_NOT_FOUND);
   }
 }

@@ -27,5 +27,7 @@ export const ICONS = {
   chevronDown: svg(<path d="m6 9.5 6 6 6-6" />, 18),
   trendUp: svg(<path d="M4 17 10 11l4 4 6-7M15 8h5v5" />, 16),
   star: svg(<path d="m12 4 2.4 5 5.4.7-4 3.7 1 5.4-4.8-2.7-4.8 2.7 1-5.4-4-3.7 5.4-.7Z" />, 18),
+  payout: svg(<><rect x="3" y="6" width="18" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6.5 9.5v5M17.5 9.5v5" /></>, 20),
+  gauge: svg(<><path d="M4 18a8 8 0 1 1 16 0" /><path d="M12 18l4-5" /><path d="M3 18h18" /></>, 20),
   scale: svg(<><path d="M12 4v16M7 20h10" /><path d="M5 8h14" /><path d="M5 8l-2.5 6a3 3 0 0 0 5 0L5 8ZM19 8l-2.5 6a3 3 0 0 0 5 0L19 8Z" /></>, 20),
 } as const;
