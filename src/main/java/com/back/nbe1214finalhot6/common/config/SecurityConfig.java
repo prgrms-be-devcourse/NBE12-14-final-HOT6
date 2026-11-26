@@ -64,7 +64,12 @@ public class SecurityConfig {
                     .dispatcherTypeMatchers(DispatcherType.ASYNC)
                     .permitAll()
                     // 누구나
-                    .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/users/signup")
+                    .requestMatchers(
+                        HttpMethod.POST,
+                        "/api/auth/login",
+                        "/api/auth/owner/login",
+                        "/api/users/signup",
+                        "/api/owners/signup")
                     .permitAll()
                     .requestMatchers("/actuator/health/**")
                     .permitAll()

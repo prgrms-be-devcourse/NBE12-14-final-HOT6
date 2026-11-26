@@ -90,18 +90,18 @@ class PinFlowTest {
     assertThat(failCount(user)).isEqualTo(5);
   }
 
-  // 목적: 잠긴 지 30분이 지나면 실제 보안 설정과 DB 로도 풀려서 맞는 PIN 이 통과하는지 확인한다.
+  // 목적: 잠긴 지 10분이 지나면 실제 보안 설정과 DB 로도 풀려서 맞는 PIN 이 통과하는지 확인한다.
   // (임시 방식. MVP 이후에는 이메일 인증으로 해제(U7)로 바꾼다)
   @Test
-  @DisplayName("잠긴 지 30분이 지나면 풀려서 맞는 PIN 이 통과한다")
-  void unlocksAfterThirtyMinutes() throws Exception {
+  @DisplayName("잠긴 지 10분이 지나면 풀려서 맞는 PIN 이 통과한다")
+  void unlocksAfterTenMinutes() throws Exception {
     User user = save("pf6@devpay.com", "01044440006", UserRole.USER);
     for (int i = 0; i < 5; i++) {
       verify(user, "000000");
     }
     verify(user, PIN).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("AUTH-006"));
 
-    clock.advance(Duration.ofMinutes(29).plusSeconds(59));
+    clock.advance(Duration.ofMinutes(9).plusSeconds(59));
     verify(user, PIN).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("AUTH-006"));
 
     clock.advance(Duration.ofSeconds(1));

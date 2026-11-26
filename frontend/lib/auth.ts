@@ -5,7 +5,7 @@ import { clearQrTokens } from "@/lib/devContext";
 export type Role = "USER" | "OWNER" | "ADMIN";
 export type Audience = "user" | "merchant" | "admin";
 
-export type Session = { accessToken: string; expiresAt: number; role: Role; userId: number };
+export type Session = { accessToken: string; expiresAt: number; role: Role; userId: number; pinVerified?: boolean };
 
 // 백엔드 LoginResponse
 type LoginResponse = { accessToken: string; tokenType: string; expiresIn: number };
@@ -17,10 +17,13 @@ const ALLOWED: Record<Audience, Role[]> = { user: ["USER", "OWNER"], merchant: [
 
 export const LOGIN_PATH: Record<Audience, string> = { user: "/login", merchant: "/merchant/login", admin: "/admin/login" };
 
+// 화면마다 부르는 로그인 API. 점주 계정은 점주 로그인만 받는다
+export const LOGIN_API: Record<Audience, string> = { user: "/auth/login", merchant: "/auth/owner/login", admin: "/auth/login" };
+
 export const canEnter = (role: Role, audience: Audience) => ALLOWED[audience].includes(role);
 
 // 로그인 직후 처음 보여 줄 화면
-export const HOME_PATH: Record<Audience, string> = { user: "/pin?next=/wallet", merchant: "/merchant/qr", admin: "/admin" };
+export const HOME_PATH: Record<Audience, string> = { user: "/pin?next=/wallet", merchant: "/merchant/pin", admin: "/admin" };
 
 export const audienceOfPath = (path: string): Audience =>
   path.startsWith("/admin") ? "admin" : path.startsWith("/merchant") ? "merchant" : "user";
@@ -48,6 +51,17 @@ export function saveLogin(res: LoginResponse): Session | null {
     /* 저장 불가 환경 */
   }
   return session;
+}
+
+// 점주 화면은 간편비밀번호 확인을 통과해야 연다. 확인 결과는 이번 로그인에만 남고, 다시 로그인하면 다시 확인한다
+export function markPinVerified() {
+  const session = getSession();
+  if (!session) return;
+  try {
+    localStorage.setItem(KEY, JSON.stringify({ ...session, pinVerified: true }));
+  } catch {
+    /* 저장 불가 환경 */
+  }
 }
 
 // 저장된 세션 문자열 그대로(없으면 null). 화면이 저장소 변화를 구독할 때 쓴다.

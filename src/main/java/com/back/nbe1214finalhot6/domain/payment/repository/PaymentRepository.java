@@ -20,6 +20,9 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
   Optional<Payment> findByWalletIdAndIdempotencyKey(Long walletId, String idempotencyKey);
 
+  // 사장님 결제 한 건 조회. 가맹점 번호까지 조건에 넣어 다른 가맹점의 결제는 조회되지 않는다
+  Optional<Payment> findByIdAndMerchantId(Long id, Long merchantId);
+
   @Transactional //테스트 호출을 위한 어노테이션 처리
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Payment p SET p.status = :to WHERE p.id = :id AND p.status = :from")

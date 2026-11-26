@@ -1,7 +1,9 @@
 package com.back.nbe1214finalhot6.domain.reconciliation.service;
 
+import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantClosureDeduction;
 import com.back.nbe1214finalhot6.domain.reconciliation.dto.ReconciliationOutcome;
 import com.back.nbe1214finalhot6.domain.reconciliation.entity.ReconciliationType;
+import com.back.nbe1214finalhot6.domain.reconciliation.repository.ClosureDeductionReader;
 import com.back.nbe1214finalhot6.domain.reconciliation.repository.DailySettlementReader;
 import com.back.nbe1214finalhot6.domain.reconciliation.repository.MonthlySettlementReader;
 import com.back.nbe1214finalhot6.domain.reconciliation.repository.WalletLedgerReader;
@@ -24,6 +26,9 @@ import org.springframework.stereotype.Component;
 /**
  * 월 지급 대사. 기준일까지 끝난 가장 최근 달을 대상으로 월 지급액, 일 정산 확정액의 합, 지갑 원장의 입금과 출금이 같은지 본다. 대기 건은 아직 지급
  * 전이므로 원장과 비교하지 않는다.
+ *
+ * <p>해지 정산이 부족분을 갚으려고 지급액에서 차감한 달은 지급액이 확정액의 합보다 작다. 그 차감액을 확정액의 합에서 뺀 값을 기대 지급액으로 본다. 전액
+ * 차감되어 월 정산 건이 없는 달은 기대 지급액이 0이라 누락으로 보지 않는다.
  */
 @Component
 @RequiredArgsConstructor
@@ -31,6 +36,7 @@ public class MonthlyPayoutCheck implements ReconciliationCheck {
 
   private final DailySettlementReader dailyReader;
   private final MonthlySettlementReader monthlyReader;
+  private final ClosureDeductionReader deductionReader;
   private final WalletLedgerReader ledgerReader;
 
   @Override
@@ -50,6 +56,11 @@ public class MonthlyPayoutCheck implements ReconciliationCheck {
                 Collectors.groupingBy(
                     DailySettlement::getMerchantId,
                     Collectors.summingLong(DailySettlement::getConfirmedAmount)));
+    Map<Long, Long> deductions =
+        deductionReader.findBySettlementMonth(monthStart).stream()
+            .collect(
+                Collectors.toMap(
+                    MerchantClosureDeduction::getMerchantId, MerchantClosureDeduction::getAmount));
     Map<Long, MonthlySettlement> settlements =
         monthlyReader.findBySettlementMonth(monthStart).stream()
             .collect(Collectors.toMap(MonthlySettlement::getMerchantId, Function.identity()));
@@ -67,18 +78,19 @@ public class MonthlyPayoutCheck implements ReconciliationCheck {
     Set<Long> merchantIds = new TreeSet<>(settlements.keySet());
     confirmedSums.forEach(
         (merchantId, sum) -> {
-          if (sum > 0) {
+          if (sum - deductions.getOrDefault(merchantId, 0L) > 0) {
             merchantIds.add(merchantId);
           }
         });
 
     List<String> mismatches = new ArrayList<>();
     for (Long merchantId : merchantIds) {
-      long confirmedSum = confirmedSums.getOrDefault(merchantId, 0L);
+      long expectedPayout =
+          confirmedSums.getOrDefault(merchantId, 0L) - deductions.getOrDefault(merchantId, 0L);
       MonthlySettlement settlement = settlements.get(merchantId);
       if (settlement == null) {
         mismatches.add("merchantId=" + merchantId + ":MISSING");
-      } else if (settlement.getPayoutAmount() != confirmedSum) {
+      } else if (settlement.getPayoutAmount() != expectedPayout) {
         mismatches.add("merchantId=" + merchantId + ":AMOUNT");
       } else if (settlement.isPaid() && !ledgerMatches(settlement, deposits, withdrawals)) {
         mismatches.add("merchantId=" + merchantId + ":LEDGER");

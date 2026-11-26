@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "가맹점", description = "가맹점 등록·수정·검색 관련 API")
+@Tag(name = "가맹점", description = "가맹점 등록·수정·검색·해지 관련 API")
 @RestController
 @RequestMapping("/api/merchants")
 @RequiredArgsConstructor

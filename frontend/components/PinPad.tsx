@@ -11,11 +11,12 @@ type Props = {
   lockedHref?: string;
   // 6자리를 다 입력했을 때(set 은 두 번 일치했을 때) 서버 호출을 맡긴다. 없으면 바로 이동한다
   onSubmit?: (pin: string) => Promise<PinResult>;
+  setGuide?: string; // set 에서 처음 입력할 때의 안내를 바꿀 때
 };
 
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
 
-export default function PinPad({ mode, doneHref, lockedHref = "/locked", onSubmit }: Props) {
+export default function PinPad({ mode, doneHref, lockedHref = "/locked", onSubmit, setGuide = "결제·로그인에 쓸 6자리를 입력하세요" }: Props) {
   const router = useRouter();
   const [pin, setPin] = useState("");
   const [first, setFirst] = useState<string | null>(null);
@@ -61,7 +62,7 @@ export default function PinPad({ mode, doneHref, lockedHref = "/locked", onSubmi
   const guide =
     mode === "set"
       ? first === null
-        ? "결제·로그인에 쓸 6자리를 입력하세요"
+        ? setGuide
         : "확인을 위해 한 번 더 입력하세요"
       : "간편비밀번호 6자리를 입력하세요";
 

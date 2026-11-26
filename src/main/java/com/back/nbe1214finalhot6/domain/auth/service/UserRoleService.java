@@ -5,7 +5,10 @@ import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.entity.User;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserStatus;
+import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
+import java.util.EnumSet;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +36,20 @@ public class UserRoleService {
     if (user.getRole() == UserRole.ADMIN) {
       throw new BusinessException(CommonErrorCode.FORBIDDEN); // 운영자는 가맹점을 등록할 수 없다
     }
+    if (user.getRole() == UserRole.USER) {
+      requireNoOwnerAccount(user);
+    }
     user.promoteToOwner();
+  }
+
+  // 같은 이메일·전화번호의 점주 계정이 이미 있으면 올릴 수 없다(계정 종류별 중복 제약). DB 오류(500) 대신 이유를 알려 준다
+  private void requireNoOwnerAccount(User user) {
+    Set<UserRole> owner = EnumSet.of(UserRole.OWNER);
+    if (userRepository.existsByRoleInAndEmail(owner, user.getEmail())) {
+      throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL, "같은 이메일의 점주 계정이 이미 있습니다");
+    }
+    if (userRepository.existsByRoleInAndPhone(owner, user.getPhone())) {
+      throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE, "같은 전화번호의 점주 계정이 이미 있습니다");
+    }
   }
 }

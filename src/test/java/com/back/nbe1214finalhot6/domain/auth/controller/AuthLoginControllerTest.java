@@ -57,6 +57,22 @@ class AuthLoginControllerTest {
   }
 
   @Test
+  @DisplayName("점주 로그인도 인증 없이 호출하고, 점주 로그인으로 처리한다")
+  void ownerLogin_ok() throws Exception {
+    given(authService.loginOwner(any()))
+        .willReturn(LoginResponse.bearer("owner-token", 1800L));
+
+    mockMvc
+        .perform(
+            post("/api/auth/owner/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(VALID_BODY))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.accessToken").value("owner-token"));
+    verify(authService, never()).login(any());
+  }
+
+  @Test
   @DisplayName("로그인에 실패하면 401 과 AUTH-003 을 반환한다")
   void login_failed() throws Exception {
     given(authService.login(any())).willThrow(new BusinessException(AuthErrorCode.LOGIN_FAILED));

@@ -2,6 +2,8 @@ package com.back.nbe1214finalhot6.domain.merchant.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -11,6 +13,7 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 @Entity
 @Table(
@@ -39,6 +42,12 @@ public class Merchant {
 
   @Column(name = "cashback_eligible", nullable = false)
   private boolean cashbackEligible;
+
+  // 상태는 조건부 UPDATE 로만 바꾼다(MerchantRepository.updateStatusIfCurrent). 기존 행은 ACTIVE 로 채운다
+  @Enumerated(EnumType.STRING)
+  @ColumnDefault("'ACTIVE'")
+  @Column(nullable = false, length = 20)
+  private MerchantStatus status = MerchantStatus.ACTIVE;
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;

@@ -42,7 +42,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 모의계좌 → 지갑 충전. 한도는 기본값(보유 200만원, 월 충전 100만원), 계좌 초기 잔액은 200만원. */
+/** 모의계좌 → 지갑 충전. 한도는 기본값(보유 200만원, 월 충전 100만원), 계좌 초기 잔액은 500만원. */
 @IntegrationTest
 class ChargeServiceTest {
 
@@ -107,7 +107,7 @@ class ChargeServiceTest {
   @DisplayName("계좌 잔액이 부족하면 WAL-009로 거절되고 아무것도 바뀌지 않는다")
   void insufficientAccountBalance() {
     Account account = account();
-    account.debit(1_950_000L); // 계좌 잔액 5만원
+    account.debit(Account.INITIAL_BALANCE - 50_000L); // 계좌 잔액 5만원
     accountRepository.save(account);
 
     assertFails(
