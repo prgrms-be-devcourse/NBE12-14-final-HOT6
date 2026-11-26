@@ -3,8 +3,10 @@ package com.back.nbe1214finalhot6.domain.qr.service;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
+import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
+import com.back.nbe1214finalhot6.domain.merchant.service.MerchantStatusGuard;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateRequest;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrCreateResponse;
 import com.back.nbe1214finalhot6.domain.qr.dto.QrPaymentTarget;
@@ -30,9 +32,7 @@ public class QrService {
 
   @Transactional
   public QrCreateResponse createDynamic(Long merchantId, QrCreateRequest request) {
-    if (!merchantRepository.existsById(merchantId)) {
-      throw new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND);
-    }
+    assertMerchantActive(merchantId);
 
     QrCode qrCode =
         qrCodeRepository.save(
@@ -67,6 +67,7 @@ public class QrService {
         merchantRepository
             .findById(qrCode.getMerchantId())
             .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+    MerchantStatusGuard.assertActive(merchant.getStatus());
 
     return QrScanResponse.of(qrCode, merchant);
   }
@@ -77,8 +78,18 @@ public class QrService {
         qrCodeRepository
             .findByToken(qrToken)
             .orElseThrow(() -> new BusinessException(QrErrorCode.QR_NOT_FOUND));
+    assertMerchantActive(qrCode.getMerchantId());
 
     return QrPaymentTarget.from(qrCode);
+  }
+
+  // 해지 신청 뒤의 가맹점에는 새 결제를 받지 않는다
+  private void assertMerchantActive(Long merchantId) {
+    MerchantStatus status =
+        merchantRepository
+            .findStatusById(merchantId)
+            .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+    MerchantStatusGuard.assertActive(status);
   }
 
   @Transactional
