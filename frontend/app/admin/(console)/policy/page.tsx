@@ -37,8 +37,12 @@ export default function AdminPolicyPage() {
   const [busy, setBusy] = useState(false);
   const [apiError, setApiError] = useState("");
   const r = Number(rate);
+  // 달 중에는 인하만 한다. 현재(월 기본) 요율보다 낮아야 저장할 수 있다
+  const currentRate = budget.data?.baseRate != null ? Math.round(budget.data.baseRate * 1000) / 10 : null;
+  const notLower = currentRate != null && r >= currentRate;
   const policyError =
     !rate.trim() || Number.isNaN(r) || r <= 0 || r > 100 ? "요율은 0보다 크고 100 이하인 숫자로 입력해 주세요"
+    : notLower && rateInput !== null ? `요율은 현재 요율(${currentRate}%)보다 낮아야 해요`
     : !from ? "적용 시작 일시를 입력해 주세요"
     : "";
   const flash = (m: string) => { setSaved(m); setTimeout(() => setSaved(""), 3000); };
@@ -79,7 +83,7 @@ export default function AdminPolicyPage() {
             <label className="block"><span className="label">적용 시작 일시</span><input className="field" type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
           </div>
           {(policyError || apiError) && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{policyError || apiError}</p>}
-          <button type="button" disabled={!!policyError || busy} onClick={save} className="btn btn-primary !w-auto px-8 disabled:opacity-40">요율 인하 저장</button>
+          <button type="button" disabled={!!policyError || notLower || busy} onClick={save} className="btn btn-primary !w-auto px-8 disabled:opacity-40">요율 인하 저장</button>
           <p className="note">달 중에는 요율을 인하만 할 수 있고(올리려면 다음 달 기본 요율로 정해요), 저장하면 정책 변경 예고 공지가 자동으로 등록돼요. 적용은 그 달 말까지예요.</p>
         </div>
       </section>
