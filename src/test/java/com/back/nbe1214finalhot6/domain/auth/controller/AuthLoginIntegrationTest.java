@@ -89,21 +89,23 @@ class AuthLoginIntegrationTest {
   }
 
   @Test
-  @DisplayName("OWNER·ADMIN 으로 바뀐 회원은 다시 로그인하면 토큰의 역할이 바뀐다")
+  @DisplayName("역할이 바뀐 회원은 그 역할을 받는 로그인으로 다시 로그인하면 토큰의 역할이 바뀐다")
   void login_reflectsRoleAtLoginTime() throws Exception {
     String before = tokenOf(login(EMAIL, PASSWORD).andReturn());
     assertThat(jwtProvider.parse(before).role()).isEqualTo(UserRole.USER);
 
     jdbcTemplate.update("update users set role = 'OWNER' where email = ?", EMAIL);
 
-    // 이미 발급된 토큰은 그대로(옛 역할), 다시 로그인하면 새 역할
+    // 이미 발급된 토큰은 그대로(옛 역할), 점주가 된 계정은 점주 로그인으로만 새 역할을 받는다
     assertThat(jwtProvider.parse(before).role()).isEqualTo(UserRole.USER);
-    String after = tokenOf(login(EMAIL, PASSWORD).andReturn());
+    login(EMAIL, PASSWORD).andExpect(status().isUnauthorized());
+    String after = tokenOf(ownerLogin(EMAIL, PASSWORD).andReturn());
     assertThat(jwtProvider.parse(after).role()).isEqualTo(UserRole.OWNER);
 
     jdbcTemplate.update("update users set role = 'ADMIN' where email = ?", EMAIL);
     assertThat(jwtProvider.parse(tokenOf(login(EMAIL, PASSWORD).andReturn())).role())
         .isEqualTo(UserRole.ADMIN);
+    ownerLogin(EMAIL, PASSWORD).andExpect(status().isUnauthorized());
   }
 
   @Test
@@ -146,8 +148,16 @@ class AuthLoginIntegrationTest {
   }
 
   private ResultActions login(String email, String password) throws Exception {
+    return login("/api/auth/login", email, password);
+  }
+
+  private ResultActions ownerLogin(String email, String password) throws Exception {
+    return login("/api/auth/owner/login", email, password);
+  }
+
+  private ResultActions login(String path, String email, String password) throws Exception {
     return mockMvc.perform(
-        post("/api/auth/login")
+        post(path)
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"email\": \"%s\", \"password\": \"%s\"}".formatted(email, password)));
   }

@@ -41,7 +41,7 @@ class AuthServiceLoginTest {
   private final LoginRequest request = new LoginRequest("user@example.com", "Password1!");
 
   @Test
-  @DisplayName("이메일과 비밀번호가 맞으면 회원 ID 와 역할로 토큰을 발급한다")
+  @DisplayName("점주 로그인은 이메일과 비밀번호가 맞으면 회원 ID 와 역할로 토큰을 발급한다")
   void login_success() {
     User user = user(7L, UserRole.OWNER, UserStatus.ACTIVE);
     given(userRepository.findAllByEmail("user@example.com")).willReturn(List.of(user));
@@ -49,7 +49,7 @@ class AuthServiceLoginTest {
     given(jwtProvider.createAccessToken(7L, UserRole.OWNER)).willReturn("access-token");
     given(jwtProvider.accessTokenExpiresInSeconds()).willReturn(1800L);
 
-    LoginResponse response = authService.login(request);
+    LoginResponse response = authService.loginOwner(request);
 
     assertThat(response.accessToken()).isEqualTo("access-token");
     assertThat(response.tokenType()).isEqualTo("Bearer");

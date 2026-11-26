@@ -106,36 +106,62 @@ class AccountRoleUniquenessTest {
     assertThat(userRepository.count()).isEqualTo(3);
   }
 
-  // 점주의 이메일로 누가 이용자 가입을 해도 점주 로그인이 막히지 않아야 한다
   @Test
-  @DisplayName("같은 이메일의 계정이 둘이면 비밀번호가 맞는 계정으로 로그인된다")
-  void loginByPassword() {
-    User owner = save(EMAIL, PHONE, UserRole.OWNER, OWNER_PASSWORD);
+  @DisplayName("이메일과 비밀번호가 같아도 로그인은 이용자 계정, 점주 로그인은 점주 계정이다")
+  void loginPicksAccountByEndpoint() {
+    User owner = save(EMAIL, PHONE, UserRole.OWNER, USER_PASSWORD);
     Long userId = authService.signup(request(EMAIL, PHONE)).id();
 
     assertThat(loginId(USER_PASSWORD)).isEqualTo(userId);
-    assertThat(loginId(OWNER_PASSWORD)).isEqualTo(owner.getId());
+    assertThat(ownerLoginId(USER_PASSWORD)).isEqualTo(owner.getId());
+  }
+
+  @Test
+  @DisplayName("점주 비밀번호로 하는 기존 로그인과 이용자 비밀번호로 하는 점주 로그인은 LOGIN_FAILED 다")
+  void otherKindOfAccountIsRejected() {
+    save(EMAIL, PHONE, UserRole.OWNER, OWNER_PASSWORD);
+    authService.signup(request(EMAIL, PHONE));
+
     assertError(
-        () -> authService.login(new LoginRequest(EMAIL, "Wrong123!")), AuthErrorCode.LOGIN_FAILED);
+        () -> authService.login(new LoginRequest(EMAIL, OWNER_PASSWORD)),
+        AuthErrorCode.LOGIN_FAILED);
+    assertError(
+        () -> authService.loginOwner(new LoginRequest(EMAIL, USER_PASSWORD)),
+        AuthErrorCode.LOGIN_FAILED);
   }
 
   @Test
-  @DisplayName("두 계정의 비밀번호까지 같으면 이용자 계정으로 로그인된다")
-  void loginSamePasswordPrefersUser() {
-    save(EMAIL, PHONE, UserRole.OWNER, USER_PASSWORD);
-    Long userId = authService.signup(request(EMAIL, PHONE)).id();
+  @DisplayName("운영자는 기존 로그인만 쓸 수 있다")
+  void adminUsesCommonLogin() {
+    User admin = save(EMAIL, PHONE, UserRole.ADMIN, USER_PASSWORD);
 
-    assertThat(loginId(USER_PASSWORD)).isEqualTo(userId);
+    assertThat(loginId(USER_PASSWORD)).isEqualTo(admin.getId());
+    assertError(
+        () -> authService.loginOwner(new LoginRequest(EMAIL, USER_PASSWORD)),
+        AuthErrorCode.LOGIN_FAILED);
   }
 
   @Test
-  @DisplayName("이용자 계정이 탈퇴 상태면 활동 중인 점주 계정으로 로그인된다")
+  @DisplayName("같은 종류에 탈퇴 계정과 활동 계정이 함께 있으면 활동 계정으로 로그인된다")
   void loginPrefersActiveAccount() {
+    User old = save(EMAIL, PHONE, UserRole.OWNER, OWNER_PASSWORD);
+    withdraw(old.getId());
+    User current = save(EMAIL, PHONE, UserRole.OWNER, OWNER_PASSWORD);
+
+    assertThat(ownerLoginId(OWNER_PASSWORD)).isEqualTo(current.getId());
+  }
+
+  @Test
+  @DisplayName("탈퇴한 이용자는 같은 이메일의 점주 계정이 있어도 이용자 로그인에서 AUTH-004 를 받는다")
+  void withdrawnUserWithActiveOwner() {
     Long userId = authService.signup(request(EMAIL, PHONE)).id();
     withdraw(userId);
-    User owner = save(EMAIL, PHONE, UserRole.OWNER, OWNER_PASSWORD);
+    User owner = save(EMAIL, PHONE, UserRole.OWNER, USER_PASSWORD);
 
-    assertThat(loginId(OWNER_PASSWORD)).isEqualTo(owner.getId());
+    assertError(
+        () -> authService.login(new LoginRequest(EMAIL, USER_PASSWORD)),
+        AuthErrorCode.WITHDRAWN_USER);
+    assertThat(ownerLoginId(USER_PASSWORD)).isEqualTo(owner.getId());
   }
 
   @Test
@@ -169,6 +195,12 @@ class AccountRoleUniquenessTest {
 
   private void withdraw(Long userId) {
     jdbcTemplate.update("update users set status = 'WITHDRAWN' where id = ?", userId);
+  }
+
+  private Long ownerLoginId(String password) {
+    return jwtProvider
+        .parse(authService.loginOwner(new LoginRequest(EMAIL, password)).accessToken())
+        .userId();
   }
 
   private Long loginId(String password) {

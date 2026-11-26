@@ -59,7 +59,7 @@ class MerchantRegistrationFlowTest {
         .andExpect(jsonPath("$.code").value("COM-008"));
 
     // 다시 로그인하면 점주(OWNER) 토큰을 받고 점주 기능을 쓸 수 있다
-    String ownerToken = login();
+    String ownerToken = ownerLogin();
     assertThat(jwtProvider.parse(ownerToken).role()).isEqualTo(UserRole.OWNER);
     mockMvc.perform(patchMe(ownerToken)).andExpect(status().isOk());
   }
@@ -85,7 +85,7 @@ class MerchantRegistrationFlowTest {
     int merchantId = JsonPath.read(registered.getResponse().getContentAsString(), "$.data.merchantId");
 
     // 로그인한 회원이 점주가 되어, 새 토큰으로 자기 가맹점을 수정할 수 있다
-    mockMvc.perform(patchMe(login())).andExpect(status().isOk());
+    mockMvc.perform(patchMe(ownerLogin())).andExpect(status().isOk());
   }
 
   @Test
@@ -158,11 +158,19 @@ class MerchantRegistrationFlowTest {
     return login("flow@devpay.com");
   }
 
+  private String ownerLogin() throws Exception {
+    return login("/api/auth/owner/login", "flow@devpay.com");
+  }
+
   private String login(String email) throws Exception {
+    return login("/api/auth/login", email);
+  }
+
+  private String login(String path, String email) throws Exception {
     MvcResult result =
         mockMvc
             .perform(
-                post("/api/auth/login")
+                post(path)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"email\": \"%s\", \"password\": \"Password1!\"}".formatted(email)))
             .andExpect(status().isOk())

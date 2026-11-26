@@ -39,10 +39,19 @@ public class AuthService {
   private static final Set<UserRole> USER_SIGNUP_BLOCKING_ROLES =
       Collections.unmodifiableSet(EnumSet.of(UserRole.USER, UserRole.ADMIN));
 
-  // 로그인할 때 확인하는 순서. 활동 중인 계정을 먼저, 그다음 USER, OWNER, ADMIN
-  private static final Comparator<User> LOGIN_PRIORITY =
-      Comparator.comparing((User user) -> user.getStatus() != UserStatus.ACTIVE)
-          .thenComparing(User::getRole);
+  // 점주 가입에서 이메일·전화번호가 겹치면 안 되는 계정 종류. 이용자 계정과는 같은 값을 써도 된다
+  private static final Set<UserRole> OWNER_SIGNUP_BLOCKING_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.OWNER, UserRole.ADMIN));
+
+  // 로그인 API 마다 받는 계정 종류. 같은 이메일의 이용자 계정과 점주 계정은 어느 API 로 로그인하는지로 구분한다
+  private static final Set<UserRole> USER_LOGIN_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.USER, UserRole.ADMIN));
+  private static final Set<UserRole> OWNER_LOGIN_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.OWNER));
+
+  // 같은 이메일의 탈퇴 계정과 활동 계정이 함께 있으면 활동 중인 계정을 먼저 확인한다
+  private static final Comparator<User> ACTIVE_FIRST =
+      Comparator.comparing((User user) -> user.getStatus() != UserStatus.ACTIVE);
 
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
@@ -51,23 +60,7 @@ public class AuthService {
 
   @Transactional
   public SignupResponse signup(SignupRequest request) {
-    // 이메일 중복이면 예외
-    if (userRepository.existsByRoleInAndEmail(USER_SIGNUP_BLOCKING_ROLES, request.email())) {
-      throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
-    }
-    // 전화번호 중복이면 예외
-    if (userRepository.existsByRoleInAndPhone(USER_SIGNUP_BLOCKING_ROLES, request.phone())) {
-      throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE);
-    }
-    // 암호화
-    String passwordHash = passwordEncoder.encode(request.password());
-    String pinHash = passwordEncoder.encode(request.pin());
-
-    User user =
-        User.create(
-            request.name(), request.email(), request.phone(), passwordHash, pinHash, UserRole.USER);
-
-    User saved = saveOrThrowDuplicate(user);
+    User saved = saveNewUser(request, UserRole.USER, USER_SIGNUP_BLOCKING_ROLES);
 
     // 같은 트랜잭션에서 모의계좌·가입 보너스 원장·지갑 생성. 하나라도 실패하면 회원 저장까지 롤백됨
     walletOpeningService.open(saved.getId());
@@ -75,10 +68,55 @@ public class AuthService {
     return SignupResponse.from(saved);
   }
 
-  // 트랜잭션을 두지 않는다. 조회한 뒤에 하는 BCrypt 비교(느림) 동안 DB 연결을 잡고 있지 않기 위해서다.
-  public LoginResponse login(LoginRequest request) {
+  /** 점주(OWNER)로 가입한다. 지갑 없이 잔액 0원인 개인 모의계좌만 만든다. */
+  @Transactional
+  public SignupResponse signupOwner(SignupRequest request) {
+    User saved = saveNewUser(request, UserRole.OWNER, OWNER_SIGNUP_BLOCKING_ROLES);
+
+    // 계좌 생성이 실패하면 회원 저장까지 롤백됨
+    walletOpeningService.openOwnerAccount(saved.getId());
+
+    return SignupResponse.from(saved);
+  }
+
+  // 중복을 확인하고 비밀번호·PIN 을 암호화해 저장한다. 호출한 가입의 트랜잭션 안에서 실행된다
+  private User saveNewUser(SignupRequest request, UserRole role, Set<UserRole> blockingRoles) {
+    // 이메일 중복이면 예외
+    if (userRepository.existsByRoleInAndEmail(blockingRoles, request.email())) {
+      throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
+    }
+    // 전화번호 중복이면 예외
+    if (userRepository.existsByRoleInAndPhone(blockingRoles, request.phone())) {
+      throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE);
+    }
+    // 암호화
+    String passwordHash = passwordEncoder.encode(request.password());
+    String pinHash = passwordEncoder.encode(request.pin());
+
     User user =
-        findByPassword(userRepository.findAllByEmail(request.email()), request.password());
+        User.create(request.name(), request.email(), request.phone(), passwordHash, pinHash, role);
+
+    return saveOrThrowDuplicate(user);
+  }
+
+  /** 이용자·운영자 로그인. 점주 계정은 받지 않는다. */
+  public LoginResponse login(LoginRequest request) {
+    return authenticate(request, USER_LOGIN_ROLES);
+  }
+
+  /** 점주 로그인. 점주 계정만 받는다. */
+  public LoginResponse loginOwner(LoginRequest request) {
+    return authenticate(request, OWNER_LOGIN_ROLES);
+  }
+
+  // 트랜잭션을 두지 않는다. 조회한 뒤에 하는 BCrypt 비교(느림) 동안 DB 연결을 잡고 있지 않기 위해서다.
+  private LoginResponse authenticate(LoginRequest request, Set<UserRole> roles) {
+    // 받지 않는 종류의 계정은 없는 계정과 똑같이 처리한다
+    List<User> accounts =
+        userRepository.findAllByEmail(request.email()).stream()
+            .filter(account -> roles.contains(account.getRole()))
+            .toList();
+    User user = findByPassword(accounts, request.password());
 
     // 이메일 없음과 비밀번호 불일치는 같은 에러로 거절한다(어느 쪽인지 알려 주지 않는다)
     if (user == null) {
@@ -93,8 +131,7 @@ public class AuthService {
     return LoginResponse.bearer(accessToken, jwtProvider.accessTokenExpiresInSeconds());
   }
 
-  // 같은 이메일을 이용자 계정과 점주 계정이 함께 쓸 수 있어, 비밀번호가 맞는 계정을 찾는다. 한 계정만 고르면 같은 이메일로
-  // 가입한 다른 계정 때문에 로그인이 막힐 수 있다. 비밀번호가 둘 다 맞으면 LOGIN_PRIORITY 의 앞선 계정이다
+  // 비밀번호가 맞는 계정을 찾는다. 여럿이면 활동 중인 계정이 먼저다
   private User findByPassword(List<User> accounts, String rawPassword) {
     // 회원이 없어도 비밀번호 비교는 한다(응답 시간 차이 방지)
     if (accounts.isEmpty()) {
@@ -102,7 +139,7 @@ public class AuthService {
       return null;
     }
     return accounts.stream()
-        .sorted(LOGIN_PRIORITY)
+        .sorted(ACTIVE_FIRST)
         .filter(user -> passwordEncoder.matches(rawPassword, user.getPasswordHash()))
         .findFirst()
         .orElse(null);
