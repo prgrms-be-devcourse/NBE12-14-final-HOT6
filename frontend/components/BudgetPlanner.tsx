@@ -2,18 +2,18 @@
 
 import { useState } from "react";
 import { getAnnualBudget, listMonthlyBudgets, putAnnualBudget, putMonthlyBudget, transferBudget, type AnnualBudget, type MonthlyBudget } from "@/lib/adminApi";
+import { pctText } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
 
 const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
-const RESERVE_PERCENT = 10; // 서버 설정(cashback.contingency-rate)의 기본값. 실제 대비금은 서버가 월 시작 시 확정한 값을 쓴다
 const digits = (v: string) => Number(v.replace(/\D/g, "")) || 0;
 const pct = (n: number, whole: number) => (whole > 0 ? Math.round((n / whole) * 100) : 0);
 const totalOf = (m: MonthlyBudget) => m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount;
 
-type Props = { year: number; thisMonth: number; onFlash: (message: string) => void; onChanged?: () => void };
+type Props = { year: number; thisMonth: number; contingencyRate?: number; onFlash: (message: string) => void; onChanged?: () => void };
 
-export default function BudgetPlanner({ year, thisMonth, onFlash, onChanged }: Props) {
+export default function BudgetPlanner({ year, thisMonth, contingencyRate, onFlash, onChanged }: Props) {
   const annualLoad = useLoad(() => getAnnualBudget(year), [year]);
   const monthlyLoad = useLoad(() => listMonthlyBudgets(year), [year]);
   const reload = () => { annualLoad.reload(); monthlyLoad.reload(); };
@@ -34,6 +34,7 @@ export default function BudgetPlanner({ year, thisMonth, onFlash, onChanged }: P
       key={version}
       year={year}
       thisMonth={thisMonth}
+      contingencyRate={contingencyRate}
       savedAnnual={annualLoad.data}
       monthly={monthlyLoad.data ?? []}
       onFlash={onFlash}
@@ -43,11 +44,11 @@ export default function BudgetPlanner({ year, thisMonth, onFlash, onChanged }: P
 }
 
 type PlannerProps = {
-  year: number; thisMonth: number; savedAnnual: AnnualBudget | null; monthly: MonthlyBudget[];
+  year: number; thisMonth: number; contingencyRate?: number; savedAnnual: AnnualBudget | null; monthly: MonthlyBudget[];
   onFlash: (message: string) => void; onSaved: () => void;
 };
 
-function Planner({ year, thisMonth, savedAnnual, monthly, onFlash, onSaved }: PlannerProps) {
+function Planner({ year, thisMonth, contingencyRate, savedAnnual, monthly, onFlash, onSaved }: PlannerProps) {
   const [annual, setAnnual] = useState(savedAnnual?.totalAmount ?? 0);
   const [alloc, setAlloc] = useState<number[]>(() => {
     const next = Array(12).fill(0) as number[];
@@ -61,10 +62,10 @@ function Planner({ year, thisMonth, savedAnnual, monthly, onFlash, onSaved }: Pl
   const [error, setError] = useState("");
 
   const byMonth = new Map(monthly.map((m) => [m.budgetMonth, m]));
-  // 지난 달이거나 예약·지급이 시작된 달은 서버가 배정 변경을 거절한다
+  // 지난 달이거나 예약·지급·이월이 시작된 달은 서버(changeAllocated)가 배정 변경을 거절한다
   const isLocked = (i: number) => {
     const m = byMonth.get(i + 1);
-    return i + 1 < thisMonth || (!!m && m.reservedAmount + m.paidAmount > 0);
+    return i + 1 < thisMonth || (!!m && m.reservedAmount + m.paidAmount + m.carriedOutAmount > 0);
   };
 
   const sum = alloc.reduce((a, b) => a + b, 0);
@@ -115,7 +116,28 @@ function Planner({ year, thisMonth, savedAnnual, monthly, onFlash, onSaved }: Pl
       .filter((c) => !isLocked(c.i) && c.v !== c.old && (c.exists || c.v > 0))
       .sort((a, b) => a.v - a.old - (b.v - b.old));
     if (changes.length === 0) { onFlash("바뀐 배정이 없습니다"); return; }
-    void run(async () => { for (const c of changes) await putMonthlyBudget(year, c.i + 1, c.v, rate); }, `${changes.length}개 달의 예산 배정이 저장되었습니다`);
+    void saveChanges(changes, rate);
+  };
+
+  // 순차 저장 중 한 달이 실패해도 앞서 저장된 달은 화면에 반영하고, 어디까지 저장됐는지 알려 준다
+  const saveChanges = async (changes: { i: number; v: number }[], rate: number | undefined) => {
+    setBusy(true);
+    setError("");
+    let saved = 0;
+    try {
+      for (const c of changes) {
+        await putMonthlyBudget(year, c.i + 1, c.v, rate);
+        saved += 1;
+      }
+      onFlash(`${changes.length}개 달의 예산 배정이 저장되었습니다`);
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : "처리하지 못했어요";
+      const failed = MONTH_LABELS[changes[saved].i];
+      setError(saved === 0 ? reason : `${saved}개 달은 저장했지만 ${failed}부터는 저장하지 못했어요. ${reason}`);
+    } finally {
+      if (saved > 0) onSaved();
+      setBusy(false);
+    }
   };
 
   const move = () => run(() => transferBudget(year, month, moveAmount), `${MONTH_LABELS[month - 1]}의 남은 예산 ${won(moveAmount)}을 다음 달로 이월했습니다`);
@@ -228,7 +250,7 @@ function Planner({ year, thisMonth, savedAnnual, monthly, onFlash, onSaved }: Pl
           <button type="button" disabled={busy || over || !hasAnnual} onClick={saveAlloc} className="btn btn-primary btn-sm !w-auto disabled:opacity-40">배정 저장</button>
           <button type="button" disabled={busy} onClick={fillEven} className="btn btn-outline btn-sm !w-auto">고정되지 않은 달에 균등 배분</button>
         </div>
-        <p className="note">지난 달과 예약 · 지급이 시작된 달은 배정을 바꿀 수 없어요. 대비금은 월 배정의 {RESERVE_PERCENT}%로 월 시작 시 확정됩니다. 예약 · 차감 · 복원은 결제 시 자동 반영됩니다.</p>
+        <p className="note">지난 달과 예약 · 지급이 시작된 달은 배정을 바꿀 수 없어요. 대비금은 월 배정의 {contingencyRate != null ? pctText(contingencyRate) : "일부"}로 월 시작 시 확정됩니다. 예약 · 차감 · 복원은 결제 시 자동 반영됩니다.</p>
       </section>
     </div>
   );

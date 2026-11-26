@@ -85,6 +85,24 @@ class CashbackMonthlyLimitConcurrencyTest {
     assertThat(limitRepository.count()).isEqualTo(1);
   }
 
+  // 목적: 행이 없는 상태에서 20건이 한 번에 부분 사용을 시도해도 실제 사용량의 합이 한도와 같고(넘지도 모자라지도 않음)
+  // 사용량도 한도와 같은지 확인한다. 부분 적립에서 이용자의 월 한도를 넘는 적립이 없음을 보장한다.
+  @Test
+  @DisplayName("동시에 부분 사용해도 사용량의 합이 한도를 넘지 않는다")
+  void concurrentConsumeUpTo_neverExceedsLimit() throws Exception {
+    List<Callable<Long>> tasks = new ArrayList<>();
+    for (int i = 0; i < 20; i++) {
+      tasks.add(() -> limitService.consumeUpTo(1L, MONTH, 7_000L, LIMIT));
+    }
+
+    List<Long> granted = runConcurrently(tasks);
+
+    assertThat(granted.stream().mapToLong(Long::longValue).sum()).isEqualTo(LIMIT);
+    assertThat(granted).allMatch(g -> g == 7_000L || g == 1_000L || g == 0L);
+    assertThat(limitService.usedAmount(1L, MONTH)).isEqualTo(LIMIT);
+    assertThat(limitRepository.count()).isEqualTo(1);
+  }
+
   // 목적: 사용과 복원이 섞여 동시에 들어와도 사용량이 음수가 되거나 한도를 넘지 않는지 확인한다. 복원이 먼저 몰려 사용량이 모자라면 그 복원은
   // 정상적으로 거부되므로 결과로 받는다.
   @Test

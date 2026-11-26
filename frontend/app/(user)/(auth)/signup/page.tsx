@@ -79,9 +79,9 @@ export default function SignupPage() {
                  error={show("phone")}/>
           <Field label="비밀번호" type="password" value={password} onChange={setPassword}
                  autoComplete="new-password" maxLength={15} hint="8~15자 · 영문, 숫자, 특수문자(!@#%^&*) 포함"
-                 error={show("password")}/>
+                 error={show("password")} noClipboard/>
           <Field label="비밀번호 확인" type="password" value={confirm} onChange={setConfirm}
-                 autoComplete="new-password" maxLength={15} error={show("confirm")}/>
+                 autoComplete="new-password" maxLength={15} error={show("confirm")} noClipboard/>
           <label className="flex items-center gap-2 py-1 text-[13px]">
             <input type="checkbox" className="h-4 w-4" checked={agree}
                    onChange={(e) => setAgree(e.target.checked)}/> 이용약관 · 개인정보 수집 동의

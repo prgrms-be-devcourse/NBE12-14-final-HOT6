@@ -11,6 +11,7 @@ import java.math.BigDecimal;
  * @param expectedAmount 예상 적립액(원). 적립받을 수 없으면 0
  * @param monthlyLimitRemaining 이번 달 남은 월 적립 한도(원). 이번 결제를 반영하기 전 값이고, 한도를 이미 넘겼으면 0
  * @param exclusionReason 적립받을 수 없는 사유. 받을 수 있으면 {@link CashbackExclusionReason#NONE}
+ * @param limitReduced 남은 월 한도가 모자라서 적립액을 줄였는지. 줄였으면 {@code expectedAmount} 는 줄인 금액이다
  */
 public record CashbackPreviewResponse(
     boolean earnable,
@@ -18,4 +19,5 @@ public record CashbackPreviewResponse(
     BigDecimal appliedRate,
     long expectedAmount,
     long monthlyLimitRemaining,
-    CashbackExclusionReason exclusionReason) {}
+    CashbackExclusionReason exclusionReason,
+    boolean limitReduced) {}

@@ -52,6 +52,18 @@ public interface CashbackMonthlyLimitRepository extends JpaRepository<CashbackMo
       @Param("amount") long amount,
       @Param("limit") long limit);
 
+  /**
+   * 사용량을 읽으면서 그 행을 잠근다(트랜잭션이 끝날 때까지). 남은 한도만큼만 부분으로 확보할 때, 읽고 계산하는 사이에 다른 결제가 끼어들지 못하게 한다.
+   * 행이 없으면 비어 있다.
+   */
+  @Query(
+      value =
+          "select used_amount from cashback_monthly_limit"
+              + " where wallet_id = :walletId and limit_month = :month for update",
+      nativeQuery = true)
+  Optional<Long> findUsedAmountForUpdate(
+      @Param("walletId") Long walletId, @Param("month") LocalDate month);
+
   /** 사용량을 되돌린다. 사용량보다 많이 빼야 하면 0 을 돌려주고 바꾸지 않는다. */
   @Modifying(flushAutomatically = true)
   @Query(

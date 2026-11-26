@@ -3,7 +3,7 @@ import type {
   DailySettlementResponse, MerchantAccountResponse, MonthlySettlementResponse, MonthlySettlementRunResult,
   ReconciliationResultResponse, SettlementRunResult,
   MerchantPaymentsResponse, MerchantRegisterRequest, MerchantRegisterResponse, MerchantResponse, MerchantUpdateRequest, PageResponse, PaymentRequest, PaymentResponse, UserPaymentsResponse,
-  QrCreateResponse, QrScanResponse, QrStatusResponse, WalletResponse,
+  QrCreateResponse, QrLimit, QrScanResponse, QrStatusResponse, WalletResponse,
 } from "@/lib/types";
 
 export const registerMerchant = (body: MerchantRegisterRequest) =>
@@ -65,6 +65,7 @@ export const runReconciliation = (date?: string) =>
 export const getReconciliations = (from: string, to: string) =>
   api<ReconciliationResultResponse[]>(`/admin/settlements/reconciliation?from=${from}&to=${to}`);
 
+export const getQrLimit = () => api<QrLimit>("/qr/limit");
 export const scanQr = (token: string) => api<QrScanResponse>(`/qr/${encodeURIComponent(token)}`);
 
 export const getQrStatus = (token: string) => api<QrStatusResponse>(`/qr/${encodeURIComponent(token)}/status`);
