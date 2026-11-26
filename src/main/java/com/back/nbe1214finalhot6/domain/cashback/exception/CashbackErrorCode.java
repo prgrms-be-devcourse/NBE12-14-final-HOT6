@@ -32,7 +32,10 @@ public enum CashbackErrorCode implements ErrorCode {
   TRANSFER_EXCEEDS_REMAINING("CSH-011", HttpStatus.CONFLICT, "이월 금액이 남은 예산보다 많습니다"),
 
   // 적립 중단
-  BUDGET_ALREADY_STOPPED("CSH-012", HttpStatus.CONFLICT, "이미 중단됐거나 마감된 월 예산입니다");
+  BUDGET_ALREADY_STOPPED("CSH-012", HttpStatus.CONFLICT, "이미 중단됐거나 마감된 월 예산입니다"),
+
+  // 지급 배치
+  PAYOUT_RUN_NOT_FOUND("CSH-013", HttpStatus.NOT_FOUND, "지급 실행 기록을 찾을 수 없습니다");
 
   private final String code;
   private final HttpStatus status;

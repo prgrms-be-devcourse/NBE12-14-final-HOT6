@@ -73,6 +73,32 @@ public interface CashbackEarningRepository extends JpaRepository<CashbackEarning
       @Param("pending") EarningStatus pending,
       @Param("paid") EarningStatus paid);
 
+  /** 해당 상태 적립 건의 건수와 금액 합계. 없으면 0 이다. */
+  @Query(
+      """
+      select count(e) as count, coalesce(sum(e.amount), 0L) as amount
+      from CashbackEarning e where e.status = :status
+      """)
+  PayableTotal totalByStatus(@Param("status") EarningStatus status);
+
+  /** 지급 예정 시각이 지난 적립 예정 건의 건수와 금액 합계. {@link #findPayableIds} 와 같은 조건이다. */
+  @Query(
+      """
+      select count(e) as count, coalesce(sum(e.amount), 0L) as amount
+      from CashbackEarning e where e.status = :pending and e.payableAt <= :now
+      """)
+  PayableTotal totalPayable(
+      @Param("now") LocalDateTime now, @Param("pending") EarningStatus pending);
+
+  /** 아직 시각이 되지 않은 적립 예정 건 중 가장 이른 지급 예정 시각. 없으면 null 이다. */
+  @Query(
+      """
+      select min(e.payableAt) from CashbackEarning e
+      where e.status = :pending and e.payableAt > :now
+      """)
+  LocalDateTime findNextPayableAt(
+      @Param("now") LocalDateTime now, @Param("pending") EarningStatus pending);
+
   /** 지급 완료({@code PAID}) 건만 회수로 바꾼다. 바꾸면 1, 이미 다른 상태면 0 을 돌려준다. */
   @Modifying(flushAutomatically = true)
   @Query(

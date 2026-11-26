@@ -29,6 +29,21 @@ export type CashbackRules = { contingencyRate: number; emergencyRatio: number; n
 export const getCashbackRules = () => api<CashbackRules>(`${BASE}/rules`);
 export const getMonthlyBudget = (year: number, month: number) => api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}`);
 export const getPolicyHistory = (page = 0, size = 10) => api<PageResponse<PolicyHistory>>(`${BASE}/policies/history?page=${page}&size=${size}`);
+// 적립 지급 배치: 대기 현황, 수동 실행, 실행 목록과 상세
+export type PayoutRunResult = { paid: number; skipped: number; failed: number };
+export type PayoutStatusData = {
+  pendingCount: number; pendingAmount: number; dueCount: number; dueAmount: number; nextPayableAt: string | null;
+};
+export type PayoutRunSummary = PayoutRunResult & { runId: number; ranAt: string; trigger: "SCHEDULED" | "MANUAL" };
+export type PayoutItemResult = "PAID" | "SKIPPED" | "FAILED";
+export type PayoutRunDetail = {
+  run: PayoutRunSummary; paidAmount: number;
+  items: { earningId: number; paymentId: number; walletId: number; amount: number; result: PayoutItemResult; errorCode: string | null; errorMessage: string | null }[];
+};
+export const getPayoutStatus = () => api<PayoutStatusData>(`${BASE}/payouts/status`);
+export const getPayoutRuns = (page = 0, size = 20) => api<PageResponse<PayoutRunSummary>>(`${BASE}/payouts/runs?page=${page}&size=${size}`);
+export const getPayoutRun = (runId: number) => api<PayoutRunDetail>(`${BASE}/payouts/runs/${runId}`);
+export const runPayouts = () => api<PayoutRunResult>(`${BASE}/payouts/run`, { method: "POST" });
 export const getForecast = () => api<Forecast>(`${BASE}/forecast`);
 export const reduceRate = (rate: number, effectiveAt: string) =>
   api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt } });

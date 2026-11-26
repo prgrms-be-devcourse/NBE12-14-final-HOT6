@@ -1,11 +1,16 @@
 package com.back.nbe1214finalhot6.domain.cashback.service;
 
+import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.config.CashbackProperties;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PayoutRunResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PayoutItemResult;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PayoutTrigger;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,10 +28,29 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class CashbackPayoutService {
 
+  // 예상하지 못한 오류는 내부 메시지를 기록에 남기지 않는다
+  private static final String UNEXPECTED_ERROR_MESSAGE = "예상하지 못한 오류가 났어요. 서버 로그를 확인해 주세요";
+
   private final CashbackEarningRepository earningRepository;
   private final CashbackPayoutProcessor processor;
   private final CashbackProperties properties;
+  private final CashbackPayoutStatusService statusService;
   private final Clock clock;
+
+  /**
+   * 지급할 수 있는 건을 모두 처리하고 실행 기록을 남긴다. 스케줄러와 운영자 수동 실행이 쓴다. 기록에 실패해도 이미 커밋된 지급은 그대로이므로 결과를 돌려준다.
+   */
+  public PayoutRunResponse runAndRecord(PayoutTrigger trigger) {
+    LocalDateTime startedAt = LocalDateTime.now(clock);
+    List<PayoutItemLog> items = new ArrayList<>();
+    PayoutRunResponse result = execute(properties.scheduler().payoutBatchSize(), items);
+    try {
+      statusService.record(startedAt, trigger, result, items);
+    } catch (RuntimeException e) {
+      log.warn("지급 실행 기록 저장 실패 trigger={} result={}", trigger, result, e);
+    }
+    return result;
+  }
 
   /** 지급할 수 있는 건을 모두 처리한다. */
   public PayoutRunResponse run() {
@@ -38,6 +62,11 @@ public class CashbackPayoutService {
    * 처리한 ID 부터 이어서 읽으므로 실패한 건이 같은 배치에서 다시 잡히지 않는다.
    */
   PayoutRunResponse run(int batchSize) {
+    return execute(batchSize, new ArrayList<>());
+  }
+
+  // 처리한 건마다의 결과를 items 에 담는다
+  private PayoutRunResponse execute(int batchSize, List<PayoutItemLog> items) {
     LocalDateTime now = LocalDateTime.now(clock);
     int paid = 0;
     int skipped = 0;
@@ -55,15 +84,30 @@ public class CashbackPayoutService {
         try {
           if (processor.pay(id) == PayoutOutcome.PAID) {
             paid++;
+            items.add(new PayoutItemLog(id, PayoutItemResult.PAID, null, null));
           } else {
             skipped++;
+            items.add(new PayoutItemLog(id, PayoutItemResult.SKIPPED, null, null));
           }
         } catch (RuntimeException e) {
           failed++;
+          items.add(failure(id, e));
           log.warn("캐시백 지급 실패 earningId={}: {}", id, e.getMessage());
         }
       }
     }
     return new PayoutRunResponse(paid, skipped, failed);
+  }
+
+  private static PayoutItemLog failure(Long earningId, RuntimeException e) {
+    if (e instanceof BusinessException business) {
+      return new PayoutItemLog(
+          earningId, PayoutItemResult.FAILED, business.getErrorCode().getCode(), business.getMessage());
+    }
+    return new PayoutItemLog(
+        earningId,
+        PayoutItemResult.FAILED,
+        CommonErrorCode.INTERNAL_SERVER_ERROR.getCode(),
+        UNEXPECTED_ERROR_MESSAGE);
   }
 }
