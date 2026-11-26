@@ -1,4 +1,5 @@
 import { api, ApiError } from "@/lib/api";
+import type { Notice } from "@/lib/cashbackApi";
 import type { PageResponse } from "@/lib/types";
 
 // 운영자용 캐시백 API (/api/admin/cashback/**)
@@ -49,10 +50,28 @@ export type SettingKey = "CASHBACK_USER_MONTHLY_LIMIT" | "WALLET_HOLDING_LIMIT" 
 export type OperatorSetting = {
   key: SettingKey; description: string; value: number; source: "DEFAULT" | "OPERATOR";
   defaultValue: number; minValue: number; hardMax: number | null; updatedAt: string | null;
+  scheduled?: { value: number; reset: boolean; effectiveDate: string; noticeId: number | null } | null; // 대기 중인 예약 (#265)
 };
 export const getSettings = () => api<OperatorSetting[]>("/admin/settings");
-export const updateSetting = (key: SettingKey, value: number) => api<OperatorSetting>(`/admin/settings/${key}`, { method: "PUT", body: { value } });
-export const resetSetting = (key: SettingKey) => api<OperatorSetting>(`/admin/settings/${key}`, { method: "DELETE" });
+// 한도를 바꾸면서 알리는 공지
+export type SettingNotice = { title: string; content: string; showOnHome: boolean; homeUntil: string | null };
+export const updateSetting = (key: SettingKey, value: number, notice: SettingNotice) => api<OperatorSetting>(`/admin/settings/${key}`, { method: "PUT", body: { value, notice } });
+export const resetSetting = (key: SettingKey, notice: SettingNotice) => api<OperatorSetting>(`/admin/settings/${key}`, { method: "DELETE", body: { notice } });
+// 적용일 00:00 부터 새 값을 쓴다. value 가 null 이면 기본값으로 되돌리는 예약
+export const scheduleSetting = (key: SettingKey, body: { value: number | null; effectiveDate: string; notice: SettingNotice }) => api<OperatorSetting>(`/admin/settings/${key}/schedule`, { method: "POST", body });
+export const cancelSchedule = (key: SettingKey) => api<OperatorSetting>(`/admin/settings/${key}/schedule`, { method: "DELETE" });
+// 한도 변경 이력 (최근순)
+export type SettingHistory = {
+  historyId: number; key: SettingKey; description: string; previousValue: number; value: number; reset: boolean; changedAt: string;
+};
+export const getSettingHistory = (page = 0, size = 10) => api<PageResponse<SettingHistory>>(`/admin/settings/history?page=${page}&size=${size}`);
+// 공지 관리: 거둔 공지를 포함한 전체 목록과 수정
+export type AdminNotice = { notice: Notice; status: "PUBLISHED" | "WITHDRAWN"; showOnHome: boolean; homeUntil: string | null };
+export const getAdminNotices = (page = 0, size = 20) => api<PageResponse<AdminNotice>>(`/admin/notices?page=${page}&size=${size}`);
+export const updateNotice = (noticeId: number, body: SettingNotice) => api<AdminNotice>(`/admin/notices/${noticeId}`, { method: "PATCH", body });
+// 요율 구간 전체 (지금 적용 중인 구간과 예정 구간을 고른다)
+export type Policy = { policyId: number; rate: number; startsAt: string; endsAt: string | null };
+export const getPolicies = () => api<Policy[]>(`${BASE}/policies`);
 export const getForecast = () => api<Forecast>(`${BASE}/forecast`);
 export const reduceRate = (rate: number, effectiveAt: string) =>
   api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt } });
