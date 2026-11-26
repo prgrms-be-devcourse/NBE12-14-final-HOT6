@@ -45,5 +45,40 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        // 성능 측정(@Tag("perf"))은 느리고 시간에 따라 결과가 흔들려서 일반 테스트에서 뺀다. 측정은 perfTest 로만 돌린다
+        excludeTags 'perf'
+    }
+}
+
+// 성능 측정 전용: ./gradlew perfTest (특정 시나리오만: ./gradlew perfTest --tests '*S1*')
+// 결과 JSON 은 docs/perf/data/ 에 쌓이고, 측정한 코드의 커밋 해시를 함께 남긴다
+def gitOutput = { List<String> args ->
+    providers.exec {
+        commandLine(['git'] + args)
+        ignoreExitValue = true
+    }.standardOutput.asText.map { it.trim() }
+}
+
+tasks.register('perfTest', Test) {
+    description = '결제 동시성 성능 측정(@Tag("perf"))만 실행한다'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'perf'
+    }
+    maxParallelForks = 1 // 측정끼리 DB·CPU를 나눠 쓰지 않게 한 번에 하나씩
+    outputs.upToDateWhen { false } // 코드가 그대로여도 매번 다시 측정한다
+    testLogging {
+        showStandardStreams = true // 시나리오별 요약 줄을 콘솔에서 바로 본다
+    }
+    systemProperty 'perf.outputDir', file('docs/perf/data').absolutePath
+    // 측정 조건을 바꿔 돌릴 때: -PperfThreads=2,10 -PperfRounds=1 -PperfVariant=no-wallet-lock(보호 장치를 뺀 실험 이름)
+    systemProperty 'perf.threads', findProperty('perfThreads') ?: '2,10,50'
+    systemProperty 'perf.rounds', findProperty('perfRounds') ?: '5'
+    systemProperty 'perf.variant', findProperty('perfVariant') ?: ''
+    systemProperty 'perf.commit', gitOutput(['rev-parse', '--short', 'HEAD']).get()
+    // 커밋하지 않은 수정이 있으면 측정한 코드가 커밋과 다를 수 있어 표시해 둔다
+    systemProperty 'perf.dirty', String.valueOf(!gitOutput(['status', '--porcelain', '--', 'src']).get().isEmpty())
 }
