@@ -2,7 +2,7 @@ import { api } from "@/lib/api";
 import type {
   DailySettlementResponse, MerchantAccountResponse, MonthlySettlementResponse, MonthlySettlementRunResult,
   ReconciliationResultResponse, SettlementRunResult,
-  MerchantPaymentsResponse, MerchantRegisterRequest, MerchantRegisterResponse, MerchantResponse, MerchantUpdateRequest, PageResponse, PaymentRequest, PaymentResponse, UserPaymentsResponse,
+  MerchantPaymentItem, MerchantPaymentsResponse, MerchantRegisterRequest, MerchantRegisterResponse, MerchantResponse, MerchantUpdateRequest, PageResponse, PaymentRequest, PaymentResponse, UserPaymentsResponse,
   QrCreateResponse, QrLimit, QrScanResponse, QrStatusResponse, WalletResponse,
 } from "@/lib/types";
 
@@ -37,6 +37,9 @@ export const getMyPayments = (status: "COMPLETED" | "CANCELED" | undefined, page
 // 점주의 결제 내역과 매출. from·to 는 yyyy-MM-dd(양 끝 포함, 최대 31일)이고 가맹점은 토큰의 회원으로 찾는다
 export const getMerchantPayments = (from: string, to: string, page = 0, size = 10) =>
   api<MerchantPaymentsResponse>(`/merchants/me/payments?from=${from}&to=${to}&page=${page}&size=${size}`);
+
+// 결제번호로 내 가맹점의 결제 한 건(영수증)을 조회한다. 없거나 다른 가맹점의 결제면 PAY-003
+export const getMerchantPayment = (paymentId: number) => api<MerchantPaymentItem>(`/merchants/me/payments/${paymentId}`);
 
 export const createDynamicQr = (amount: number) =>
   api<QrCreateResponse>("/merchants/me/qr/dynamic", { method: "POST", body: { amount } });
