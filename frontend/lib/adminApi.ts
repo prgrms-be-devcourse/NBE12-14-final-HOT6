@@ -44,6 +44,15 @@ export const getPayoutStatus = () => api<PayoutStatusData>(`${BASE}/payouts/stat
 export const getPayoutRuns = (page = 0, size = 20) => api<PageResponse<PayoutRunSummary>>(`${BASE}/payouts/runs?page=${page}&size=${size}`);
 export const getPayoutRun = (runId: number) => api<PayoutRunDetail>(`${BASE}/payouts/runs/${runId}`);
 export const runPayouts = () => api<PayoutRunResult>(`${BASE}/payouts/run`, { method: "POST" });
+// 운영자 설정 한도 (월 적립 한도, 지갑 보유·월 충전 한도). 범위와 기본값은 서버가 알려 준다
+export type SettingKey = "CASHBACK_USER_MONTHLY_LIMIT" | "WALLET_HOLDING_LIMIT" | "WALLET_MONTHLY_CHARGE_LIMIT";
+export type OperatorSetting = {
+  key: SettingKey; description: string; value: number; source: "DEFAULT" | "OPERATOR";
+  defaultValue: number; minValue: number; hardMax: number | null; updatedAt: string | null;
+};
+export const getSettings = () => api<OperatorSetting[]>("/admin/settings");
+export const updateSetting = (key: SettingKey, value: number) => api<OperatorSetting>(`/admin/settings/${key}`, { method: "PUT", body: { value } });
+export const resetSetting = (key: SettingKey) => api<OperatorSetting>(`/admin/settings/${key}`, { method: "DELETE" });
 export const getForecast = () => api<Forecast>(`${BASE}/forecast`);
 export const reduceRate = (rate: number, effectiveAt: string) =>
   api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt } });
