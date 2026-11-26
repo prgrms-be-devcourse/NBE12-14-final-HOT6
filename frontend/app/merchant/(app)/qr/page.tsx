@@ -6,9 +6,9 @@ import Countdown from "@/components/Countdown";
 import Header from "@/components/Header";
 import { ApiError } from "@/lib/api";
 import { saveCtx } from "@/lib/devContext";
-import { createDynamicQr, getQrStatus, secondsUntil } from "@/lib/endpoints";
-import { LIMITS } from "@/lib/limits";
+import { createDynamicQr, getQrLimit, getQrStatus, secondsUntil } from "@/lib/endpoints";
 import { won } from "@/lib/format";
+import { useLoad } from "@/lib/useLoad";
 import type { QrCreateResponse, QrStatus } from "@/lib/types";
 
 const STATUS_LABEL: Record<QrStatus, string> = { WAITING: "대기중", USED: "결제완료", EXPIRED: "만료" };
@@ -40,7 +40,7 @@ export default function MerchantQrPage() {
       const res = await createDynamicQr(amount);
       setQr(res);
       setStatus("WAITING");
-      saveCtx({ qrToken: res.token });
+      saveCtx({ merchantQrToken: res.token });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "QR을 만들지 못했어요");
     } finally {
@@ -58,7 +58,9 @@ export default function MerchantQrPage() {
     }
   };
 
-  const over = amount > LIMITS.perPayment;
+  // 한도는 서버가 정한다. 아직 못 불러왔으면 검사하지 않고, 넘기면 서버가 거절한다
+  const maxAmount = useLoad(() => getQrLimit(), []).data?.maxAmount;
+  const over = maxAmount != null && amount > maxAmount;
 
   return (
     <>
@@ -75,7 +77,7 @@ export default function MerchantQrPage() {
           {[1000, 5000, 10000].map((v) => <button key={v} type="button" onClick={() => setAmount((a) => a + v)} className="chip">+{v.toLocaleString("ko-KR")}</button>)}
           <button type="button" onClick={() => setAmount(0)} className="chip">지우기</button>
         </div>
-        {over && <p role="alert" className="text-[13px] font-medium text-red-600">결제 한도({won(LIMITS.perPayment)})를 넘는 금액은 QR을 만들 수 없어요</p>}
+        {over && <p role="alert" className="text-[13px] font-medium text-red-600">결제 한도({won(maxAmount ?? 0)})를 넘는 금액은 QR을 만들 수 없어요</p>}
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">{error}</p>}
         <button type="button" onClick={create} disabled={busy || amount === 0 || over} className="btn btn-primary disabled:opacity-40">{busy ? "만드는 중…" : "QR 생성"}</button>
 

@@ -1,11 +1,12 @@
 import { signed, won } from "@/lib/format";
 
-type Kind = "in" | "out" | "cashback" | "wait" | "plain";
+type Kind = "in" | "out" | "cashback" | "cashbackDeep" | "wait" | "plain";
 
 const COLOR: Record<Kind, string> = {
   in: "amt-in",
   out: "amt-out",
   cashback: "amt-cb",
+  cashbackDeep: "text-emerald-800", // 홈 카드의 캐시백 잔액(짙은 초록)
   wait: "amt-wait",
   plain: "",
 };

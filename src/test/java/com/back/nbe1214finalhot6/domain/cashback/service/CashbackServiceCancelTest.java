@@ -129,6 +129,22 @@ class CashbackServiceCancelTest {
     assertThat(annualReserved()).isZero();
   }
 
+  // 목적: 남은 한도로 줄어든 부분 적립(1,700,000 × 3% = 51,000 → 50,000)을 취소하면 적립 건의 금액만큼 한도와 예산이 돌아오는지 확인한다.
+  @Test
+  @DisplayName("부분 적립을 취소하면 줄어든 금액만큼 월 한도와 예산이 돌아온다")
+  void cancel_partialEarning_restoresReducedAmount() {
+    reserve(1L, 1_700_000L, NOV_AT);
+    assertThat(limitService.usedAmount(WALLET, NOV)).isEqualTo(50_000L);
+    assertThat(monthlyReserved(11)).isEqualTo(50_000L);
+
+    service.cancel(1L);
+
+    assertThat(earning(1L).getStatus()).isEqualTo(EarningStatus.CANCELED);
+    assertThat(limitService.usedAmount(WALLET, NOV)).isZero();
+    assertThat(monthlyReserved(11)).isZero();
+    assertThat(annualReserved()).isZero();
+  }
+
   // 목적: 같은 결제를 두 번 취소해도 한 번만 되돌리는지 확인한다. 같은 트랜잭션에서 다시 부르면 컨텍스트의 낡은 엔티티(PENDING)를 읽게 되므로 그
   // 경로도 함께 확인한다.
   @Test

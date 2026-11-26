@@ -13,7 +13,8 @@ import { paymentErrorText } from "@/lib/paymentErrors";
 import { saveCtx } from "@/lib/devContext";
 import { clearPending, loadPending, type PendingPayment } from "@/lib/pendingPayment";
 import { dropPin, peekPin } from "@/lib/pinStore";
-import { REASON_TEXT, pctText, type ExclusionCode } from "@/lib/cashbackApi";
+import { getPayoutRules, REASON_TEXT, pctText, type ExclusionCode } from "@/lib/cashbackApi";
+import { useLoad } from "@/lib/useLoad";
 import type { PaymentResponse } from "@/lib/types";
 
 type State =
@@ -42,6 +43,7 @@ function ReceiptBody() {
   const inFlight = useRef(false);
   const alive = useRef(true);
   const pending = useRef<PendingPayment | null>(null);
+  const payoutDelayDays = useLoad(() => getPayoutRules(), []).data?.payoutDelayDays; // 지급 예정일 안내에 쓰는 서버 설정값
 
   useEffect(() => {
     alive.current = true;
@@ -169,7 +171,7 @@ function ReceiptBody() {
 
   const rows: [string, string][] = [
     ["적용요율", r.appliedRate != null ? pctText(r.appliedRate) : "-"],
-    ["지급 예정일", r.cashbackPayableAt ? `${r.cashbackPayableAt.slice(0, 10)} (결제 다음 날부터 3일 뒤)` : "-"],
+    ["지급 예정일", r.cashbackPayableAt ? `${r.cashbackPayableAt.slice(0, 10)}${payoutDelayDays != null ? ` (결제 다음 날부터 ${payoutDelayDays}일 뒤)` : ""}` : "-"],
     ["결제 시각", fmt(r.completedAt)],
     ...(r.status === "CANCELED" ? ([["취소 시각", fmt(r.canceledAt)]] as [string, string][]) : []),
   ];

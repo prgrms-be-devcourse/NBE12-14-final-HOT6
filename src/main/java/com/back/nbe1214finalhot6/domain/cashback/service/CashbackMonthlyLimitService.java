@@ -42,6 +42,36 @@ public class CashbackMonthlyLimitService {
   }
 
   /**
+   * 적립액만큼, 남은 한도가 모자라면 남은 한도만큼 이번 달 한도를 사용하고 실제로 사용한 금액을 돌려준다. 남은 한도가 없으면 아무것도 바꾸지 않고 0 을
+   * 돌려준다(예외가 아니다). 호출한 쪽의 트랜잭션에 참여한다.
+   *
+   * <p>그 행을 잠그고 읽은 사용량으로 확보량을 정한 뒤 늘린다. 같은 이용자의 같은 달 결제는 이 잠금에서 줄을 서므로 확보량의 합이 한도를 넘지 않는다.
+   * 잠금은 호출한 쪽 트랜잭션이 끝날 때 풀린다.
+   *
+   * @param limit 지금 적용되는 월 한도(원)
+   * @return 실제로 사용한 금액(0 이상, {@code amount} 이하)
+   * @throws BusinessException 금액이 0 이하일 때(CSH-007)
+   */
+  @Transactional
+  public long consumeUpTo(Long walletId, YearMonth month, long amount, long limit) {
+    validateAmount(amount);
+    var firstDay = month.atDay(1);
+    long used =
+        limitRepository
+            .findUsedAmountForUpdate(walletId, firstDay)
+            .orElseGet(
+                () -> {
+                  limitRepository.insertIfAbsent(walletId, firstDay);
+                  return limitRepository.findUsedAmountForUpdate(walletId, firstDay).orElse(0L);
+                });
+    long granted = Math.min(amount, Math.max(0L, limit - used));
+    if (granted > 0) {
+      limitRepository.consume(walletId, firstDay, granted, limit);
+    }
+    return granted;
+  }
+
+  /**
    * 사용했던 한도를 되돌린다. 결제 취소나 예산 확보 실패 때 호출하며, 호출한 쪽의 트랜잭션에 참여한다. 취소는 결제한 달의 행에서 되돌리므로 호출한 쪽이
    * 그 달을 넘긴다.
    *

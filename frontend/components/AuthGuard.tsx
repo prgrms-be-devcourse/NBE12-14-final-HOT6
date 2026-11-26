@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { type Audience, canEnter, getSession, LOGIN_PATH, parseSession, readRawSession } from "@/lib/auth";
 
@@ -28,7 +28,11 @@ export default function AuthGuard({ audience, publicPaths = [], children }: { au
     if (!current || !canEnter(current.role, audience)) router.replace(LOGIN_PATH[audience]);
   }, [mounted, isPublic, audience, pathname, router]);
 
+  // Next.js(cacheComponents)는 화면을 벗어나도 숨겨 두어 상태가 남는다. 로그인한 사람이 바뀌면 이전 사용자의 화면 상태
+  // (QR, 오류 문구 등)가 보이지 않도록 로그인·로그아웃 때마다 아래 화면을 새로 만든다.
+  const sessionKey = mounted && session ? `${session.userId}-${session.expiresAt}` : "none";
+
   // 공개 경로는 로그인 여부와 상관없으므로 서버에서도 바로 그린다. 서버에서 null 이면 그 페이지가 렌더링에서 빠져
   // Next.js 가 즉시 이동(instant navigation)을 검증하지 못한다. 보호된 경로만 세션 확인 뒤에 보여 준다.
-  return isPublic || (mounted && allowed) ? <>{children}</> : null;
+  return isPublic || (mounted && allowed) ? <Fragment key={sessionKey}>{children}</Fragment> : null;
 }

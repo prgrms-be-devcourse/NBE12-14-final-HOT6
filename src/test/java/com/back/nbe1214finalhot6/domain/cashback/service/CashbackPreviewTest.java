@@ -109,17 +109,29 @@ class CashbackPreviewTest {
     CashbackPreviewResponse fits = preview(true, 16_667L); // 500.01 → 500
     assertThat(fits.expectedAmount()).isEqualTo(500L);
     assertThat(fits.earnable()).isTrue();
-    CashbackPreviewResponse over = preview(true, 16_700L); // 501
-    assertThat(over.earnable()).isFalse();
-    assertThat(over.exclusionReason()).isEqualTo(CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED);
+    assertThat(exact.limitReduced()).isFalse();
+    assertThat(fits.limitReduced()).isFalse();
+    CashbackPreviewResponse over = preview(true, 16_700L); // 501 → 남은 한도 500 으로 줄인다
+    assertThat(over.earnable()).isTrue();
+    assertThat(over.limitReduced()).isTrue();
+    assertThat(over.expectedAmount()).isEqualTo(500L);
     assertThat(over.monthlyLimitRemaining()).isEqualTo(500L);
-    assertThat(over.expectedAmount()).isZero();
 
-    reserve(1L, true, 10_000L); // 300 사용
-    assertThat(preview(true, 10_000L).monthlyLimitRemaining()).isEqualTo(200L);
-    assertThat(preview(true, 10_000L).exclusionReason())
-        .isEqualTo(CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED);
-    assertThat(reserve(2L, true, 10_000L).exclusionReason())
+    reserve(1L, true, 10_000L); // 300 사용, 남은 한도 200
+    CashbackPreviewResponse reduced = preview(true, 10_000L); // 300 → 200
+    assertThat(reduced.monthlyLimitRemaining()).isEqualTo(200L);
+    assertThat(reduced.earnable()).isTrue();
+    assertThat(reduced.limitReduced()).isTrue();
+    assertThat(reduced.expectedAmount()).isEqualTo(200L);
+    assertThat(reserve(2L, true, 10_000L).earnedAmount()).isEqualTo(200L); // 실제 적립도 같다
+
+    // 한도를 다 쓰면 제외
+    CashbackPreviewResponse none = preview(true, 10_000L);
+    assertThat(none.earnable()).isFalse();
+    assertThat(none.exclusionReason()).isEqualTo(CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED);
+    assertThat(none.expectedAmount()).isZero();
+    assertThat(none.limitReduced()).isFalse();
+    assertThat(reserve(3L, true, 10_000L).exclusionReason())
         .isEqualTo(CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED);
 
     settingAdminService.put(SettingKey.CASHBACK_USER_MONTHLY_LIMIT.name(), 100L); // 사용량(300)보다 낮춤
