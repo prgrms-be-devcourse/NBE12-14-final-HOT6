@@ -38,7 +38,11 @@ public class OpenApiConfig {
 
   /** 토큰 없이 부를 수 있는 API. {@link SecurityConfig} 의 "누구나" 규칙과 같아야 한다. */
   private static final Set<String> PUBLIC_OPERATIONS =
-      Set.of("POST /api/auth/login", "POST /api/users/signup");
+      Set.of(
+          "POST /api/auth/login",
+          "POST /api/auth/owner/login",
+          "POST /api/users/signup",
+          "POST /api/owners/signup");
 
   /** 실패했을 때의 응답 본문. 성공 응답과 같은 틀({@code success/code/message/data})이다. */
   @Schema(name = "ErrorResponse", description = "실패 응답. 성공 응답과 같은 틀이고 data 는 null 이다")
@@ -60,7 +64,7 @@ public class OpenApiConfig {
                     """
                     캐시백 QR 결제 서비스 DevPay 의 API 명세입니다.
 
-                    **인증**: `POST /api/auth/login` 으로 받은 `accessToken` 을 오른쪽 위 **Authorize** 에 넣으면 이후 요청에 자동으로 붙습니다.
+                    **인증**: `POST /api/auth/login`(이용자·운영자)이나 `POST /api/auth/owner/login`(점주)으로 받은 `accessToken` 을 오른쪽 위 **Authorize** 에 넣으면 이후 요청에 자동으로 붙습니다.
                     역할은 이용자(USER), 점주(OWNER, 이용자 기능 포함), 운영자(ADMIN, 운영 전용)입니다.
 
                     **응답**: 성공과 실패 모두 `{ success, code, message, data }` 로 감싸 옵니다. 실패하면 `success=false` 이고 `code` 가 오류 종류입니다.

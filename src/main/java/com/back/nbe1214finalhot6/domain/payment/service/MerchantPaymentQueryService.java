@@ -5,6 +5,7 @@ import com.back.nbe1214finalhot6.common.response.PageResponse;
 import com.back.nbe1214finalhot6.domain.payment.dto.MerchantPaymentItem;
 import com.back.nbe1214finalhot6.domain.payment.dto.MerchantPaymentsResponse;
 import com.back.nbe1214finalhot6.domain.payment.dto.SalesTotals;
+import com.back.nbe1214finalhot6.domain.payment.entity.Payment;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.exception.PaymentErrorCode;
 import com.back.nbe1214finalhot6.domain.payment.repository.PaymentRepository;
@@ -85,5 +86,20 @@ public class MerchantPaymentQueryService {
         cancels.amount(),
         payments.amount() - cancels.amount(),
         items);
+  }
+
+  /**
+   * 결제 번호로 내 가맹점의 결제 한 건을 돌려준다. 목록과 같이 완료·취소된 결제만 조회한다.
+   *
+   * <p>없는 번호, 다른 가맹점의 결제, 처리 중·실패한 결제는 모두 PAY-003 으로 똑같이 응답해서 다른 가맹점의 결제가 있는지 알려 주지 않는다.
+   */
+  @Transactional(readOnly = true)
+  public MerchantPaymentItem getOne(Long merchantId, Long paymentId) {
+    Payment payment =
+        paymentRepository
+            .findByIdAndMerchantId(paymentId, merchantId)
+            .filter(p -> SALES_STATUSES.contains(p.getStatus()))
+            .orElseThrow(() -> new BusinessException(PaymentErrorCode.PAYMENT_NOT_FOUND));
+    return MerchantPaymentItem.from(payment);
   }
 }

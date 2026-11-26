@@ -19,7 +19,7 @@ import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
 import com.back.nbe1214finalhot6.domain.wallet.service.WalletOpeningService;
-import java.util.Optional;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,15 +41,15 @@ class AuthServiceLoginTest {
   private final LoginRequest request = new LoginRequest("user@example.com", "Password1!");
 
   @Test
-  @DisplayName("이메일과 비밀번호가 맞으면 회원 ID 와 역할로 토큰을 발급한다")
+  @DisplayName("점주 로그인은 이메일과 비밀번호가 맞으면 회원 ID 와 역할로 토큰을 발급한다")
   void login_success() {
     User user = user(7L, UserRole.OWNER, UserStatus.ACTIVE);
-    given(userRepository.findByEmail("user@example.com")).willReturn(Optional.of(user));
+    given(userRepository.findAllByEmail("user@example.com")).willReturn(List.of(user));
     given(passwordEncoder.matches("Password1!", "hashed-pw")).willReturn(true);
     given(jwtProvider.createAccessToken(7L, UserRole.OWNER)).willReturn("access-token");
     given(jwtProvider.accessTokenExpiresInSeconds()).willReturn(1800L);
 
-    LoginResponse response = authService.login(request);
+    LoginResponse response = authService.loginOwner(request);
 
     assertThat(response.accessToken()).isEqualTo("access-token");
     assertThat(response.tokenType()).isEqualTo("Bearer");
@@ -60,7 +60,7 @@ class AuthServiceLoginTest {
   @Test
   @DisplayName("없는 이메일이면 LOGIN_FAILED 이고, 그래도 비밀번호 비교는 한 번 한다")
   void login_unknownEmail() {
-    given(userRepository.findByEmail("user@example.com")).willReturn(Optional.empty());
+    given(userRepository.findAllByEmail("user@example.com")).willReturn(List.of());
 
     assertLoginFailed(request);
 
@@ -72,7 +72,7 @@ class AuthServiceLoginTest {
   @DisplayName("비밀번호가 틀리면 LOGIN_FAILED 이고 토큰을 발급하지 않는다")
   void login_wrongPassword() {
     User user = user(7L, UserRole.USER, UserStatus.ACTIVE);
-    given(userRepository.findByEmail("user@example.com")).willReturn(Optional.of(user));
+    given(userRepository.findAllByEmail("user@example.com")).willReturn(List.of(user));
     given(passwordEncoder.matches("Password1!", "hashed-pw")).willReturn(false);
 
     assertLoginFailed(request);
@@ -85,7 +85,7 @@ class AuthServiceLoginTest {
   @DisplayName("탈퇴한 회원이 비밀번호까지 맞으면 WITHDRAWN_USER 로 안내한다")
   void login_withdrawnUser() {
     User user = user(7L, UserRole.USER, UserStatus.WITHDRAWN);
-    given(userRepository.findByEmail("user@example.com")).willReturn(Optional.of(user));
+    given(userRepository.findAllByEmail("user@example.com")).willReturn(List.of(user));
     given(passwordEncoder.matches("Password1!", "hashed-pw")).willReturn(true);
 
     assertLoginFailed(request, AuthErrorCode.WITHDRAWN_USER);
@@ -98,7 +98,7 @@ class AuthServiceLoginTest {
   @DisplayName("탈퇴한 회원이어도 비밀번호가 틀리면 LOGIN_FAILED 이다(탈퇴 여부를 알려 주지 않는다)")
   void login_withdrawnUserWithWrongPassword() {
     User user = user(7L, UserRole.USER, UserStatus.WITHDRAWN);
-    given(userRepository.findByEmail("user@example.com")).willReturn(Optional.of(user));
+    given(userRepository.findAllByEmail("user@example.com")).willReturn(List.of(user));
     given(passwordEncoder.matches("Password1!", "hashed-pw")).willReturn(false);
 
     assertLoginFailed(request);

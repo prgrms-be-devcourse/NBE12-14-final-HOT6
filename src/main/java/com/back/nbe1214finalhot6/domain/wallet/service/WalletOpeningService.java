@@ -13,7 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 회원의 모의계좌·가입 보너스 원장·지갑을 만듦. 가입 트랜잭션에 참여함. */
+/** 가입할 때 모의계좌를 만듦. 이용자는 가입 보너스 원장과 지갑까지 만들고, 점주는 계좌만 만듦. 가입 트랜잭션에 참여함. */
 @Service
 @RequiredArgsConstructor
 public class WalletOpeningService {
@@ -29,7 +29,7 @@ public class WalletOpeningService {
   public void open(Long userId) {
     LocalDateTime now = LocalDateTime.now(clock);
 
-    // 1. 모의계좌 생성(초기 잔액 200만원)
+    // 1. 모의계좌 생성(초기 잔액 500만원)
     Account account = accountRepository.save(Account.create(userId, now));
 
     // 2. 계좌 원장에 가입 보너스 기록
@@ -44,5 +44,11 @@ public class WalletOpeningService {
 
     // 3. 지갑 생성(잔액 0, ACTIVE). 지갑에 돈이 들어가는 길은 충전(W3)뿐임
     walletRepository.save(Wallet.create(userId, now));
+  }
+
+  // 점주는 결제·충전을 하지 않으므로 지갑 없이 잔액 0원인 개인 모의계좌만 만듦
+  @Transactional
+  public void openOwnerAccount(Long userId) {
+    accountRepository.save(Account.createEmpty(userId, LocalDateTime.now(clock)));
   }
 }

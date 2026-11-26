@@ -3,7 +3,6 @@
 export type DevContext = {
   qrToken?: string; // 이용자가 마지막으로 조회한 QR
   merchantQrToken?: string; // 점주가 마지막으로 만든 QR. 이용자 결제 화면에 미리 입력되지 않도록 따로 둔다
-  phone?: string;
   merchantName?: string; merchantAddress?: string; category?: string; eligible?: boolean; lat?: number; lng?: number;
 };
 

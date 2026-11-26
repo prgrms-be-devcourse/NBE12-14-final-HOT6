@@ -9,9 +9,16 @@ spring:
     url: jdbc:postgresql://localhost:5432/devpay
     username: devpay
     password: ${DB_PASSWORD:devpay1234}
+  sql:
+    init:
+      mode: always
+      # schema.sql 의 DO 블록 안에 세미콜론이 있어 구분자를 바꾼다
+      separator: "^^"
   jpa:
     hibernate:
       ddl-auto: update
+    # JPA 가 테이블을 만든 뒤에 schema.sql 을 실행한다(부분 유니크 인덱스)
+    defer-datasource-initialization: true
     show-sql: true
     properties:
       hibernate:

@@ -32,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class QrServiceTest {
 
+  private long nextOwnerId = 5_000L;
+
   @Autowired private QrService qrService;
   @Autowired private QrCodeRepository qrCodeRepository;
   @Autowired private MerchantRepository merchantRepository;
@@ -340,7 +342,12 @@ class QrServiceTest {
   }
 
   private QrCode saveQr() {
-    return qrCodeRepository.save(QrCode.createDynamic(1L, 1000L, LocalDateTime.now(clock)));
+    // 결제 대상 조회가 가맹점 상태를 확인하므로 가맹점도 함께 저장한다(점주당 하나라 번호를 달리한다)
+    Long merchantId =
+        merchantRepository
+            .save(Merchant.create(nextOwnerId++, "QR 테스트 가맹점", "인천광역시 남동구 1", true))
+            .getId();
+    return qrCodeRepository.save(QrCode.createDynamic(merchantId, 1000L, LocalDateTime.now(clock)));
   }
 
   private Long saveMerchant() {

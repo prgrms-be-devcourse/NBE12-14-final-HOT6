@@ -2,6 +2,8 @@ package com.back.nbe1214finalhot6.domain.reconciliation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantClosureDeduction;
+import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantClosureDeductionRepository;
 import com.back.nbe1214finalhot6.domain.payment.entity.Payment;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.repository.PaymentRepository;
@@ -51,6 +53,7 @@ class ReconciliationCheckTest {
   @Autowired MonthlySettlementService monthlyService;
   @Autowired DailySettlementRepository dailyRepository;
   @Autowired MonthlySettlementRepository monthlyRepository;
+  @Autowired MerchantClosureDeductionRepository deductionRepository;
   @Autowired PaymentRepository paymentRepository;
   @Autowired MerchantWalletService walletService;
   @Autowired MerchantWalletRepository walletRepository;
@@ -60,6 +63,7 @@ class ReconciliationCheckTest {
   @AfterEach
   void cleanUp() {
     resultRepository.deleteAll();
+    deductionRepository.deleteAll();
     transactionRepository.deleteAll();
     monthlyRepository.deleteAll();
     dailyRepository.deleteAll();
@@ -189,6 +193,46 @@ class ReconciliationCheckTest {
     ReconciliationResult result = resultOf(ReconciliationType.MONTHLY_PAYOUT);
 
     assertThat(result.getStatus()).isEqualTo(ReconciliationStatus.MATCHED);
+  }
+
+  @Test
+  @DisplayName("해지 정산이 부족분을 차감한 달은 확정액의 합에서 차감액을 뺀 값과 지급액이 같으면 일치한다")
+  void 해지_차감한_달_일치() {
+    walletService.createFor(MERCHANT);
+    saveDaily(MERCHANT, LocalDate.of(2026, 10, 5), 30_000L);
+    deductionRepository.save(
+        MerchantClosureDeduction.create(MERCHANT, OCTOBER_FIRST, 10_000L, NOW));
+    MonthlySettlement settlement = MonthlySettlement.create(MERCHANT, OCTOBER_FIRST, 20_000L, NOW);
+    monthlyRepository.save(settlement);
+
+    ReconciliationResult result = resultOf(ReconciliationType.MONTHLY_PAYOUT);
+
+    assertThat(result.getStatus()).isEqualTo(ReconciliationStatus.MATCHED);
+  }
+
+  @Test
+  @DisplayName("전액 차감되어 월 정산 건이 없는 달은 누락으로 보지 않는다")
+  void 해지_전액_차감_건없음_일치() {
+    saveDaily(MERCHANT, LocalDate.of(2026, 10, 5), 5_000L);
+    deductionRepository.save(MerchantClosureDeduction.create(MERCHANT, OCTOBER_FIRST, 5_000L, NOW));
+
+    ReconciliationResult result = resultOf(ReconciliationType.MONTHLY_PAYOUT);
+
+    assertThat(result.getStatus()).isEqualTo(ReconciliationStatus.MATCHED);
+  }
+
+  @Test
+  @DisplayName("차감액을 남겼는데 지급액이 확정액의 합 그대로이면 월 지급 대사에서 불일치로 잡힌다")
+  void 해지_차감액과_지급액_불일치() {
+    saveDaily(MERCHANT, LocalDate.of(2026, 10, 5), 30_000L);
+    deductionRepository.save(
+        MerchantClosureDeduction.create(MERCHANT, OCTOBER_FIRST, 10_000L, NOW));
+    monthlyRepository.save(MonthlySettlement.create(MERCHANT, OCTOBER_FIRST, 30_000L, NOW));
+
+    ReconciliationResult result = resultOf(ReconciliationType.MONTHLY_PAYOUT);
+
+    assertThat(result.getStatus()).isEqualTo(ReconciliationStatus.MISMATCHED);
+    assertThat(result.getMismatchRefs()).isEqualTo("merchantId=1:AMOUNT");
   }
 
   @Test

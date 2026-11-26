@@ -12,7 +12,12 @@ import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
 import com.back.nbe1214finalhot6.domain.wallet.service.WalletOpeningService;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,6 +34,25 @@ public class AuthService {
   private static final String DUMMY_PASSWORD_HASH =
       "$2y$10$mPWVWlLpLgssl1EggKaYk.DpDfaw2noVJOG01Bjc6s/v4RKIUtb.C";
 
+  // 이용자 가입에서 이메일·전화번호가 겹치면 안 되는 계정 종류. 점주 계정과는 같은 값을 써도 된다.
+  // 운영자의 이메일·전화번호는 로그인 대상이 섞이지 않게 계속 막는다
+  private static final Set<UserRole> USER_SIGNUP_BLOCKING_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.USER, UserRole.ADMIN));
+
+  // 점주 가입에서 이메일·전화번호가 겹치면 안 되는 계정 종류. 이용자 계정과는 같은 값을 써도 된다
+  private static final Set<UserRole> OWNER_SIGNUP_BLOCKING_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.OWNER, UserRole.ADMIN));
+
+  // 로그인 API 마다 받는 계정 종류. 같은 이메일의 이용자 계정과 점주 계정은 어느 API 로 로그인하는지로 구분한다
+  private static final Set<UserRole> USER_LOGIN_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.USER, UserRole.ADMIN));
+  private static final Set<UserRole> OWNER_LOGIN_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.OWNER));
+
+  // 같은 이메일의 탈퇴 계정과 활동 계정이 함께 있으면 활동 중인 계정을 먼저 확인한다
+  private static final Comparator<User> ACTIVE_FIRST =
+      Comparator.comparing((User user) -> user.getStatus() != UserStatus.ACTIVE);
+
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
   private final WalletOpeningService walletOpeningService;
@@ -36,23 +60,7 @@ public class AuthService {
 
   @Transactional
   public SignupResponse signup(SignupRequest request) {
-    // 이메일 중복이면 예외
-    if (userRepository.existsByEmail(request.email())) {
-      throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
-    }
-    // 전화번호 중복이면 예외
-    if (userRepository.existsByPhone(request.phone())) {
-      throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE);
-    }
-    // 암호화
-    String passwordHash = passwordEncoder.encode(request.password());
-    String pinHash = passwordEncoder.encode(request.pin());
-
-    User user =
-        User.create(
-            request.name(), request.email(), request.phone(), passwordHash, pinHash, UserRole.USER);
-
-    User saved = saveOrThrowDuplicate(user);
+    User saved = saveNewUser(request, UserRole.USER, USER_SIGNUP_BLOCKING_ROLES);
 
     // 같은 트랜잭션에서 모의계좌·가입 보너스 원장·지갑 생성. 하나라도 실패하면 회원 저장까지 롤백됨
     walletOpeningService.open(saved.getId());
@@ -60,16 +68,58 @@ public class AuthService {
     return SignupResponse.from(saved);
   }
 
-  // 트랜잭션을 두지 않는다. 조회한 뒤에 하는 BCrypt 비교(느림) 동안 DB 연결을 잡고 있지 않기 위해서다.
-  public LoginResponse login(LoginRequest request) {
-    User user = userRepository.findByEmail(request.email()).orElse(null);
+  /** 점주(OWNER)로 가입한다. 지갑 없이 잔액 0원인 개인 모의계좌만 만든다. */
+  @Transactional
+  public SignupResponse signupOwner(SignupRequest request) {
+    User saved = saveNewUser(request, UserRole.OWNER, OWNER_SIGNUP_BLOCKING_ROLES);
 
-    // 회원이 없어도 비밀번호 비교는 한다(응답 시간 차이 방지)
-    String hash = user == null ? DUMMY_PASSWORD_HASH : user.getPasswordHash();
-    boolean passwordMatches = passwordEncoder.matches(request.password(), hash);
+    // 계좌 생성이 실패하면 회원 저장까지 롤백됨
+    walletOpeningService.openOwnerAccount(saved.getId());
+
+    return SignupResponse.from(saved);
+  }
+
+  // 중복을 확인하고 비밀번호·PIN 을 암호화해 저장한다. 호출한 가입의 트랜잭션 안에서 실행된다
+  private User saveNewUser(SignupRequest request, UserRole role, Set<UserRole> blockingRoles) {
+    // 이메일 중복이면 예외
+    if (userRepository.existsByRoleInAndEmail(blockingRoles, request.email())) {
+      throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
+    }
+    // 전화번호 중복이면 예외
+    if (userRepository.existsByRoleInAndPhone(blockingRoles, request.phone())) {
+      throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE);
+    }
+    // 암호화
+    String passwordHash = passwordEncoder.encode(request.password());
+    String pinHash = passwordEncoder.encode(request.pin());
+
+    User user =
+        User.create(request.name(), request.email(), request.phone(), passwordHash, pinHash, role);
+
+    return saveOrThrowDuplicate(user);
+  }
+
+  /** 이용자·운영자 로그인. 점주 계정은 받지 않는다. */
+  public LoginResponse login(LoginRequest request) {
+    return authenticate(request, USER_LOGIN_ROLES);
+  }
+
+  /** 점주 로그인. 점주 계정만 받는다. */
+  public LoginResponse loginOwner(LoginRequest request) {
+    return authenticate(request, OWNER_LOGIN_ROLES);
+  }
+
+  // 트랜잭션을 두지 않는다. 조회한 뒤에 하는 BCrypt 비교(느림) 동안 DB 연결을 잡고 있지 않기 위해서다.
+  private LoginResponse authenticate(LoginRequest request, Set<UserRole> roles) {
+    // 받지 않는 종류의 계정은 없는 계정과 똑같이 처리한다
+    List<User> accounts =
+        userRepository.findAllByEmail(request.email()).stream()
+            .filter(account -> roles.contains(account.getRole()))
+            .toList();
+    User user = findByPassword(accounts, request.password());
 
     // 이메일 없음과 비밀번호 불일치는 같은 에러로 거절한다(어느 쪽인지 알려 주지 않는다)
-    if (user == null || !passwordMatches) {
+    if (user == null) {
       throw new BusinessException(AuthErrorCode.LOGIN_FAILED);
     }
     // 비밀번호까지 맞았는데 탈퇴한 계정이면 안내한다. 비밀번호를 모르는 사람은 이 응답에 닿지 못한다
@@ -79,6 +129,20 @@ public class AuthService {
 
     String accessToken = jwtProvider.createAccessToken(user.getId(), user.getRole());
     return LoginResponse.bearer(accessToken, jwtProvider.accessTokenExpiresInSeconds());
+  }
+
+  // 비밀번호가 맞는 계정을 찾는다. 여럿이면 활동 중인 계정이 먼저다
+  private User findByPassword(List<User> accounts, String rawPassword) {
+    // 회원이 없어도 비밀번호 비교는 한다(응답 시간 차이 방지)
+    if (accounts.isEmpty()) {
+      passwordEncoder.matches(rawPassword, DUMMY_PASSWORD_HASH);
+      return null;
+    }
+    return accounts.stream()
+        .sorted(ACTIVE_FIRST)
+        .filter(user -> passwordEncoder.matches(rawPassword, user.getPasswordHash()))
+        .findFirst()
+        .orElse(null);
   }
 
   // 동시 가입으로 위의 중복 확인을 함께 통과한 요청은 DB unique 제약이 막는다. 이를 중복 에러로 바꾼다.

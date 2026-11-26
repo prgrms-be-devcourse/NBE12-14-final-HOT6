@@ -24,8 +24,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Account {
 
-  // 가입 시 지급하는 초기 잔액(200만원)
-  public static final long INITIAL_BALANCE = 2_000_000L;
+  // 가입 시 지급하는 초기 잔액(500만원)
+  public static final long INITIAL_BALANCE = 5_000_000L;
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,15 +42,20 @@ public class Account {
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
-  private Account(Long userId, LocalDateTime now) {
+  private Account(Long userId, long balance, LocalDateTime now) {
     this.userId = userId;
-    this.balance = INITIAL_BALANCE;
+    this.balance = balance;
     this.createdAt = now;
   }
 
   // 초기 잔액을 채워서 생성. 생성 시각은 호출자가 Clock으로 만들어 넘김
   public static Account create(Long userId, LocalDateTime now) {
-    return new Account(userId, now);
+    return new Account(userId, INITIAL_BALANCE, now);
+  }
+
+  // 잔액 0원으로 생성(점주의 개인 계좌). 지급하는 금액이 없어 원장도 남기지 않음(잔액 0 = 원장 합 0)
+  public static Account createEmpty(Long userId, LocalDateTime now) {
+    return new Account(userId, 0L, now);
   }
 
   // 출금. 잔액이 모자라면 거절하고, 출금한 뒤의 잔액을 돌려줌

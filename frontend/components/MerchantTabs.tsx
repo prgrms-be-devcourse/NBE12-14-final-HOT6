@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
-  { href: "/merchant/payments", label: "결제 내역" },
   { href: "/merchant/daily", label: "일 정산" },
   { href: "/merchant/monthly", label: "월 정산" },
 ];

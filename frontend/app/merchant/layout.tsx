@@ -1,8 +1,8 @@
 import AuthGuard from "@/components/AuthGuard";
 import PhoneFrame from "@/components/PhoneFrame";
 
-// 로그인·가맹점 등록 화면은 로그인 없이 연다
-const PUBLIC_PATHS = ["/merchant/login", "/merchant/register"];
+// 로그인·회원가입·가맹점 등록·잠금 안내 화면은 로그인 없이 연다
+const PUBLIC_PATHS = ["/merchant/login", "/merchant/signup", "/merchant/register", "/merchant/locked"];
 
 export default function MerchantLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -149,9 +149,9 @@ class PaymentPinEnforcementTest {
     assertThat(failCount()).isEqualTo(5);
   }
 
-  // 목적: 잠긴 지 30분이 지나면 다시 결제할 수 있는지 확인한다(임시 방식, MVP 이후 이메일 인증 해제(U7)로 대체).
+  // 목적: 잠긴 지 10분이 지나면 다시 결제할 수 있는지 확인한다(임시 방식, MVP 이후 이메일 인증 해제(U7)로 대체).
   @Test
-  @DisplayName("잠긴 지 30분이 지나면 맞는 PIN 으로 다시 결제할 수 있다")
+  @DisplayName("잠긴 지 10분이 지나면 맞는 PIN 으로 다시 결제할 수 있다")
   void canPayAgainAfterLockExpires() throws Exception {
     for (int i = 0; i < 5; i++) {
       pay("{\"qrToken\": \"qr-1\", \"pin\": \"000000\"}");
@@ -159,7 +159,7 @@ class PaymentPinEnforcementTest {
     pay("{\"qrToken\": \"qr-1\", \"pin\": \"" + PIN + "\"}").andExpect(status().isConflict());
     verify(paymentFacade, never()).pay(any(), any());
 
-    clock.advance(Duration.ofMinutes(30));
+    clock.advance(Duration.ofMinutes(10));
     pay("{\"qrToken\": \"qr-1\", \"cashbackUsed\": 0, \"pin\": \"" + PIN + "\"}")
         .andExpect(status().isOk());
 

@@ -3,6 +3,7 @@ package com.back.nbe1214finalhot6.domain.payment.controller;
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
 import com.back.nbe1214finalhot6.common.security.OwnedResources;
 import com.back.nbe1214finalhot6.domain.auth.security.AuthUser;
+import com.back.nbe1214finalhot6.domain.payment.dto.MerchantPaymentItem;
 import com.back.nbe1214finalhot6.domain.payment.dto.MerchantPaymentsResponse;
 import com.back.nbe1214finalhot6.domain.payment.service.MerchantPaymentQueryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,5 +44,16 @@ public class MerchantPaymentController {
       @RequestParam(defaultValue = "20") @Min(1) int size) {
     return ApiResponse.ok(
         queryService.get(ownedResources.merchantIdOf(user), from, to, page, size));
+  }
+
+  @Operation(
+      summary = "사장님 결제 한 건 조회",
+      description =
+          "로그인한 점주의 가맹점 결제를 결제 번호로 한 건 조회한다(가맹점 번호는 토큰의 회원으로 찾는다). "
+              + "완료·취소된 결제만 조회되며, 없는 번호이거나 다른 가맹점의 결제이면 404(PAY-003)이다")
+  @GetMapping("/{paymentId}")
+  public ApiResponse<MerchantPaymentItem> getOne(
+      @AuthenticationPrincipal AuthUser user, @PathVariable Long paymentId) {
+    return ApiResponse.ok(queryService.getOne(ownedResources.merchantIdOf(user), paymentId));
   }
 }

@@ -24,6 +24,7 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
+import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantRegistrationFacade;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
@@ -180,7 +181,7 @@ class MerchantControllerTest {
   @DisplayName("내 가맹점을 조회하면 200 과 가맹점 정보를 반환한다")
   void 내가맹점조회() throws Exception {
     given(merchantService.get(1L))
-        .willReturn(new MerchantResponse(1L, "내 가게", "서울시 중구", true));
+        .willReturn(new MerchantResponse(1L, "내 가게", "서울시 중구", true, MerchantStatus.ACTIVE));
 
     mockMvc
         .perform(get("/api/merchants/me"))
@@ -207,7 +208,7 @@ class MerchantControllerTest {
   @DisplayName("가맹점을 수정하면 200 과 수정 결과를 반환한다")
   void 가맹점수정성공() throws Exception {
     given(merchantService.update(eq(1L), any()))
-        .willReturn(new MerchantResponse(1L, "새 이름", "인천광역시 남동구 1", true));
+        .willReturn(new MerchantResponse(1L, "새 이름", "인천광역시 남동구 1", true, MerchantStatus.ACTIVE));
 
     mockMvc
         .perform(
@@ -227,7 +228,7 @@ class MerchantControllerTest {
   @DisplayName("일부 필드만 보내면 나머지는 null 로 전달된다")
   void 일부필드만수정시나머지는null() throws Exception {
     given(merchantService.update(eq(1L), any()))
-        .willReturn(new MerchantResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true));
+        .willReturn(new MerchantResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true, MerchantStatus.ACTIVE));
 
     mockMvc
         .perform(
@@ -285,7 +286,7 @@ class MerchantControllerTest {
   @DisplayName("수정할 이름은 100자, 주소는 200자까지 허용한다")
   void 수정길이경계값() throws Exception {
     given(merchantService.update(eq(1L), any()))
-        .willReturn(new MerchantResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true));
+        .willReturn(new MerchantResponse(1L, "테스트 가맹점", "인천광역시 남동구 1", true, MerchantStatus.ACTIVE));
 
     mockMvc.perform(patchRequest("{\"name\": \"%s\"}".formatted("가".repeat(100))))
         .andExpect(status().isOk());
@@ -302,8 +303,8 @@ class MerchantControllerTest {
         .willReturn(
             new PageResponse<>(
                 List.of(
-                    new MerchantResponse(1L, "행복분식", "인천광역시 남동구 1", true),
-                    new MerchantResponse(2L, "해피분식", "인천광역시 서구 2", false)),
+                    new MerchantResponse(1L, "행복분식", "인천광역시 남동구 1", true, MerchantStatus.ACTIVE),
+                    new MerchantResponse(2L, "해피분식", "인천광역시 서구 2", false, MerchantStatus.ACTIVE)),
                 0,
                 20,
                 2,

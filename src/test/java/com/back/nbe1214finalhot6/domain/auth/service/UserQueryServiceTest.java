@@ -61,7 +61,7 @@ class UserQueryServiceTest {
     assertThat(info.needsRelogin()).isFalse();
   }
 
-  // 목적: 잠금 시각이 있고 30분이 지나지 않았으면 pinLocked 가 true 인지 확인한다.
+  // 목적: 잠금 시각이 있고 10분이 지나지 않았으면 pinLocked 가 true 인지 확인한다.
   @Test
   @DisplayName("PIN 이 잠겨 있으면 pinLocked 가 true 이다")
   void pinLocked() {
@@ -71,18 +71,18 @@ class UserQueryServiceTest {
     assertThat(userQueryService.getMyInfo(user.getId(), UserRole.USER).pinLocked()).isTrue();
   }
 
-  // 목적: PIN 잠금은 잠긴 지 30분이 지나면 자동으로 풀리므로 /me 도 그 기준으로 보여 주는지 경계를 확인한다.
-  // (29분 59초는 잠김, 30분은 풀림. 임시 방식이며 MVP 이후 이메일 인증 해제(U7)로 대체된다)
+  // 목적: PIN 잠금은 잠긴 지 10분이 지나면 자동으로 풀리므로 /me 도 그 기준으로 보여 주는지 경계를 확인한다.
+  // (9분 59초는 잠김, 10분은 풀림. 임시 방식이며 MVP 이후 이메일 인증 해제(U7)로 대체된다)
   @Test
-  @DisplayName("PIN 잠금은 잠긴 지 30분이 지나면 pinLocked 가 false 가 된다")
-  void pinLockedExpiresAfterThirtyMinutes() {
+  @DisplayName("PIN 잠금은 잠긴 지 10분이 지나면 pinLocked 가 false 가 된다")
+  void pinLockedExpiresAfterTenMinutes() {
     User user = save("q6@devpay.com", "01077770006");
     lockNow(user);
 
-    clock.advance(Duration.ofMinutes(29).plusSeconds(59));
+    clock.advance(Duration.ofMinutes(9).plusSeconds(59));
     assertThat(userQueryService.getMyInfo(user.getId(), UserRole.USER).pinLocked()).isTrue();
 
-    clock.advance(Duration.ofSeconds(1)); // 정확히 30분
+    clock.advance(Duration.ofSeconds(1)); // 정확히 10분
     assertThat(userQueryService.getMyInfo(user.getId(), UserRole.USER).pinLocked()).isFalse();
   }
 

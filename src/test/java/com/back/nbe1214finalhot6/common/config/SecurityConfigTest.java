@@ -83,13 +83,16 @@ class SecurityConfigTest {
     return Stream.of(
         // 누구나
         Arguments.of("POST", "/api/auth/login", 200, 200, 200, 200),
+        Arguments.of("POST", "/api/auth/owner/login", 200, 200, 200, 200),
         Arguments.of("POST", "/api/users/signup", 200, 200, 200, 200),
+        Arguments.of("POST", "/api/owners/signup", 200, 200, 200, 200),
         Arguments.of("GET", "/actuator/health", 200, 200, 200, 200),
         Arguments.of("GET", "/api/auth/login", 401, 200, 200, 200), // 로그인 경로는 POST 만 열려 있다
         // 운영자 전용
         Arguments.of("GET", "/api/admin/settings", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/settlements/daily/run", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/settlements/monthly/run", 401, 403, 403, 200),
+        Arguments.of("POST", "/api/admin/merchants/closures/run", 401, 403, 403, 200),
         Arguments.of("PUT", "/api/admin/cashback/budget/annual/2026", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/cashback/policies/reductions", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/cashback/payouts/run", 401, 403, 403, 200),
@@ -122,6 +125,9 @@ class SecurityConfigTest {
         Arguments.of("GET", "/api/merchants/me/settlements/daily", 401, 403, 200, 403),
         Arguments.of("GET", "/api/merchants/me/settlements/monthly", 401, 403, 200, 403),
         Arguments.of("GET", "/api/merchants/me/payments", 401, 403, 200, 403),
+        Arguments.of("GET", "/api/merchants/me/payments/1", 401, 403, 200, 403),
+        Arguments.of("GET", "/api/merchants/me/closure/preview", 401, 403, 200, 403),
+        Arguments.of("POST", "/api/merchants/me/closure", 401, 403, 200, 403),
         // 결제 취소는 점주만
         Arguments.of("POST", "/api/payments/1/cancel", 401, 403, 200, 403),
         // 내 정보 조회는 모든 로그인 역할이 쓴다(운영자 포함)

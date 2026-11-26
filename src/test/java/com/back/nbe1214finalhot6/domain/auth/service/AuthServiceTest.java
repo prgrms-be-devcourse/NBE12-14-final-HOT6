@@ -3,6 +3,7 @@ package com.back.nbe1214finalhot6.domain.auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -76,7 +77,7 @@ class AuthServiceTest {
   @Test
   @DisplayName("이미 등록된 이메일이면 DUPLICATE_EMAIL 예외가 나고 저장되지 않는다")
   void signup_duplicateEmail() {
-    given(userRepository.existsByEmail("user@example.com")).willReturn(true);
+    given(userRepository.existsByRoleInAndEmail(any(), eq("user@example.com"))).willReturn(true);
 
     assertThatThrownBy(() -> authService.signup(request))
         .isInstanceOfSatisfying(
@@ -91,7 +92,7 @@ class AuthServiceTest {
   @Test
   @DisplayName("이미 등록된 전화번호면 DUPLICATE_PHONE 예외가 나고 저장되지 않는다")
   void signup_duplicatePhone() {
-    given(userRepository.existsByPhone("01012345678")).willReturn(true);
+    given(userRepository.existsByRoleInAndPhone(any(), eq("01012345678"))).willReturn(true);
 
     assertThatThrownBy(() -> authService.signup(request))
         .isInstanceOfSatisfying(
@@ -106,7 +107,7 @@ class AuthServiceTest {
   @Test
   @DisplayName("저장 시 이메일 unique 제약에 걸리면 DUPLICATE_EMAIL 예외가 난다")
   void signup_uniqueViolationOnEmail() {
-    given(userRepository.saveAndFlush(any(User.class))).willThrow(uniqueViolation("users_email_key"));
+    given(userRepository.saveAndFlush(any(User.class))).willThrow(uniqueViolation("uk_users_email_role_active"));
 
     assertThatThrownBy(() -> authService.signup(request))
         .isInstanceOfSatisfying(
@@ -117,7 +118,7 @@ class AuthServiceTest {
   @Test
   @DisplayName("저장 시 전화번호 unique 제약에 걸리면 DUPLICATE_PHONE 예외가 난다")
   void signup_uniqueViolationOnPhone() {
-    given(userRepository.saveAndFlush(any(User.class))).willThrow(uniqueViolation("users_phone_key"));
+    given(userRepository.saveAndFlush(any(User.class))).willThrow(uniqueViolation("uk_users_phone_role_active"));
 
     assertThatThrownBy(() -> authService.signup(request))
         .isInstanceOfSatisfying(

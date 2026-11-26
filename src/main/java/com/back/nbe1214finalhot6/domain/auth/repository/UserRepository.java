@@ -1,9 +1,11 @@
 package com.back.nbe1214finalhot6.domain.auth.repository;
 
 import com.back.nbe1214finalhot6.domain.auth.entity.User;
+import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.entity.UserStatus;
 import java.time.LocalDateTime;
-import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,7 +17,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
   boolean existsByPhone(String phone);
 
-  Optional<User> findByEmail(String email);
+  // 주어진 계정 종류 중에 이 이메일·전화번호를 쓰는 계정이 있는지(탈퇴한 계정 포함)
+  boolean existsByRoleInAndEmail(Collection<UserRole> roles, String email);
+
+  boolean existsByRoleInAndPhone(Collection<UserRole> roles, String phone);
+
+  // 같은 이메일을 이용자 계정과 점주 계정이 함께 쓸 수 있어 여러 건이 나올 수 있다
+  List<User> findAllByEmail(String email);
 
   // 인증 필터가 매 요청 탈퇴 여부를 확인하는 데 쓴다. 객체를 읽지 않고 존재 여부만 가볍게 묻는다
   boolean existsByIdAndStatus(Long id, UserStatus status);
