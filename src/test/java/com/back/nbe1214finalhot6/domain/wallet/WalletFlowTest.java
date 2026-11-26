@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 가입 → 로그인 → 내 지갑 조회·충전·환불을, 실제 보안 설정과 DB 로 끝까지 확인한다.
  *
  * <p>테스트 전체를 한 트랜잭션으로 감싸서(끝나면 롤백) 따로 정리하지 않는다. 한도는 운영자 설정이 없을 때의 기본값(보유 200만원, 월 충전 100만원)이고, 가입하면
- * 모의계좌에 200만원이 들어 있다.
+ * 모의계좌에 500만원이 들어 있다.
  */
 @IntegrationTest
 @AutoConfigureMockMvc

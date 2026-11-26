@@ -70,14 +70,14 @@ class WalletRepositoryTest {
   }
 
   @Test
-  @DisplayName("계좌는 초기 잔액 200만원으로 저장된다")
+  @DisplayName("계좌는 초기 잔액 500만원으로 저장된다")
   void account_initialBalance() {
     Account saved = accountRepository.saveAndFlush(Account.create(1L, NOW));
 
     // 저장한 객체가 아니라 DB에서 다시 읽은 값으로 확인
     Account found = accountRepository.findById(saved.getId()).orElseThrow();
 
-    assertThat(found.getBalance()).isEqualTo(2_000_000L);
+    assertThat(found.getBalance()).isEqualTo(5_000_000L);
   }
 
   @Test
