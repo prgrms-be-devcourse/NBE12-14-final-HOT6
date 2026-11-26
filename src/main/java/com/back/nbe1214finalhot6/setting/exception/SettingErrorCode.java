@@ -9,7 +9,9 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum SettingErrorCode implements ErrorCode {
-  INVALID_SETTING("SET-001", HttpStatus.BAD_REQUEST, "설정 키 또는 값이 올바르지 않습니다");
+  INVALID_SETTING("SET-001", HttpStatus.BAD_REQUEST, "설정 키 또는 값이 올바르지 않습니다"),
+  SCHEDULE_ALREADY_EXISTS("SET-002", HttpStatus.CONFLICT, "이미 예약된 변경이 있습니다. 취소한 뒤 다시 예약해 주세요"),
+  SCHEDULE_NOT_FOUND("SET-003", HttpStatus.NOT_FOUND, "취소할 예약이 없습니다");
 
   private final String code;
   private final HttpStatus status;
