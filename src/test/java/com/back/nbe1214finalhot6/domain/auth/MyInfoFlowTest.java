@@ -88,7 +88,7 @@ class MyInfoFlowTest {
         .andExpect(jsonPath("$.data.needsRelogin").value(true));
 
     // 다시 로그인해 새 토큰(OWNER)을 받으면 재로그인은 필요 없다
-    String newToken = login("me2@devpay.com");
+    String newToken = login("/api/auth/owner/login", "me2@devpay.com");
     assertThat(jwtProvider.parse(newToken).role()).isEqualTo(UserRole.OWNER);
     mockMvc
         .perform(get("/api/users/me").header("Authorization", "Bearer " + newToken))
@@ -163,10 +163,14 @@ class MyInfoFlowTest {
   }
 
   private String login(String email) throws Exception {
+    return login("/api/auth/login", email);
+  }
+
+  private String login(String path, String email) throws Exception {
     MvcResult login =
         mockMvc
             .perform(
-                post("/api/auth/login")
+                post(path)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         "{\"email\": \"%s\", \"password\": \"Password1!\"}".formatted(email)))

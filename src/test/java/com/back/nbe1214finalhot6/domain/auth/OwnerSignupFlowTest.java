@@ -196,7 +196,7 @@ class OwnerSignupFlowTest {
     String body =
         mockMvc
             .perform(
-                post("/api/auth/login")
+                post("/api/auth/owner/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         "{\"email\": \"%s\", \"password\": \"%s\"}".formatted(EMAIL, PASSWORD)))

@@ -46,11 +46,24 @@ public class AuthController {
   }
 
   @Operation(
-      summary = "로그인",
-      description = "이메일·비밀번호로 로그인하고 액세스 토큰을 발급. 실패 사유(이메일 없음·비밀번호 불일치·탈퇴)는 구분하지 않음")
+      summary = "이용자·운영자 로그인",
+      description =
+          "이용자·운영자 계정이 이메일·비밀번호로 로그인하고 액세스 토큰을 발급. 점주 계정은 점주 로그인을 쓴다. "
+              + "실패 사유(이메일 없음·비밀번호 불일치·계정 종류)는 구분하지 않음")
   @PostMapping("/auth/login")
   public ResponseEntity<ApiResponse<LoginResponse>> login(
       @Valid @RequestBody LoginRequest request) {
     return ResponseEntity.ok(ApiResponse.ok(authService.login(request)));
+  }
+
+  @Operation(
+      summary = "점주 로그인",
+      description =
+          "점주(OWNER) 계정이 이메일·비밀번호로 로그인하고 액세스 토큰을 발급. "
+              + "실패 사유(이메일 없음·비밀번호 불일치·계정 종류)는 구분하지 않음")
+  @PostMapping("/auth/owner/login")
+  public ResponseEntity<ApiResponse<LoginResponse>> loginOwner(
+      @Valid @RequestBody LoginRequest request) {
+    return ResponseEntity.ok(ApiResponse.ok(authService.loginOwner(request)));
   }
 }

@@ -43,10 +43,15 @@ public class AuthService {
   private static final Set<UserRole> OWNER_SIGNUP_BLOCKING_ROLES =
       Collections.unmodifiableSet(EnumSet.of(UserRole.OWNER, UserRole.ADMIN));
 
-  // 로그인할 때 확인하는 순서. 활동 중인 계정을 먼저, 그다음 USER, OWNER, ADMIN
-  private static final Comparator<User> LOGIN_PRIORITY =
-      Comparator.comparing((User user) -> user.getStatus() != UserStatus.ACTIVE)
-          .thenComparing(User::getRole);
+  // 로그인 API 마다 받는 계정 종류. 같은 이메일의 이용자 계정과 점주 계정은 어느 API 로 로그인하는지로 구분한다
+  private static final Set<UserRole> USER_LOGIN_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.USER, UserRole.ADMIN));
+  private static final Set<UserRole> OWNER_LOGIN_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.OWNER));
+
+  // 같은 이메일의 탈퇴 계정과 활동 계정이 함께 있으면 활동 중인 계정을 먼저 확인한다
+  private static final Comparator<User> ACTIVE_FIRST =
+      Comparator.comparing((User user) -> user.getStatus() != UserStatus.ACTIVE);
 
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
@@ -94,10 +99,24 @@ public class AuthService {
     return saveOrThrowDuplicate(user);
   }
 
-  // 트랜잭션을 두지 않는다. 조회한 뒤에 하는 BCrypt 비교(느림) 동안 DB 연결을 잡고 있지 않기 위해서다.
+  /** 이용자·운영자 로그인. 점주 계정은 받지 않는다. */
   public LoginResponse login(LoginRequest request) {
-    User user =
-        findByPassword(userRepository.findAllByEmail(request.email()), request.password());
+    return authenticate(request, USER_LOGIN_ROLES);
+  }
+
+  /** 점주 로그인. 점주 계정만 받는다. */
+  public LoginResponse loginOwner(LoginRequest request) {
+    return authenticate(request, OWNER_LOGIN_ROLES);
+  }
+
+  // 트랜잭션을 두지 않는다. 조회한 뒤에 하는 BCrypt 비교(느림) 동안 DB 연결을 잡고 있지 않기 위해서다.
+  private LoginResponse authenticate(LoginRequest request, Set<UserRole> roles) {
+    // 받지 않는 종류의 계정은 없는 계정과 똑같이 처리한다
+    List<User> accounts =
+        userRepository.findAllByEmail(request.email()).stream()
+            .filter(account -> roles.contains(account.getRole()))
+            .toList();
+    User user = findByPassword(accounts, request.password());
 
     // 이메일 없음과 비밀번호 불일치는 같은 에러로 거절한다(어느 쪽인지 알려 주지 않는다)
     if (user == null) {
@@ -112,8 +131,7 @@ public class AuthService {
     return LoginResponse.bearer(accessToken, jwtProvider.accessTokenExpiresInSeconds());
   }
 
-  // 같은 이메일을 이용자 계정과 점주 계정이 함께 쓸 수 있어, 비밀번호가 맞는 계정을 찾는다. 한 계정만 고르면 같은 이메일로
-  // 가입한 다른 계정 때문에 로그인이 막힐 수 있다. 비밀번호가 둘 다 맞으면 LOGIN_PRIORITY 의 앞선 계정이다
+  // 비밀번호가 맞는 계정을 찾는다. 여럿이면 활동 중인 계정이 먼저다
   private User findByPassword(List<User> accounts, String rawPassword) {
     // 회원이 없어도 비밀번호 비교는 한다(응답 시간 차이 방지)
     if (accounts.isEmpty()) {
@@ -121,7 +139,7 @@ public class AuthService {
       return null;
     }
     return accounts.stream()
-        .sorted(LOGIN_PRIORITY)
+        .sorted(ACTIVE_FIRST)
         .filter(user -> passwordEncoder.matches(rawPassword, user.getPasswordHash()))
         .findFirst()
         .orElse(null);
