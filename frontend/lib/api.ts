@@ -1,4 +1,4 @@
-import { audienceOfPath, clearSession, getSession, LOGIN_PATH } from "@/lib/auth";
+import { audienceOfPath, clearSession, getSession, LOGIN_API, LOGIN_PATH } from "@/lib/auth";
 
 // 백엔드 공통 응답: { success, code, message, data }
 type ApiEnvelope<T> = { success: boolean; code: string | null; message: string | null; data: T | null };
@@ -38,7 +38,7 @@ export async function api<T>(path: string, { method = "GET", body, idempotencyKe
   }
 
   // 토큰이 없거나 만료·무효면 세션을 지우고 해당 앱의 로그인 화면으로 보낸다. 로그인 요청 자체의 401(자격 증명 오류)은 화면이 메시지로 보여 준다
-  if (res.status === 401 && path !== "/auth/login") {
+  if (res.status === 401 && !Object.values(LOGIN_API).includes(path)) {
     clearSession();
     if (!stay401 && typeof window !== "undefined") window.location.assign(LOGIN_PATH[audienceOfPath(window.location.pathname)]);
   }

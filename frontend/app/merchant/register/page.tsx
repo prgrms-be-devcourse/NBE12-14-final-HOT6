@@ -6,11 +6,12 @@ import Header from "@/components/Header";
 import MapPicker, { type LatLng } from "@/components/MapPicker";
 import RegisterGate from "@/components/RegisterGate";
 import { ApiError } from "@/lib/api";
+import { getSession, type Role } from "@/lib/auth";
 import { saveCtx } from "@/lib/devContext";
 import { CATEGORIES } from "@/lib/stores";
 import { registerMerchant } from "@/lib/endpoints";
 
-// 로그인한 이용자만 등록할 수 있다(RegisterGate). 로그인하지 않았으면 이용자 로그인으로 보낸다
+// 가맹점이 없는 점주와 이용자만 등록할 수 있다(RegisterGate). 로그인하지 않았으면 점주 로그인·회원가입을 안내한다
 export default function MerchantRegisterPage() {
   return (
     <>
@@ -24,6 +25,7 @@ export default function MerchantRegisterPage() {
 
 function RegisterForm() {
   const [done, setDone] = useState(false);
+  const [role, setRole] = useState<Role | undefined>(); // 등록을 요청한 계정의 역할
   const [needLogin, setNeedLogin] = useState(false); // 등록 중 401(로그인 만료·없음)
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
@@ -38,6 +40,8 @@ function RegisterForm() {
     setError("");
     setNeedLogin(false);
     setBusy(true);
+    const requestedBy = getSession()?.role; // 401 이면 세션이 지워지므로 요청 전에 읽는다
+    setRole(requestedBy);
     try {
       const res = await registerMerchant({ name: name.trim(), address: address.trim(), ...(proof ? { revenueProof: proof } : {}) });
       saveCtx({ merchantName: res.name, category, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
@@ -55,7 +59,19 @@ function RegisterForm() {
     }
   };
 
-  // 등록하면 회원이 점주(OWNER)로 바뀌지만, 이미 받은 토큰은 옛 역할이라 다시 로그인해야 점주 기능을 쓸 수 있다
+  if (done && role === "OWNER") {
+    return (
+      <div className="space-y-4 px-5 pb-5">
+        <section className="card text-center">
+          <div className="text-lg font-bold">가맹점이 등록되었어요</div>
+          <p className="note mt-2">이제 QR 생성과 정산 조회를 쓸 수 있어요.</p>
+        </section>
+        <Link href="/merchant/qr" className="btn btn-primary">QR 생성하러 가기</Link>
+      </div>
+    );
+  }
+
+  // 이용자가 등록하면 점주(OWNER)로 바뀌지만, 이미 받은 토큰은 옛 역할이라 다시 로그인해야 점주 기능을 쓸 수 있다
   if (done) {
     return (
       <>
@@ -93,7 +109,7 @@ function RegisterForm() {
         </div>
         <p className="note">업종, 위치는 이 기기에만 저장되고 서버로 전송되지 않아요.</p>
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">{error}</p>}
-        {needLogin && <Link href="/login?next=/merchant/register" className="btn btn-outline">로그인하러 가기</Link>}
+        {needLogin && <Link href={role === "USER" ? "/login?next=/merchant/register" : "/merchant/login"} className="btn btn-outline">로그인하러 가기</Link>}
         <button type="submit" disabled={busy || !name.trim() || !address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "등록 중…" : "등록"}</button>
       </form>
     </>
