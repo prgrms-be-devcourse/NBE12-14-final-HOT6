@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import {useRouter} from "next/navigation";
-import {useState, type FormEvent} from "react";
+import {useLayoutEffect, useState, useSyncExternalStore, type FormEvent} from "react";
 import Header from "@/components/Header";
 import Field from "@/components/Field";
 import {
   cleanName,
+  getSignupFlow,
   isMixedName,
   loadSignupDraft,
   NAME_RULE,
   PASSWORD_RULE,
   PHONE_RULE,
-  saveSignupDraft
+  saveSignupDraft,
+  subscribeSignupFlow
 } from "@/lib/signupDraft";
 
 // 이름 칸의 물음표를 누르면 보여 주는 입력 규칙 (서버 규칙은 SignupRequest)
@@ -27,17 +29,31 @@ const NAME_HELP = (
 );
 
 export default function SignupPage() {
+  // 가입 흐름을 벗어나면 번호가 바뀌어, 다시 들어올 때 빈 화면으로 새로 만든다
+  const flow = useSyncExternalStore(subscribeSignupFlow, getSignupFlow, () => 0);
+  return <SignupForm key={flow} />;
+}
+
+function SignupForm() {
   const router = useRouter();
-  // 2단계에서 돌아오면 입력값을 그대로 채워 둔다
+  // 2단계에서 돌아오면 비밀번호를 뺀 입력값을 채워 둔다
   const [init] = useState(() => loadSignupDraft());
   const [name, setName] = useState(init?.name ?? "");
   const [email, setEmail] = useState(init?.email ?? "");
   const [phone, setPhone] = useState(init?.phone ?? "");
-  const [password, setPassword] = useState(init?.password ?? "");
-  const [confirm, setConfirm] = useState(init?.password ?? "");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [agree, setAgree] = useState(!!init);
   const [tried, setTried] = useState(false);
   const [nameNotice, setNameNotice] = useState(""); // 이름 입력칸에서 방금 지운 문자의 안내
+
+  // 화면을 벗어날 때(2단계로 갈 때 포함) 비밀번호와 안내 문구를 비운다. 화면 상태가 보존되므로 직접 지운다
+  useLayoutEffect(() => () => {
+    setPassword("");
+    setConfirm("");
+    setTried(false);
+    setNameNotice("");
+  }, []);
 
   const errors = {
     name: !name.trim() ? "이름을 입력해 주세요" : NAME_RULE.test(name.trim()) ? "" : "이름은 한글 또는 영문 중 하나로만 입력해 주세요",
