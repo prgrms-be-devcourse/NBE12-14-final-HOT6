@@ -1,0 +1,54 @@
+{
+  "scenario": "A-no-payment-lock-S4-same-cancel",
+  "label": "t50-r3",
+  "environment": {
+    "commit": "f3a60ef",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:53:46.529912",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 50,
+    "amount": 10000,
+    "variant": "no-payment-lock",
+    "round": 3,
+    "rounds": 3
+  },
+  "wallMs": 66.82,
+  "counts": {
+    "CANCELED": 50
+  },
+  "latencyMs": {
+    "n": 50,
+    "min": 18.03,
+    "p50": 33.51,
+    "p95": 60.11,
+    "max": 66.62
+  },
+  "groups": {
+    "cancel": {
+      "counts": {
+        "CANCELED": 50
+      },
+      "latencyMs": {
+        "n": 50,
+        "min": 18.03,
+        "p50": 33.51,
+        "p95": 60.11,
+        "max": 66.62
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": true,
+    "refundLines": 1,
+    "balance": 10000,
+    "expectedBalance": 10000,
+    "canceledPayments": 1,
+    "earningStatus": "CANCELED"
+  },
+  "exampleMessages": {}
+}

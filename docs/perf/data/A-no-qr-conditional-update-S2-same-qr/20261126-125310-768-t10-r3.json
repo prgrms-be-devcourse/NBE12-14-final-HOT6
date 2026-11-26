@@ -1,0 +1,52 @@
+{
+  "scenario": "A-no-qr-conditional-update-S2-same-qr",
+  "label": "t10-r3",
+  "environment": {
+    "commit": "bb319f1",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:53:10.768024",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 10,
+    "amount": 10000,
+    "variant": "no-qr-conditional-update",
+    "round": 3,
+    "rounds": 3
+  },
+  "wallMs": 204.72,
+  "counts": {
+    "COMPLETED": 10
+  },
+  "latencyMs": {
+    "n": 10,
+    "min": 31.36,
+    "p50": 107.73,
+    "p95": 204.6,
+    "max": 204.6
+  },
+  "groups": {
+    "pay": {
+      "counts": {
+        "COMPLETED": 10
+      },
+      "latencyMs": {
+        "n": 10,
+        "min": 31.36,
+        "p50": 107.73,
+        "p95": 204.6,
+        "max": 204.6
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": false,
+    "completedByQr": 10,
+    "debitLinesAllWallets": 10,
+    "qrStatus": "USED"
+  },
+  "exampleMessages": {}
+}
