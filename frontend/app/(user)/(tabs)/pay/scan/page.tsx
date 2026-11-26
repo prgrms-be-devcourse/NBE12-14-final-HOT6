@@ -242,7 +242,7 @@ export default function ScanPage() {
                     <span className="text-slate-500">적립 여부</span>
                     <span role="status" className={`rounded-lg border px-2.5 py-1 text-right text-[13px] font-semibold ${REASON_TONE_CLASS[tone]}`}>
                       {earning
-                        ? REASON_TEXT.NONE
+                        ? p!.limitReduced ? `이번 달 적립 한도까지만 적립돼요 (남은 한도 ${won(monthlyRemaining)})` : REASON_TEXT.NONE
                         : devMoney === 0 ? "캐시백으로만 결제하면 적립되지 않아요." : previewLoad.loading ? "계산 중이에요…" : REASON_TEXT[reason]}
                     </span>
                   </div>

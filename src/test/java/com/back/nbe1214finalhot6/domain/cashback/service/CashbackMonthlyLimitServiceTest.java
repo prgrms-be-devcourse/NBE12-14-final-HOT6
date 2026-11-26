@@ -35,6 +35,21 @@ class CashbackMonthlyLimitServiceTest {
         .hasFieldOrPropertyWithValue("errorCode", CashbackErrorCode.INVALID_BUDGET);
   }
 
+  // 목적: 부분 사용이 남은 한도까지만 늘리고 실제 사용량을 돌려주는지, 남은 한도가 없거나 한도를 사용량보다 낮췄으면 0 인지(경계) 확인한다.
+  @Test
+  @DisplayName("부분 사용은 남은 한도까지만 사용하고 실제 사용량을 돌려준다")
+  void consumeUpTo_partial() {
+    assertThat(limitService.consumeUpTo(1L, NOV, 12_000L, LIMIT)).isEqualTo(12_000L);
+    assertThat(limitService.consumeUpTo(1L, NOV, 100_000L, LIMIT)).isEqualTo(LIMIT - 12_000L);
+    assertThat(limitService.usedAmount(1L, NOV)).isEqualTo(LIMIT);
+
+    assertThat(limitService.consumeUpTo(1L, NOV, 1L, LIMIT)).isZero(); // 남은 한도 없음
+    assertThat(limitService.usedAmount(1L, NOV)).isEqualTo(LIMIT);
+    assertThat(limitService.consumeUpTo(1L, NOV, 1L, LIMIT - 10_000L)).isZero(); // 한도를 사용량보다 낮춤
+    assertThat(limitService.consumeUpTo(2L, DEC, 5_000L, LIMIT)).isEqualTo(5_000L); // 다른 이용자·달
+    assertInvalid(() -> limitService.consumeUpTo(1L, NOV, 0L, LIMIT));
+  }
+
   // 목적: 그 달 행이 없어도 첫 사용이 성공하고 사용량이 쌓이는지, 사용량이 값으로 조회되는지 확인한다.
   @Test
   @DisplayName("첫 사용은 행을 만들고 이후 사용은 사용량을 더한다")
