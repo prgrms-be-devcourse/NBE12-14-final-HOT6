@@ -101,6 +101,7 @@ class MerchantClosureSettlementConcurrencyTest {
           merchantId);
       jdbcTemplate.update("delete from merchant_wallet where merchant_id = ?", merchantId);
       jdbcTemplate.update("delete from merchant_account where merchant_id = ?", merchantId);
+      jdbcTemplate.update("delete from merchant_closure_deduction where merchant_id = ?", merchantId);
       jdbcTemplate.update("delete from monthly_settlement where merchant_id = ?", merchantId);
       jdbcTemplate.update("delete from daily_settlement where merchant_id = ?", merchantId);
       jdbcTemplate.update("delete from merchant where id = ?", merchantId);

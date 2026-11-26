@@ -4,9 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
+import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantClosureDeduction;
 import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
+import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantClosureDeductionRepository;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantClosureSettlementProcessor.Outcome;
+import com.back.nbe1214finalhot6.domain.reconciliation.service.MonthlyPayoutCheck;
 import com.back.nbe1214finalhot6.domain.settlement.entity.DailySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlementStatus;
@@ -36,6 +39,8 @@ class MerchantClosureSettlementProcessorTest {
   private long nextOwnerId = 9_300L;
 
   @Autowired private MerchantClosureSettlementProcessor processor;
+  @Autowired private MerchantClosureDeductionRepository deductionRepository;
+  @Autowired private MonthlyPayoutCheck monthlyPayoutCheck;
   @Autowired private MerchantRepository merchantRepository;
   @Autowired private MerchantWalletService merchantWalletService;
   @Autowired private MerchantWalletRepository walletRepository;
@@ -80,6 +85,43 @@ class MerchantClosureSettlementProcessorTest {
   }
 
   @Test
+  @DisplayName("차감한 달과 금액을 남기고, 월 지급 대사가 그 지급을 일치로 본다")
+  void 차감액_기록과_대사_일치() {
+    Long merchantId = saveClosingMerchant();
+    saveDaily(merchantId, DAY.minusDays(2), 30_000, 0, 0);
+    saveDaily(merchantId, DAY.minusDays(1), 0, 10_000, 0);
+    saveDaily(merchantId, DAY, 0, 0, -10_000);
+
+    processor.settleOne(merchantId, DAY);
+
+    assertThat(deductionRepository.findByMerchantIdOrderBySettlementMonthAsc(merchantId))
+        .extracting(MerchantClosureDeduction::getSettlementMonth, MerchantClosureDeduction::getAmount)
+        .containsExactly(tuple(LocalDate.of(2026, 11, 1), 10_000L));
+    assertThat(monthlyPayoutCheck.check(LocalDate.of(2026, 11, 30)).mismatches()).isEmpty();
+  }
+
+  @Test
+  @DisplayName("전액 차감되어 월 정산 건이 없는 달도 월 지급 대사에서 불일치로 잡히지 않는다")
+  void 전액_차감_대사_일치() {
+    Long merchantId = saveClosingMerchant();
+    // 10월 매출은 그대로 지급되고, 11월 매출 5,000원은 취소 5,000원으로 전액 차감된다
+    saveDaily(merchantId, LocalDate.of(2026, 10, 20), 20_000, 0, 0);
+    saveDaily(merchantId, DAY.minusDays(1), 5_000, 0, 0);
+    saveDaily(merchantId, DAY, 0, 5_000, 0);
+
+    Outcome outcome = processor.settleOne(merchantId, DAY);
+
+    assertThat(outcome).isEqualTo(Outcome.CLOSED);
+    assertThat(monthlyOf(merchantId))
+        .extracting(MonthlySettlement::getSettlementMonth)
+        .containsExactly(LocalDate.of(2026, 10, 1));
+    assertThat(deductionRepository.findByMerchantIdOrderBySettlementMonthAsc(merchantId))
+        .extracting(MerchantClosureDeduction::getSettlementMonth, MerchantClosureDeduction::getAmount)
+        .containsExactly(tuple(LocalDate.of(2026, 11, 1), 5_000L));
+    assertThat(monthlyPayoutCheck.check(LocalDate.of(2026, 11, 30)).mismatches()).isEmpty();
+  }
+
+  @Test
   @DisplayName("부족분이 정산금보다 많으면 아무것도 바꾸지 않고 보류한다")
   void 부족분이_많으면_보류() {
     Long merchantId = saveClosingMerchant();
@@ -92,6 +134,7 @@ class MerchantClosureSettlementProcessorTest {
     assertThat(statusOf(merchantId)).isEqualTo(MerchantStatus.CLOSING);
     assertThat(monthlySettlementRepository.findAll())
         .noneMatch(monthly -> monthly.getMerchantId().equals(merchantId));
+    assertThat(deductionRepository.findByMerchantIdOrderBySettlementMonthAsc(merchantId)).isEmpty();
     assertThat(accountBalance(merchantId)).isZero();
   }
 

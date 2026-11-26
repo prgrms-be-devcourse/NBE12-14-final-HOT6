@@ -2,7 +2,9 @@ package com.back.nbe1214finalhot6.domain.merchant.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
+import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantClosureDeduction;
 import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
+import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantClosureDeductionRepository;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.settlement.entity.DailySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlement;
@@ -24,7 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
  * 가맹점 한 곳의 해지 정산을 한 트랜잭션으로 처리한다. 호출하는 쪽은 트랜잭션을 열지 않는다.
  *
  * <p>월 정산에 묶이지 않은 달의 일 정산 확정액으로 월 정산 건을 만들고, 마지막 일 정산에 남은 부족분을 가장 최근 달부터 차감한 뒤 지갑을 거쳐 계좌로
- * 지급하고 해지 완료로 바꾼다. 부족분이 정산금보다 많으면 아무것도 바꾸지 않고 보류한다. 점주의 계좌와 이미 지급한 정산금은 건드리지 않는다.
+ * 지급하고 해지 완료로 바꾼다. 달별로 차감한 금액은 따로 남겨 월 지급 대사가 지급액을 설명할 수 있게 한다. 부족분이 정산금보다 많으면 아무것도 바꾸지 않고
+ * 보류한다. 점주의 계좌와 이미 지급한 정산금은 건드리지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -42,6 +45,7 @@ public class MerchantClosureSettlementProcessor {
   private record Payout(LocalDate month, long amount) {}
 
   private final MerchantRepository merchantRepository;
+  private final MerchantClosureDeductionRepository deductionRepository;
   private final DailySettlementRepository dailySettlementRepository;
   private final MonthlySettlementRepository monthlySettlementRepository;
   private final MerchantWalletService walletService;
@@ -60,7 +64,8 @@ public class MerchantClosureSettlementProcessor {
             .orElse(0L);
 
     List<Payout> payouts = unsettledPayouts(merchantId, closureDate);
-    if (!offset(payouts, debt)) {
+    List<Payout> deductions = offset(payouts, debt);
+    if (deductions.stream().mapToLong(Payout::amount).sum() < debt) {
       return Outcome.HELD;
     }
 
@@ -73,6 +78,11 @@ public class MerchantClosureSettlementProcessor {
     }
 
     LocalDateTime now = LocalDateTime.now(clock);
+    // 달별 차감액을 남겨 둔다. 월 지급 대사가 확정액의 합에서 이 금액을 빼고 지급액과 비교한다
+    for (Payout deduction : deductions) {
+      deductionRepository.save(
+          MerchantClosureDeduction.create(merchantId, deduction.month(), deduction.amount(), now));
+    }
     for (Payout payout : payouts) {
       if (payout.amount() > 0) {
         monthlySettlementRepository.save(
@@ -115,16 +125,18 @@ public class MerchantClosureSettlementProcessor {
     return payouts;
   }
 
-  // 부족분을 가장 최근 달의 지급액부터 깎는다. 다 갚으면 true, 정산금이 모자라면 false
-  private boolean offset(List<Payout> payouts, long debt) {
+  // 부족분을 가장 최근 달의 지급액부터 깎고, 달별로 깎은 금액을 돌려준다. 깎은 합이 부족분보다 작으면 정산금이 모자란 것이다
+  private List<Payout> offset(List<Payout> payouts, long debt) {
+    List<Payout> deductions = new ArrayList<>();
     long remaining = debt;
     for (int i = payouts.size() - 1; i >= 0 && remaining > 0; i--) {
       Payout payout = payouts.get(i);
       long take = Math.min(payout.amount(), remaining);
       payouts.set(i, new Payout(payout.month(), payout.amount() - take));
+      deductions.add(new Payout(payout.month(), take));
       remaining -= take;
     }
-    return remaining == 0;
+    return deductions;
   }
 
   // 지급이 끝나지 않은 건을 지갑에 입금하고 계좌로 출금한다. 같은 건을 다시 처리해도 중복 반영되지 않는다
