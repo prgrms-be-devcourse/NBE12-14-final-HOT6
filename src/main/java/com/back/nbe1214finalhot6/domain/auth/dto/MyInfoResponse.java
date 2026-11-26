@@ -16,7 +16,7 @@ public record MyInfoResponse(
             example = "USER")
         UserRole role,
     @Schema(
-            description = "PIN 잠금 여부. 5회 실패로 잠겼으면 true. 잠긴 지 30분이 지나면 자동으로 풀리므로 false",
+            description = "PIN 잠금 여부. 5회 실패로 잠겼으면 true. 잠긴 지 10분이 지나면 자동으로 풀리므로 false",
             example = "false")
         boolean pinLocked,
     @Schema(
@@ -28,7 +28,7 @@ public record MyInfoResponse(
   /**
    * tokenRole 은 지금 쓰는 토큰에 들어 있는 역할이다. DB의 현재 역할과 다르면 다시 로그인해야 한다.
    *
-   * <p>now 는 PIN 잠금이 아직 유지되는지 판단하는 현재 시각이다. 잠긴 지 30분이 지나면 풀린 것으로 본다({@link User#isPinLocked}).
+   * <p>now 는 PIN 잠금이 아직 유지되는지 판단하는 현재 시각이다. 잠긴 지 10분이 지나면 풀린 것으로 본다({@link User#isPinLocked}).
    */
   public static MyInfoResponse from(User user, UserRole tokenRole, LocalDateTime now) {
     return new MyInfoResponse(

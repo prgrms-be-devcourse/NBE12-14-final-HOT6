@@ -44,10 +44,10 @@ class UserTest {
     assertThat(admin.getRole()).isEqualTo(UserRole.ADMIN);
   }
 
-  // 목적: PIN 잠금이 정확히 30분 동안만 유지되는지 경계를 확인한다(29분 59초는 잠김, 30분은 풀림, 잠근 적 없으면 안 잠김).
+  // 목적: PIN 잠금이 정확히 10분 동안만 유지되는지 경계를 확인한다(9분 59초는 잠김, 10분은 풀림, 잠근 적 없으면 안 잠김).
   @Test
-  @DisplayName("PIN 잠금은 잠긴 지 30분 전까지만 유지된다")
-  void pinLockedOnlyForThirtyMinutes() {
+  @DisplayName("PIN 잠금은 잠긴 지 10분 전까지만 유지된다")
+  void pinLockedOnlyForTenMinutes() {
     User user = User.create("홍길동", "u@devpay.com", "01012340000", "pw", "pin", UserRole.USER);
     LocalDateTime lockedAt = LocalDateTime.of(2026, 11, 24, 9, 0);
 
@@ -55,8 +55,8 @@ class UserTest {
 
     ReflectionTestUtils.setField(user, "pinLockedAt", lockedAt);
     assertThat(user.isPinLocked(lockedAt)).isTrue();
-    assertThat(user.isPinLocked(lockedAt.plusMinutes(29).plusSeconds(59))).isTrue();
-    assertThat(user.isPinLocked(lockedAt.plusMinutes(30))).isFalse();
+    assertThat(user.isPinLocked(lockedAt.plusMinutes(9).plusSeconds(59))).isTrue();
+    assertThat(user.isPinLocked(lockedAt.plusMinutes(10))).isFalse();
     assertThat(user.isPinLocked(lockedAt.plusHours(2))).isFalse();
   }
 }

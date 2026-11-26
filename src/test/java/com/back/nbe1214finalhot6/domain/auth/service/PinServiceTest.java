@@ -140,19 +140,19 @@ class PinServiceTest {
     assertThat(failCount(user.getId())).isEqualTo(5);
   }
 
-  // 목적: 잠금은 30분 동안만 유지되는지 경계를 확인한다. 29분 59초에는 맞는 PIN 도 거절하고, 30분이 되면 풀려서 통과해야 한다.
+  // 목적: 잠금은 10분 동안만 유지되는지 경계를 확인한다. 9분 59초에는 맞는 PIN 도 거절하고, 10분이 되면 풀려서 통과해야 한다.
   // (임시 방식. MVP 이후에는 이메일 인증으로 해제(U7)로 바꾼다)
   @Test
-  @DisplayName("잠긴 지 29분 59초까지는 거절하고, 30분이 지나면 풀려서 맞는 PIN 이 통과한다")
-  void lockExpiresAfterThirtyMinutes() {
+  @DisplayName("잠긴 지 9분 59초까지는 거절하고, 10분이 지나면 풀려서 맞는 PIN 이 통과한다")
+  void lockExpiresAfterTenMinutes() {
     User user = save("p8@devpay.com", "01055550008");
     lockByFiveFailures(user);
 
-    clock.advance(Duration.ofMinutes(29).plusSeconds(59));
+    clock.advance(Duration.ofMinutes(9).plusSeconds(59));
     assertFails(() -> pinService.verify(user.getId(), PIN), AuthErrorCode.PIN_LOCKED);
     assertThat(locked(user.getId())).isTrue();
 
-    clock.advance(Duration.ofSeconds(1)); // 정확히 30분
+    clock.advance(Duration.ofSeconds(1)); // 정확히 10분
     pinService.verify(user.getId(), PIN);
 
     assertThat(locked(user.getId())).isFalse();
@@ -165,7 +165,7 @@ class PinServiceTest {
   void startsOverAfterUnlock() {
     User user = save("p9@devpay.com", "01055550009");
     lockByFiveFailures(user);
-    clock.advance(Duration.ofMinutes(31));
+    clock.advance(Duration.ofMinutes(11));
 
     assertThatThrownBy(() -> pinService.verify(user.getId(), WRONG))
         .isInstanceOfSatisfying(
@@ -179,8 +179,8 @@ class PinServiceTest {
     assertFails(() -> pinService.verify(user.getId(), WRONG), AuthErrorCode.PIN_LOCKED);
     assertThat(failCount(user.getId())).isEqualTo(5);
     assertThat(locked(user.getId())).isTrue();
-    // 다시 잠겼으니 30분이 새로 시작된다
-    clock.advance(Duration.ofMinutes(29));
+    // 다시 잠겼으니 10분이 새로 시작된다
+    clock.advance(Duration.ofMinutes(9));
     assertFails(() -> pinService.verify(user.getId(), PIN), AuthErrorCode.PIN_LOCKED);
   }
 
