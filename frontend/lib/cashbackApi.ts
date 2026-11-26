@@ -21,6 +21,8 @@ export type Notice = {
 };
 
 export const getCashbackSummary = () => api<CashbackSummary>("/cashback/summary");
+export type PayoutRules = { payoutDelayDays: number };
+export const getPayoutRules = () => api<PayoutRules>("/cashback/rules");
 export const getMonthlyLimit = () => api<MonthlyLimit>("/cashback/monthly-limit");
 export const getEarnings = (status?: EarningStatus, page = 0, size = 20) =>
   api<PageResponse<Earning>>(`/cashback/earnings?page=${page}&size=${size}${status ? `&status=${status}` : ""}`);
@@ -44,6 +46,7 @@ export const mmdd = (iso: string | null) => (iso ? `${iso.slice(5, 7)}.${iso.sli
 // 결제 전 미리보기 (예상값). 확정은 결제 응답·영수증이 기준이다
 export type CashbackPreview = {
   earnable: boolean; paused: boolean; appliedRate: number; expectedAmount: number; monthlyLimitRemaining: number; exclusionReason: ExclusionCode;
+  limitReduced: boolean; // 남은 월 한도가 모자라 예상 적립액을 남은 한도만큼으로 줄였는지
 };
 export const getCashbackPreview = (merchantId: number, walletUsedAmount: number) =>
   api<CashbackPreview>(`/cashback/preview?merchantId=${merchantId}&walletUsedAmount=${walletUsedAmount}`);

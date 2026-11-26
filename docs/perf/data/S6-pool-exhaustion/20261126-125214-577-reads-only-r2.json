@@ -1,0 +1,51 @@
+{
+  "scenario": "S6-pool-exhaustion",
+  "label": "reads-only-r2",
+  "environment": {
+    "commit": "fb820fb",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 2,
+    "executedAt": "2026-11-26T12:52:14.577778",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "reads": 5,
+    "round": 2,
+    "rounds": 3
+  },
+  "wallMs": 8.25,
+  "counts": {
+    "OK": 5
+  },
+  "latencyMs": {
+    "n": 5,
+    "min": 3.23,
+    "p50": 5.97,
+    "p95": 8.18,
+    "max": 8.18
+  },
+  "groups": {
+    "read": {
+      "counts": {
+        "OK": 5
+      },
+      "latencyMs": {
+        "n": 5,
+        "min": 3.23,
+        "p50": 5.97,
+        "p95": 8.18,
+        "max": 8.18
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": true,
+    "readOk": 5,
+    "paymentsCompleted": 3,
+    "readP50Ms": 5.97,
+    "readMaxMs": 8.18
+  },
+  "exampleMessages": {}
+}

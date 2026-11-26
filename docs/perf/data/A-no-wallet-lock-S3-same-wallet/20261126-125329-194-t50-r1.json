@@ -1,0 +1,53 @@
+{
+  "scenario": "A-no-wallet-lock-S3-same-wallet",
+  "label": "t50-r1",
+  "environment": {
+    "commit": "d3fc3b0",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:53:29.194646",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 50,
+    "amount": 10000,
+    "variant": "no-wallet-lock",
+    "round": 1,
+    "rounds": 3
+  },
+  "wallMs": 412.63,
+  "counts": {
+    "COMPLETED": 50
+  },
+  "latencyMs": {
+    "n": 50,
+    "min": 29.79,
+    "p50": 227.32,
+    "p95": 398.91,
+    "max": 411.89
+  },
+  "groups": {
+    "pay": {
+      "counts": {
+        "COMPLETED": 50
+      },
+      "latencyMs": {
+        "n": 50,
+        "min": 29.79,
+        "p50": 227.32,
+        "p95": 398.91,
+        "max": 411.89
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": false,
+    "completed": 50,
+    "expectedCompleted": 25,
+    "debitLines": 50,
+    "balance": 190000
+  },
+  "exampleMessages": {}
+}

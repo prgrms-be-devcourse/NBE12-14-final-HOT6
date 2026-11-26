@@ -3,16 +3,17 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import AccountTxList from "@/components/AccountTxList";
 import Amount from "@/components/Amount";
+import ChargeLimitNote from "@/components/ChargeLimitNote";
 import Header from "@/components/Header";
+import { HelpButton, HelpTip } from "@/components/Help";
+import { ICONS } from "@/components/icons";
 import Progress from "@/components/Progress";
-import TxList from "@/components/TxList";
+import PromoBanner from "@/components/PromoBanner";
 import { getCashbackSummary, getMonthlyLimit } from "@/lib/cashbackApi";
 import { getMyWallet } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
-import { getAccountBalance } from "@/lib/walletApi";
 
 // 충전·환불을 마치고 돌아오면 ?charged=금액 / ?refunded=금액 으로 완료 안내를 띄운다
 function doneBanner(params: URLSearchParams) {
@@ -23,67 +24,86 @@ function doneBanner(params: URLSearchParams) {
   return null;
 }
 
+// 초록 배경의 캐시백 카드 안에서 쓰는 안내창: 흰 배경에 초록 점선
+const CARD_TIP = "!border-emerald-500 !bg-white";
+
+// 잔액 옆의 아래 화살표: 그 잔액의 내역 화면으로 간다
+function HistoryArrow({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} aria-label={label} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-300 text-slate-700 hover:bg-slate-50">
+      {ICONS.chevronDown}
+    </Link>
+  );
+}
+
 function WalletBody() {
   const banner = doneBanner(useSearchParams());
   const wallet = useLoad(getMyWallet, []);
-  const account = useLoad(getAccountBalance, []);
-  const [showAccount, setShowAccount] = useState(false);
   const summary = useLoad(getCashbackSummary, []);
   const limit = useLoad(getMonthlyLimit, []);
+  const [help, setHelp] = useState(false); // 적립 예정 안내
+  const [limitHelp, setLimitHelp] = useState(false); // 월 적립 한도 안내
   const w = wallet.data;
 
   return (
-    <div className="px-5">
+    <div className="px-5 pb-4">
+      <PromoBanner />
       {banner && <p role="status" className="mb-3 rounded-lg bg-brand-600 py-2.5 text-center text-[13px] font-bold text-white">{banner}</p>}
       {wallet.error && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">{wallet.error}</p>}
-      <section className="card !p-5">
+      <section className="card !px-4 !py-3">
         <span className="text-[13px] font-medium text-slate-500">데브머니 잔액</span>
-        <div className="mt-0.5">{w ? <Amount value={w.devMoney} size="xl" /> : <span className="note">불러오는 중…</span>}</div>
-        <div className="mt-2 flex items-baseline justify-between border-t border-slate-200 pt-2.5">
-          <span className="text-[13px] text-slate-500">캐시백 잔액</span>
-          {w ? <Amount value={w.cashbackBalance} kind={w.cashbackBalance < 0 ? "out" : "cashback"} size="md" /> : <span className="note">…</span>}
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          {w ? <Amount value={w.devMoney} size="xl" /> : <span className="note">불러오는 중…</span>}
+          <HistoryArrow href="/wallet/history" label="이용내역 보기" />
+        </div>
+        {w && <ChargeLimitNote wallet={w} className="mt-1 border-t border-slate-200 pt-1.5" />}
+        <div className="mt-2.5 flex gap-2.5">
+          <Link href="/wallet/charge" className="btn btn-primary !py-2.5">충전</Link>
+          <Link href="/wallet/refund" className="btn btn-danger !py-2.5">환불</Link>
+        </div>
+      </section>
+
+      <section className="card mt-2.5 !bg-emerald-50 !px-4 !py-3">
+        <span className="text-[13px] font-medium text-emerald-800">캐시백 잔액</span>
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          {w ? <Amount value={w.cashbackBalance} kind={w.cashbackBalance < 0 ? "out" : "cashbackDeep"} size="xl" /> : <span className="note">불러오는 중…</span>}
+          <HistoryArrow href="/cashback" label="캐시백 내역 보기" />
         </div>
         {w && w.cashbackBalance < 0 && (
           <p className="note mt-1">캐시백 잔액이 음수예요. 다음 적립분으로 먼저 채워지고, 그동안은 캐시백을 쓸 수 없어요.</p>
         )}
-        <div className="mt-2 flex items-baseline justify-between">
-          <span className="text-[13px] text-slate-500">적립 예정</span>
+        <div className="mt-0.5 flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <span className="text-[13px] leading-[18px] text-slate-500">적립 예정</span>
+            <HelpButton open={help} onClick={() => setHelp((v) => !v)} controls="pending-help" label="적립 예정 안내 보기" />
+          </span>
           {summary.data ? <Amount value={summary.data.pendingAmount} kind="wait" size="md" /> : <span className="note">…</span>}
         </div>
-        <p className="note mt-0.5">적립 예정은 지급되기 전까지 쓸 수 없어요</p>
-        <div className="mt-2 flex items-baseline justify-between border-t border-slate-200 pt-2.5">
-          <span className="text-[13px] text-slate-500">모의계좌 잔액</span>
-          {account.data ? <Amount value={account.data.balance} size="md" /> : account.error ? <span className="note">불러오지 못했어요</span> : <span className="note">…</span>}
-        </div>
-        <div className="mt-4 flex gap-2.5">
-          <Link href="/wallet/charge" className="btn btn-primary">충전</Link>
-          <Link href="/wallet/refund" className="btn btn-danger">환불</Link>
-        </div>
-      </section>
-
-      <section className="card mt-3">
-        <div className="flex justify-between">
-          <span className="font-bold">이번 달 캐시백 적립</span>
+        <HelpTip id="pending-help" open={help} className={`mt-2 ${CARD_TIP}`}>적립 예정은 지급되기 전까지 쓸 수 없어요</HelpTip>
+        <div className="mt-2 flex items-baseline justify-between border-t border-slate-200 pt-2">
+          <span className="font-bold">캐시백 적립</span>
           <span className="text-[13px]">{limit.data ? `${limit.data.usedAmount.toLocaleString("ko-KR")} / ${won(limit.data.limit)}` : "…"}</span>
         </div>
         {limit.data && (
           <>
-            <div className="mt-2.5"><Progress value={limit.data.usedAmount} max={limit.data.limit} /></div>
-            <div className="mt-3 flex items-baseline justify-between rounded-lg bg-emerald-50 px-3 py-2">
-              <span className="text-[13px] font-semibold text-emerald-800">월 적립 한도 잔여</span>
+            <div className="mt-1.5"><Progress value={limit.data.usedAmount} max={limit.data.limit} /></div>
+            <div className="mt-2 flex items-center justify-between rounded-lg bg-white px-3 py-1.5">
+              <span className="flex items-center gap-1.5">
+                <span className="text-[13px] font-semibold leading-[18px] text-emerald-800">월 적립 한도 잔여</span>
+                <HelpButton open={limitHelp} onClick={() => setLimitHelp((v) => !v)} controls="limit-help" label="월 적립 한도 안내 보기" />
+              </span>
               <span className="amt-cb text-base font-bold">{won(limit.data.remaining)}</span>
             </div>
-            <p className="note mt-1.5">월 적립 한도 {won(limit.data.limit)} 중 {won(limit.data.usedAmount)} 적립 (적립 예정 포함)</p>
+            <HelpTip id="limit-help" open={limitHelp} className={`mt-2 ${CARD_TIP}`}>
+              캐시백은 한도에 맞춰 적립
+              <br />
+              (한도 : 3,000원 여유, 적립 예정 캐시백 : 5,000원 → 3,000원만 적립)
+            </HelpTip>
+            <p className="note mt-1.5 font-semibold">월 적립 한도 {won(limit.data.limit)} 중 {won(limit.data.usedAmount)} 적립 (적립 예정 포함)</p>
           </>
         )}
         {limit.error && <p role="alert" className="mt-2 text-[13px] text-red-600">{limit.error}</p>}
       </section>
-
-      <div className="mx-1.5 mb-2 mt-6 flex gap-2" role="tablist" aria-label="내역 종류">
-        <button type="button" role="tab" aria-selected={!showAccount} onClick={() => setShowAccount(false)} className={`chip ${!showAccount ? "chip-on" : ""}`}>지갑 거래내역</button>
-        <button type="button" role="tab" aria-selected={showAccount} onClick={() => setShowAccount(true)} className={`chip ${showAccount ? "chip-on" : ""}`}>모의계좌 내역</button>
-      </div>
-      <div className="pb-4">{showAccount ? <AccountTxList /> : <TxList />}</div>
     </div>
   );
 }

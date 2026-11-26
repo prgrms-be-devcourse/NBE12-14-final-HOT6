@@ -10,7 +10,7 @@ const LANES: { title: string; note?: string; items: Item[] }[] = [
     { href: "/wallet?charged=50000", label: "⑨ 충전 후 지갑 홈", star: true }, { href: "/wallet/refund", label: "⑩ 지갑 환불" } ] },
   { title: "회원 앱 · 결제 / 캐시백", items: [
     { href: "/pay/scan", label: "⑪ QR 스캔 · 미리보기", star: true }, { href: "/stores", label: "가맹점 찾기 (추가)" }, { href: "/pay/receipt", label: "⑫ 결제 완료 · 영수증", star: true },
-    { href: "/pay/history", label: "⑬ 결제 내역 · 취소" }, { href: "/cashback", label: "⑭ 내 캐시백" }, { href: "/cashback/accruals", label: "⑮ 캐시백 적립내역" } ] },
+    { href: "/pay/history", label: "⑬ 결제 내역 · 취소" }, { href: "/cashback", label: "⑭⑮ 캐시백 내역" } ] },
   { title: "회원 앱 · 마이페이지", items: [
     { href: "/my", label: "⑯ 마이페이지" }, { href: "/my/profile", label: "⑰ 내정보 수정" }, { href: "/my/withdraw", label: "⑱ 회원 탈퇴 · 정산" } ] },
   { title: "사장님 앱", items: [

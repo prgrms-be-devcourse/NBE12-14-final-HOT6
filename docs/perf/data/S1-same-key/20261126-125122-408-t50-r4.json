@@ -1,0 +1,57 @@
+{
+  "scenario": "S1-same-key",
+  "label": "t50-r4",
+  "environment": {
+    "commit": "fb820fb",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:51:22.408939",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 50,
+    "amount": 10000,
+    "variant": "",
+    "round": 4,
+    "rounds": 5
+  },
+  "wallMs": 53.57,
+  "counts": {
+    "COM-004": 49,
+    "COMPLETED": 1
+  },
+  "latencyMs": {
+    "n": 50,
+    "min": 8.1,
+    "p50": 36.76,
+    "p95": 44.19,
+    "max": 53.34
+  },
+  "groups": {
+    "pay": {
+      "counts": {
+        "COM-004": 49,
+        "COMPLETED": 1
+      },
+      "latencyMs": {
+        "n": 50,
+        "min": 8.1,
+        "p50": 36.76,
+        "p95": 44.19,
+        "max": 53.34
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": true,
+    "paymentRows": 1,
+    "debitLines": 1,
+    "balance": 490000,
+    "expectedBalance": 490000
+  },
+  "exampleMessages": {
+    "COM-004": "이전 요청을 아직 처리 중입니다"
+  }
+}

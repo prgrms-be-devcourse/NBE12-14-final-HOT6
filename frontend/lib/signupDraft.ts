@@ -7,6 +7,21 @@ export const saveSignupDraft = (d: SignupDraft) => { draft = d; };
 export const loadSignupDraft = () => draft;
 export const clearSignupDraft = () => { draft = null; };
 
+// 가입 흐름(/signup, /pin-setup)을 벗어날 때마다 올라가는 번호. 가입 화면은 이 번호를 key 로 써서,
+// 다시 들어오면 보관한 값 없이 빈 화면으로 새로 만든다 (Next.js 는 벗어난 화면의 상태를 보존한다)
+let flow = 0;
+const listeners = new Set<() => void>();
+export const subscribeSignupFlow = (listener: () => void) => {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+};
+export const getSignupFlow = () => flow;
+export const resetSignupFlow = () => {
+  draft = null;
+  flow += 1;
+  listeners.forEach((listener) => listener());
+};
+
 // 서버의 가입 규칙과 같다 (SignupRequest)
 export const PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#%^&*])[A-Za-z\d!@#%^&*]{8,15}$/;
 export const PHONE_RULE = /^01\d{8,9}$/;

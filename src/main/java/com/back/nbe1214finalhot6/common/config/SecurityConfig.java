@@ -6,6 +6,7 @@ import com.back.nbe1214finalhot6.domain.auth.entity.UserStatus;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
 import com.back.nbe1214finalhot6.domain.auth.security.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import java.util.function.LongPredicate;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
@@ -59,6 +60,9 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth
+                    // 비동기 응답(SSE)의 마무리 처리. 처음 요청에서 이미 권한을 검사했고, 이 단계에는 토큰 필터가 다시 돌지 않는다
+                    .dispatcherTypeMatchers(DispatcherType.ASYNC)
+                    .permitAll()
                     // 누구나
                     .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/users/signup")
                     .permitAll()

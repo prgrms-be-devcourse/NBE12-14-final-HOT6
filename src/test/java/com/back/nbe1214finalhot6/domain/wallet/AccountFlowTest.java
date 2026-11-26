@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 가입 → 로그인 → 모의계좌 잔액·내역 조회 → 충전·환불 뒤 다시 조회를, 실제 보안 설정과 DB 로 끝까지 확인한다.
  *
- * <p>테스트 전체를 한 트랜잭션으로 감싸서(끝나면 롤백) 따로 정리하지 않는다. 가입하면 모의계좌에 200만원이 들어 있다.
+ * <p>테스트 전체를 한 트랜잭션으로 감싸서(끝나면 롤백) 따로 정리하지 않는다. 가입하면 모의계좌에 500만원이 들어 있다.
  */
 @IntegrationTest
 @AutoConfigureMockMvc
@@ -39,38 +39,38 @@ class AccountFlowTest {
   void accountFlow() throws Exception {
     String token = signupAndLogin("ac1@devpay.com", "01099990001");
 
-    // 가입 직후: 200만원, 내역은 가입 보너스 1줄
-    balance(token, 2_000_000);
+    // 가입 직후: 500만원, 내역은 가입 보너스 1줄
+    balance(token, 5_000_000);
     getAs(token, "/api/wallet/account/transactions")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.totalElements").value(1))
         .andExpect(jsonPath("$.data.content[0].type").value("SIGNUP_BONUS"))
-        .andExpect(jsonPath("$.data.content[0].amount").value(2_000_000))
-        .andExpect(jsonPath("$.data.content[0].balanceAfter").value(2_000_000))
+        .andExpect(jsonPath("$.data.content[0].amount").value(5_000_000))
+        .andExpect(jsonPath("$.data.content[0].balanceAfter").value(5_000_000))
         .andExpect(jsonPath("$.data.content[0].refKey").doesNotExist());
 
     // 10만원 충전: 계좌에서 빠진다
     MvcResult charged =
         walletPost(token, "/api/wallet/charges", 100_000).andExpect(status().isOk()).andReturn();
     int chargeId = JsonPath.read(charged.getResponse().getContentAsString(), "$.data.chargeId");
-    balance(token, 1_900_000);
+    balance(token, 4_900_000);
     getAs(token, "/api/wallet/account/transactions")
         .andExpect(jsonPath("$.data.totalElements").value(2))
         .andExpect(jsonPath("$.data.content[0].type").value("CHARGE"))
         .andExpect(jsonPath("$.data.content[0].amount").value(-100_000))
-        .andExpect(jsonPath("$.data.content[0].balanceAfter").value(1_900_000))
+        .andExpect(jsonPath("$.data.content[0].balanceAfter").value(4_900_000))
         .andExpect(jsonPath("$.data.content[0].refKey").value(chargeId));
 
     // 3만원 환불: 계좌로 돌아온다
     MvcResult refunded =
         walletPost(token, "/api/wallet/refunds", 30_000).andExpect(status().isOk()).andReturn();
     int refundId = JsonPath.read(refunded.getResponse().getContentAsString(), "$.data.refundId");
-    balance(token, 1_930_000);
+    balance(token, 4_930_000);
     getAs(token, "/api/wallet/account/transactions")
         .andExpect(jsonPath("$.data.totalElements").value(3))
         .andExpect(jsonPath("$.data.content[0].type").value("REFUND"))
         .andExpect(jsonPath("$.data.content[0].amount").value(30_000))
-        .andExpect(jsonPath("$.data.content[0].balanceAfter").value(1_930_000))
+        .andExpect(jsonPath("$.data.content[0].balanceAfter").value(4_930_000))
         .andExpect(jsonPath("$.data.content[0].refKey").value(refundId))
         .andExpect(jsonPath("$.data.content[2].type").value("SIGNUP_BONUS"));
 
@@ -95,13 +95,13 @@ class AccountFlowTest {
     walletPost(aToken, "/api/wallet/charges", 500_000).andExpect(status().isOk());
     long aUserId = jwtProvider.parse(aToken).userId();
 
-    // B 가 A 의 번호를 붙여도 B 의 계좌(200만원, 내역 1줄)가 나온다
+    // B 가 A 의 번호를 붙여도 B 의 계좌(500만원, 내역 1줄)가 나온다
     mockMvc
         .perform(
             get("/api/wallet/account")
                 .param("userId", String.valueOf(aUserId))
                 .header("Authorization", "Bearer " + bToken))
-        .andExpect(jsonPath("$.data.balance").value(2_000_000));
+        .andExpect(jsonPath("$.data.balance").value(5_000_000));
     mockMvc
         .perform(
             get("/api/wallet/account/transactions")
@@ -109,7 +109,7 @@ class AccountFlowTest {
                 .param("userId", String.valueOf(aUserId))
                 .header("Authorization", "Bearer " + bToken))
         .andExpect(jsonPath("$.data.totalElements").value(1));
-    balance(aToken, 1_500_000);
+    balance(aToken, 4_500_000);
   }
 
   // 목적: 토큰이 없으면 401, 운영자 토큰은 시민 기능이라 403 인지 실제 보안 설정으로 확인한다.

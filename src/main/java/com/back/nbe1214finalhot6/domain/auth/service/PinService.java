@@ -35,7 +35,7 @@ public class PinService {
    *
    * <ul>
    *   <li>없는 회원이거나 탈퇴한 회원: COM-009(404)
-   *   <li>이미 잠긴 회원: AUTH-006(409). 맞는 PIN 이어도 거절한다. 잠긴 지 30분이 지나면 자동으로 풀린다(임시 방식, MVP 이후 이메일 인증 해제로 대체)
+   *   <li>이미 잠긴 회원: AUTH-006(409). 맞는 PIN 이어도 거절한다. 잠긴 지 10분이 지나면 자동으로 풀린다(임시 방식, MVP 이후 이메일 인증 해제로 대체)
    *   <li>틀림: AUTH-005(400), 메시지에 남은 횟수. 5번째로 틀려 잠기면 AUTH-006(409)
    * </ul>
    */
@@ -50,7 +50,7 @@ public class PinService {
       throw new BusinessException(AuthErrorCode.PIN_LOCKED);
     }
     if (user.getPinLockedAt() != null) {
-      // 잠긴 지 User.PIN_LOCK_DURATION(30분)이 지났다. 잠금과 실패 횟수를 초기화하고 처음부터 다시 시작한다.
+      // 잠긴 지 User.PIN_LOCK_DURATION(10분)이 지났다. 잠금과 실패 횟수를 초기화하고 처음부터 다시 시작한다.
       // (임시 방식: MVP 이후에는 이메일 인증으로 해제(U7)로 바꾼다. User.PIN_LOCK_DURATION 참고)
       recorder.unlockIfExpired(userId, now.minus(User.PIN_LOCK_DURATION));
     }

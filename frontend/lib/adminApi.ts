@@ -23,8 +23,36 @@ export type Forecast = {
 };
 
 const BASE = "/admin/cashback";
+
+// 서버 설정값(운영 화면의 안내 문구가 쓴다)
+export type CashbackRules = { contingencyRate: number; emergencyRatio: number; noticeDays: number; payoutDelayDays: number };
+export const getCashbackRules = () => api<CashbackRules>(`${BASE}/rules`);
 export const getMonthlyBudget = (year: number, month: number) => api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}`);
 export const getPolicyHistory = (page = 0, size = 10) => api<PageResponse<PolicyHistory>>(`${BASE}/policies/history?page=${page}&size=${size}`);
+// 적립 지급 배치: 대기 현황, 수동 실행, 실행 목록과 상세
+export type PayoutRunResult = { paid: number; skipped: number; failed: number };
+export type PayoutStatusData = {
+  pendingCount: number; pendingAmount: number; dueCount: number; dueAmount: number; nextPayableAt: string | null;
+};
+export type PayoutRunSummary = PayoutRunResult & { runId: number; ranAt: string; trigger: "SCHEDULED" | "MANUAL" };
+export type PayoutItemResult = "PAID" | "SKIPPED" | "FAILED";
+export type PayoutRunDetail = {
+  run: PayoutRunSummary; paidAmount: number;
+  items: { earningId: number; paymentId: number; walletId: number; amount: number; result: PayoutItemResult; errorCode: string | null; errorMessage: string | null }[];
+};
+export const getPayoutStatus = () => api<PayoutStatusData>(`${BASE}/payouts/status`);
+export const getPayoutRuns = (page = 0, size = 20) => api<PageResponse<PayoutRunSummary>>(`${BASE}/payouts/runs?page=${page}&size=${size}`);
+export const getPayoutRun = (runId: number) => api<PayoutRunDetail>(`${BASE}/payouts/runs/${runId}`);
+export const runPayouts = () => api<PayoutRunResult>(`${BASE}/payouts/run`, { method: "POST" });
+// 운영자 설정 한도 (월 적립 한도, 지갑 보유·월 충전 한도). 범위와 기본값은 서버가 알려 준다
+export type SettingKey = "CASHBACK_USER_MONTHLY_LIMIT" | "WALLET_HOLDING_LIMIT" | "WALLET_MONTHLY_CHARGE_LIMIT";
+export type OperatorSetting = {
+  key: SettingKey; description: string; value: number; source: "DEFAULT" | "OPERATOR";
+  defaultValue: number; minValue: number; hardMax: number | null; updatedAt: string | null;
+};
+export const getSettings = () => api<OperatorSetting[]>("/admin/settings");
+export const updateSetting = (key: SettingKey, value: number) => api<OperatorSetting>(`/admin/settings/${key}`, { method: "PUT", body: { value } });
+export const resetSetting = (key: SettingKey) => api<OperatorSetting>(`/admin/settings/${key}`, { method: "DELETE" });
 export const getForecast = () => api<Forecast>(`${BASE}/forecast`);
 export const reduceRate = (rate: number, effectiveAt: string) =>
   api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt } });
@@ -37,7 +65,8 @@ export const thisYearMonth = () => {
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 };
 export const STATUS_TEXT: Record<BudgetStatus, string> = { ACTIVE: "정상 적립", NOTICED: "중단 공지 중", STOPPED: "적립 중단", CLOSED: "마감" };
-export const manwon = (n: number) => Math.round(n / 10_000);
+// 그래프 금액 단위. 1만 원에 못 미치는 작은 예산도 보이도록, 가장 큰 값이 1만 원 미만이면 원 단위로 쓴다
+export const moneyUnit = (max: number) => (max >= 10_000 ? { label: "만원", div: 10_000 } : { label: "원", div: 1 });
 export const md = (iso: string | null) => (iso ? `${iso.slice(5, 7)}.${iso.slice(8, 10)}` : "-");
 
 // 연·월 예산 (/api/admin/cashback/budget/**)

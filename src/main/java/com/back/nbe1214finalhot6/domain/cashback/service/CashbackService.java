@@ -45,8 +45,8 @@ public class CashbackService {
   /**
    * 적립액을 계산하고 그만큼의 이용자 월 한도와 예산을 확보한다. 호출한 쪽(결제)의 트랜잭션에 참여한다.
    *
-   * <p>적립은 전액 또는 0원이다. 예산이 부족하거나 한도를 넘으면 예외 없이 0원과 사유를 돌려주며, 결제는 그대로 진행한다. 제외된 결제도 적립 건을
-   * 남긴다. 같은 결제 ID 로 다시 호출하면 새로 확보하지 않고 처음 결과를 돌려준다.
+   * <p>이용자 월 한도가 모자라면 남은 한도만큼만 적립한다(부분 적립). 남은 한도가 없거나 예산이 부족하면 예외 없이 0원과 사유를 돌려주며, 결제는 그대로
+   * 진행한다. 예산은 줄여서 확보하지 않고 전액 아니면 0원이다. 제외된 결제도 적립 건을 남긴다. 같은 결제 ID 로 다시 호출하면 새로 확보하지 않고 처음 결과를 돌려준다.
    *
    * <p>제외 사유는 먼저 걸리는 하나만 쓴다: 적립 대상 아님, 데브머니 사용분 없음, 적립액 1원 미만, 월 한도 초과, 예산 소진 순이다. 요율은 최초
    * 접수 시각 기준이고 적립액은 소수점 이하를 버린다. 월은 접수 시각의 월이다.
@@ -74,7 +74,9 @@ public class CashbackService {
     BigDecimal rate = quote.rate();
     long amount = quote.amount();
 
-    if (!limitService.consume(command.walletId(), month, amount, limit)) {
+    // 개인 월 한도는 남은 만큼만 부분으로 확보한다. 남은 한도가 없으면 제외다
+    amount = limitService.consumeUpTo(command.walletId(), month, amount, limit);
+    if (amount == 0) {
       return exclude(command, CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED, month, limit, now);
     }
     if (!budgetService
@@ -112,7 +114,7 @@ public class CashbackService {
   /**
    * 결제 전에 받을 수 있는 캐시백을 미리 계산한다. 읽기만 하며 월 한도·예산·적립 건을 바꾸지 않는다. 결제 도메인이나 화면이 호출한다.
    *
-   * <p>판정은 {@link #reserve} 와 같은 순서와 규칙이다: 적립 대상, 데브머니 사용분, 요율, 내림 계산, 월 한도, 예산. 지금(서버 시각) 기준의 예상 값이라
+   * <p>판정은 {@link #reserve} 와 같은 순서와 규칙이다: 적립 대상, 데브머니 사용분, 요율, 내림 계산, 월 한도(남은 한도만큼으로 줄임), 예산(줄이지 않음). 지금(서버 시각) 기준의 예상 값이라
    * 결제가 확정되는 사이에 예산·한도·요율이 바뀌면 실제 적립은 달라질 수 있다.
    */
   @Transactional(readOnly = true)
@@ -125,18 +127,32 @@ public class CashbackService {
 
     Quote quote = quote(request.cashbackEligible(), request.walletUsedAmount(), now);
     CashbackExclusionReason reason = quote.exclusionReason();
-    if (reason == CashbackExclusionReason.NONE && quote.amount() > remaining) {
-      reason = CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED;
+    // 남은 한도가 모자라면 남은 한도만큼으로 줄인다(부분 적립). 남은 한도가 없으면 제외다
+    long expected = quote.amount();
+    if (reason == CashbackExclusionReason.NONE) {
+      if (remaining <= 0) {
+        reason = CashbackExclusionReason.MONTHLY_LIMIT_EXCEEDED;
+      } else {
+        expected = Math.min(expected, remaining);
+      }
     }
+    // 예산은 줄이지 않는다. 줄인 금액이 예산 남은 금액보다 크면 제외다
     if (reason == CashbackExclusionReason.NONE
-        && !budgetService.canReserve(month.getYear(), month.getMonthValue(), quote.amount())) {
+        && !budgetService.canReserve(month.getYear(), month.getMonthValue(), expected)) {
       reason = CashbackExclusionReason.BUDGET_EXHAUSTED;
     }
     if (reason != CashbackExclusionReason.NONE) {
-      return new CashbackPreviewResponse(false, paused, BigDecimal.ZERO, 0L, remaining, reason);
+      return new CashbackPreviewResponse(
+          false, paused, BigDecimal.ZERO, 0L, remaining, reason, false);
     }
     return new CashbackPreviewResponse(
-        true, paused, quote.rate(), quote.amount(), remaining, CashbackExclusionReason.NONE);
+        true,
+        paused,
+        quote.rate(),
+        expected,
+        remaining,
+        CashbackExclusionReason.NONE,
+        expected < quote.amount());
   }
 
   /**

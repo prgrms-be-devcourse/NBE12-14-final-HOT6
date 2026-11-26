@@ -97,11 +97,11 @@ class MyInfoFlowTest {
         .andExpect(jsonPath("$.data.needsRelogin").value(false));
   }
 
-  // 목적: PIN 이 잠기면 /me 의 pinLocked 가 true 이고, 잠긴 지 30분이 지나면 자동으로 풀려 false 가 되는지
+  // 목적: PIN 이 잠기면 /me 의 pinLocked 가 true 이고, 잠긴 지 10분이 지나면 자동으로 풀려 false 가 되는지
   // 실제 보안 설정과 DB 로 확인한다(임시 방식, MVP 이후 이메일 인증 해제(U7)로 대체).
   @Test
-  @DisplayName("PIN 이 잠기면 pinLocked 가 true, 30분이 지나면 false 이다")
-  void pinLockedFollowsThirtyMinuteRule() throws Exception {
+  @DisplayName("PIN 이 잠기면 pinLocked 가 true, 10분이 지나면 false 이다")
+  void pinLockedFollowsTenMinuteRule() throws Exception {
     String token = signupAndLogin("me3@devpay.com", "01066660004");
     long userId = jwtProvider.parse(token).userId();
     jdbcTemplate.update(
@@ -115,7 +115,7 @@ class MyInfoFlowTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.pinLocked").value(true));
 
-    clock.advance(Duration.ofMinutes(30));
+    clock.advance(Duration.ofMinutes(10));
     mockMvc
         .perform(get("/api/users/me").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())

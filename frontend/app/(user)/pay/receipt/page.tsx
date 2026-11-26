@@ -13,7 +13,9 @@ import { paymentErrorText } from "@/lib/paymentErrors";
 import { saveCtx } from "@/lib/devContext";
 import { clearPending, loadPending, type PendingPayment } from "@/lib/pendingPayment";
 import { dropPin, peekPin } from "@/lib/pinStore";
-import { REASON_TEXT, pctText, type ExclusionCode } from "@/lib/cashbackApi";
+import { getPayoutRules, REASON_TEXT, pctText, type ExclusionCode } from "@/lib/cashbackApi";
+import { useCashbackPaused } from "@/lib/cashbackStatus";
+import { useLoad } from "@/lib/useLoad";
 import type { PaymentResponse } from "@/lib/types";
 
 type State =
@@ -36,9 +38,15 @@ const fmt = (iso?: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") :
 function ReceiptBody() {
   const router = useRouter();
   const [state, setState] = useState<State>({ kind: "loading" });
-  const called = useRef(false);
+  // 마지막으로 처리한 결제의 멱등키. 화면 상태가 보존된 채 다시 들어와도 키가 다르면 새 결제로 처리한다
+  const handledKey = useRef<string | null>(null);
+  // 결과(성공·실패·시간 초과)를 화면에 아직 못 보여 준 상태. 화면을 벗어나 재조회가 멈췄다면 돌아왔을 때 이어서 확인한다
+  const inFlight = useRef(false);
   const alive = useRef(true);
   const pending = useRef<PendingPayment | null>(null);
+  const payoutDelayDays = useLoad(() => getPayoutRules(), []).data?.payoutDelayDays; // 지급 예정일 안내에 쓰는 서버 설정값
+  // 예산 사유로 제외된 결제만, 지금 적립이 중단 상태인지 받아 안내 문구를 고른다 (서버는 소진과 중단을 같은 사유로 남긴다)
+  const paused = useCashbackPaused(state.kind === "ok" && state.res.cashbackExclusionReason === "BUDGET_EXHAUSTED");
 
   useEffect(() => {
     alive.current = true;
@@ -50,7 +58,10 @@ function ReceiptBody() {
     if (s.kind === "ok" || s.kind === "error") dropPin();
     // 결제가 끝났으면 쓴 QR 번호를 지운다. 다시 QR 결제 화면에 들어왔을 때 이전 번호가 남아 있지 않게 한다 (실패는 같은 QR로 다시 시도할 수 있게 둔다)
     if (s.kind === "ok" && (s.res.status === "COMPLETED" || s.res.status === "CANCELED")) saveCtx({ qrToken: undefined });
-    if (alive.current) setState(s);
+    if (alive.current) {
+      setState(s);
+      inFlight.current = s.kind === "loading" || s.kind === "polling";
+    }
   };
 
   // 같은 멱등키로 결과를 다시 조회한다. 서버는 새로 처리하지 않고 저장된 결과만 돌려준다
@@ -91,13 +102,24 @@ function ReceiptBody() {
     }
   };
 
+  // 화면에 들어올 때마다 대기 중인 결제를 읽는다 (cacheComponents 로 이전 화면 상태가 남아 있을 수 있다)
   useEffect(() => {
-    if (called.current) return;
-    called.current = true;
     const p = loadPending();
     pending.current = p;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 대기 중인 결제는 마운트 후 세션 저장소에서 읽는다
-    if (!p) return setState({ kind: "none" });
+    if (!p) {
+      handledKey.current = null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 대기 중인 결제는 마운트 후 세션 저장소에서 읽는다
+      setState({ kind: "none" });
+      return;
+    }
+    if (handledKey.current === p.key) {
+      // 이미 처리한 결제: 결과를 그대로 보여 준다. 결과를 못 받은 채 화면을 벗어났다면 같은 키로 재조회를 이어 간다
+      if (inFlight.current) void poll(p);
+      return;
+    }
+    handledKey.current = p.key;
+    inFlight.current = true;
+    setState({ kind: "loading" });
     void submit(p);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 한 번만 실행한다
   }, []);
@@ -152,7 +174,7 @@ function ReceiptBody() {
 
   const rows: [string, string][] = [
     ["적용요율", r.appliedRate != null ? pctText(r.appliedRate) : "-"],
-    ["지급 예정일", r.cashbackPayableAt ? `${r.cashbackPayableAt.slice(0, 10)} (결제 다음 날부터 3일 뒤)` : "-"],
+    ["지급 예정일", r.cashbackPayableAt ? `${r.cashbackPayableAt.slice(0, 10)}${payoutDelayDays != null ? ` (결제 다음 날부터 ${payoutDelayDays}일 뒤)` : ""}` : "-"],
     ["결제 시각", fmt(r.completedAt)],
     ...(r.status === "CANCELED" ? ([["취소 시각", fmt(r.canceledAt)]] as [string, string][]) : []),
   ];
@@ -178,7 +200,7 @@ function ReceiptBody() {
           ]}
         />
         <dl className="mt-1">{rows.map(([k, v]) => <div key={k} className="flex justify-between border-t border-zinc-100 py-2 text-sm"><dt className="text-zinc-500">{k}</dt><dd className="font-medium tabular-nums">{v}</dd></div>)}</dl>
-        {excluded && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">적립 제외 · {REASON_TEXT[reason as ExclusionCode] ?? reason}</p>}
+        {excluded && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">적립 제외 · {reason === "BUDGET_EXHAUSTED" && paused ? "적립이 중단되어 이번 결제는 적립되지 않았어요" : (REASON_TEXT[reason as ExclusionCode] ?? reason)}</p>}
         <p className="note mt-2">소수점 이하는 버림 · 접수 시각 기준 요율로 확정</p>
       </section>
       {/* 결제 취소는 가맹점주 기능이라 사용자 화면에는 두지 않는다 */}

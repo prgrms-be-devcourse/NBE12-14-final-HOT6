@@ -2,15 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import CashbackPausedNotice from "@/components/CashbackPausedNotice";
 import Countdown from "@/components/Countdown";
 import Header from "@/components/Header";
 import SignBoard from "@/components/SignBoard";
 import { ICONS } from "@/components/icons";
 import { ApiError } from "@/lib/api";
-import { getCashbackPreview, getUpcomingPolicyChange, pctText, REASON_TEXT, REASON_TONE, REASON_TONE_CLASS } from "@/lib/cashbackApi";
+import { getCashbackPreview, getMonthlyLimit, getUpcomingPolicyChange, pctText, REASON_TEXT, REASON_TONE, REASON_TONE_CLASS } from "@/lib/cashbackApi";
+import { useCashbackPaused } from "@/lib/cashbackStatus";
 import { loadCtx, saveCtx } from "@/lib/devContext";
-import { getMyWallet, scanQr, secondsUntil } from "@/lib/endpoints";
-import { LIMITS } from "@/lib/limits";
+import { getMyWallet, getQrLimit, scanQr, secondsUntil } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { newPending, savePending } from "@/lib/pendingPayment";
 import { useLoad } from "@/lib/useLoad";
@@ -63,7 +64,13 @@ export default function ScanPage() {
     const t = fromUrl || c.qrToken || "";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 브라우저 저장소 값은 마운트 후에 읽는다
     setInput(t);
-    if (t) lookup(t, !fromUrl);
+    if (t) return lookup(t, !fromUrl);
+    // 저장된 QR 이 없으면 이전 결제의 QR·입력 상태를 비운다 (화면 상태가 보존된 채 다시 들어올 수 있다)
+    lastToken.current = "";
+    setToken("");
+    setCashbackInput("");
+    setExpired(false);
+    setLoad({ kind: "idle" });
   }, []);
 
   // 얼마를 쓸 수 있는지 미리 보여 주려고 내 지갑을 읽는다
@@ -92,7 +99,9 @@ export default function ScanPage() {
   const devMoneyShort = wallet ? Math.max(0, devMoney - wallet.devMoney) : 0;
 
   // 결제 전 미리보기: 데브머니로 낼 금액이 바뀔 때마다 서버에서 다시 계산한다 (예상값)
-  const previewKey = qr && devMoney > 0 ? `${qr.merchantId}:${devMoney}` : "";
+  // 적립 중단은 서버에서 실시간으로 받고, 상태가 바뀌면 미리보기도 다시 계산한다
+  const livePaused = useCashbackPaused(!!qr);
+  const previewKey = qr && devMoney > 0 ? `${qr.merchantId}:${devMoney}:${livePaused}` : "";
   const previewLoad = useLoad(
     () => (previewKey ? getCashbackPreview(qr!.merchantId, devMoney) : Promise.resolve(null)),
     [previewKey],
@@ -101,17 +110,24 @@ export default function ScanPage() {
   const p = previewLoad.data;
   const upcoming = upcomingLoad.data;
   const eligible = qr?.cashbackEligible ?? true;
-  const reason = !eligible ? "NOT_ELIGIBLE" : (p?.exclusionReason ?? "NONE");
-  const earning = !!p && p.earnable && p.expectedAmount > 0 && devMoney > 0;
+  const paused = livePaused ?? p?.paused ?? false;
+  // 중단 알림이 미리보기보다 먼저 올 수 있어, 중단이면 이전 미리보기의 적립 예상은 쓰지 않는다
+  const previewReason = p?.exclusionReason ?? "NONE";
+  const reason = !eligible ? "NOT_ELIGIBLE" : paused && previewReason === "NONE" ? "BUDGET_EXHAUSTED" : previewReason;
+  const earning = !paused && !!p && p.earnable && p.expectedAmount > 0 && devMoney > 0;
   // 안내 문구의 색 (적립됨 초록, 대상 아님·데브머니 없음·1원 미만 회색, 월 한도 초과 주황, 예산 소진·적립 중단 빨강)
-  // (적립 중단은 위쪽 빨강 안내가 따로 알리므로, 여기서는 사유만 본다. 서버가 중단 달에 적립이 안 되면 사유를 BUDGET_EXHAUSTED 로 준다)
+  // (서버는 중단 달의 적립 제외 사유를 BUDGET_EXHAUSTED 로 준다)
   const tone = earning ? "ok" : devMoney === 0 || previewLoad.loading ? "muted" : REASON_TONE[reason];
   const rate = p?.appliedRate ?? 0;
   const monthlyRemaining = p?.monthlyLimitRemaining ?? 0;
   // 이번 결제까지 반영한 월 한도 사용 비율(%). 70% 미만 초록, 90% 미만 노랑, 그 이상 빨강
-  const usedPct = p ? Math.min(100, Math.max(0, ((LIMITS.monthlyCashback - (monthlyRemaining - (earning ? p.expectedAmount : 0))) / LIMITS.monthlyCashback) * 100)) : 0;
+  // 월 적립 한도는 운영자가 정한 서버 값이다. 못 불러오면 사용 비율은 0으로 둔다
+  const monthlyLimit = useLoad(() => getMonthlyLimit(), []).data?.limit ?? 0;
+  const usedPct = p && monthlyLimit > 0 ? Math.min(100, Math.max(0, ((monthlyLimit - (monthlyRemaining - (earning ? p.expectedAmount : 0))) / monthlyLimit) * 100)) : 0;
   const usedTone = usedPct >= 90 ? { bar: "bg-red-500", text: "text-red-700" } : usedPct >= 70 ? { bar: "bg-amber-400", text: "text-amber-700" } : { bar: "bg-emerald-500", text: "text-emerald-700" };
-  const overLimit = amount > LIMITS.perPayment;
+  // 한도는 서버가 정한다. 아직 못 불러왔으면 검사하지 않고, 넘기면 서버가 거절한다
+  const maxAmount = useLoad(() => getQrLimit(), []).data?.maxAmount;
+  const overLimit = maxAmount != null && amount > maxAmount;
   const valid = !!qr && !expired && !!wallet && devMoneyShort === 0 && amount > 0 && !overLimit && cashbackOk;
 
   const go = () => {
@@ -154,9 +170,7 @@ export default function ScanPage() {
                 <span><b>정책 변경 예고</b> · {upcoming.content}{upcoming.rate != null && upcoming.previousRate != null && ` (${pctText(upcoming.previousRate)} → ${pctText(upcoming.rate)})`}</span>
               </div>
             )}
-            {p?.paused && (
-              <div role="status" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] font-medium text-red-700">적립 중단 중이에요. 결제는 그대로 진행돼요.</div>
-            )}
+            {paused && <CashbackPausedNotice />}
 
             <section className="card">
               <div className="flex items-start justify-between gap-2">
@@ -239,8 +253,8 @@ export default function ScanPage() {
                     <span className="text-slate-500">적립 여부</span>
                     <span role="status" className={`rounded-lg border px-2.5 py-1 text-right text-[13px] font-semibold ${REASON_TONE_CLASS[tone]}`}>
                       {earning
-                        ? REASON_TEXT.NONE
-                        : devMoney === 0 ? "캐시백으로만 결제하면 적립되지 않아요." : previewLoad.loading ? "계산 중이에요…" : REASON_TEXT[reason]}
+                        ? p!.limitReduced ? `이번 달 적립 한도까지만 적립돼요 (남은 한도 ${won(monthlyRemaining)})` : REASON_TEXT.NONE
+                        : devMoney === 0 ? "캐시백으로만 결제하면 적립되지 않아요." : paused && reason === "BUDGET_EXHAUSTED" ? "적립이 중단되어 적립되지 않아요." : previewLoad.loading ? "계산 중이에요…" : REASON_TEXT[reason]}
                     </span>
                   </div>
                 )}
@@ -262,7 +276,7 @@ export default function ScanPage() {
             </section>
 
             {expired && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">QR 유효시간이 지났어요. 가맹점에 새 QR을 요청해 주세요.</p>}
-            {overLimit && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">결제 한도({won(LIMITS.perPayment)})를 넘어 결제할 수 없어요</p>}
+            {overLimit && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">결제 한도({won(maxAmount ?? 0)})를 넘어 결제할 수 없어요</p>}
             {devMoneyShort > 0 && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">데브머니가 {won(devMoneyShort)} 부족해요. 충전하거나 캐시백을 더 사용해 주세요</p>}
             <button type="button" onClick={go} disabled={!valid} className="btn btn-primary disabled:opacity-40">결제하기 (간편비밀번호)</button>
 
