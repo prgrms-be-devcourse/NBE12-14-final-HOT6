@@ -7,10 +7,9 @@ import Header from "@/components/Header";
 import SignBoard from "@/components/SignBoard";
 import { ICONS } from "@/components/icons";
 import { ApiError } from "@/lib/api";
-import { getCashbackPreview, getUpcomingPolicyChange, pctText, REASON_TEXT, REASON_TONE, REASON_TONE_CLASS } from "@/lib/cashbackApi";
+import { getCashbackPreview, getMonthlyLimit, getUpcomingPolicyChange, pctText, REASON_TEXT, REASON_TONE, REASON_TONE_CLASS } from "@/lib/cashbackApi";
 import { loadCtx, saveCtx } from "@/lib/devContext";
-import { getMyWallet, scanQr, secondsUntil } from "@/lib/endpoints";
-import { LIMITS } from "@/lib/limits";
+import { getMyWallet, getQrLimit, scanQr, secondsUntil } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { newPending, savePending } from "@/lib/pendingPayment";
 import { useLoad } from "@/lib/useLoad";
@@ -109,9 +108,13 @@ export default function ScanPage() {
   const rate = p?.appliedRate ?? 0;
   const monthlyRemaining = p?.monthlyLimitRemaining ?? 0;
   // 이번 결제까지 반영한 월 한도 사용 비율(%). 70% 미만 초록, 90% 미만 노랑, 그 이상 빨강
-  const usedPct = p ? Math.min(100, Math.max(0, ((LIMITS.monthlyCashback - (monthlyRemaining - (earning ? p.expectedAmount : 0))) / LIMITS.monthlyCashback) * 100)) : 0;
+  // 월 적립 한도는 운영자가 정한 서버 값이다. 못 불러오면 사용 비율은 0으로 둔다
+  const monthlyLimit = useLoad(() => getMonthlyLimit(), []).data?.limit ?? 0;
+  const usedPct = p && monthlyLimit > 0 ? Math.min(100, Math.max(0, ((monthlyLimit - (monthlyRemaining - (earning ? p.expectedAmount : 0))) / monthlyLimit) * 100)) : 0;
   const usedTone = usedPct >= 90 ? { bar: "bg-red-500", text: "text-red-700" } : usedPct >= 70 ? { bar: "bg-amber-400", text: "text-amber-700" } : { bar: "bg-emerald-500", text: "text-emerald-700" };
-  const overLimit = amount > LIMITS.perPayment;
+  // 한도는 서버가 정한다. 아직 못 불러왔으면 검사하지 않고, 넘기면 서버가 거절한다
+  const maxAmount = useLoad(() => getQrLimit(), []).data?.maxAmount;
+  const overLimit = maxAmount != null && amount > maxAmount;
   const valid = !!qr && !expired && !!wallet && devMoneyShort === 0 && amount > 0 && !overLimit && cashbackOk;
 
   const go = () => {
@@ -262,7 +265,7 @@ export default function ScanPage() {
             </section>
 
             {expired && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">QR 유효시간이 지났어요. 가맹점에 새 QR을 요청해 주세요.</p>}
-            {overLimit && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">결제 한도({won(LIMITS.perPayment)})를 넘어 결제할 수 없어요</p>}
+            {overLimit && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">결제 한도({won(maxAmount ?? 0)})를 넘어 결제할 수 없어요</p>}
             {devMoneyShort > 0 && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-600">데브머니가 {won(devMoneyShort)} 부족해요. 충전하거나 캐시백을 더 사용해 주세요</p>}
             <button type="button" onClick={go} disabled={!valid} className="btn btn-primary disabled:opacity-40">결제하기 (간편비밀번호)</button>
 

@@ -2,11 +2,10 @@
 
 import BarChart from "@/components/BarChart";
 import ConfirmButton from "@/components/ConfirmButton";
-import { emergencyStop, getForecast, getMonthlyBudget, getPolicyHistory, manwon, md, STATUS_TEXT, thisYearMonth } from "@/lib/adminApi";
+import { emergencyStop, getForecast, getMonthlyBudget, getPolicyHistory, md, moneyUnit, STATUS_TEXT, thisYearMonth } from "@/lib/adminApi";
 import { pctText } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
-import { weekdays } from "@/lib/mock";
 
 export default function AdminDashboardPage() {
   const budget = useLoad(() => { const t = thisYearMonth(); return getMonthlyBudget(t.year, t.month); }, []);
@@ -15,6 +14,8 @@ export default function AdminDashboardPage() {
   const b = budget.data;
   const f = forecast.data;
   const pts = f?.points.slice(0, 7) ?? [];
+  // 작은 예산도 보이도록 가장 큰 값에 맞춰 원·만원 단위를 고른다
+  const unit = moneyUnit(Math.max(f?.contingencyAmount ?? 0, ...pts.flatMap((p) => [p.fastRemaining, p.midRemaining, p.slowRemaining])));
 
   const kpi = b && [
     { k: "집행 완료", v: won(b.paidAmount), c: "text-blue-600", tag: "완료", tagCls: "badge-info" },
@@ -55,11 +56,11 @@ export default function AdminDashboardPage() {
             <BarChart
               label="소진 예측"
               labels={pts.map((p) => md(p.date))}
-              reserveLine={manwon(f.contingencyAmount)}
+              reserveLine={f.contingencyAmount / unit.div}
               series={[
-                { name: "빠름(만원)", color: "var(--color-blue-300)", values: pts.map((p) => manwon(p.fastRemaining)) },
-                { name: "중앙(만원)", color: "var(--color-blue-600)", values: pts.map((p) => manwon(p.midRemaining)) },
-                { name: "느림(만원)", color: "var(--color-blue-900)", values: pts.map((p) => manwon(p.slowRemaining)) },
+                { name: `빠름(${unit.label})`, color: "var(--color-blue-300)", values: pts.map((p) => p.fastRemaining / unit.div) },
+                { name: `중앙(${unit.label})`, color: "var(--color-blue-600)", values: pts.map((p) => p.midRemaining / unit.div) },
+                { name: `느림(${unit.label})`, color: "var(--color-blue-900)", values: pts.map((p) => p.slowRemaining / unit.div) },
               ]}
             />
           )}
@@ -71,9 +72,6 @@ export default function AdminDashboardPage() {
             </dl>
           )}
         </section>
-        <section className="card"><h2 className="mb-3 font-semibold">요율별 예상 잔액 비교 <span className="badge">예시</span></h2>
-          <BarChart label="요율별 예상 잔액" labels={weekdays} series={[{ name: "요율 5%", color: "var(--color-blue-300)", values: [390, 350, 310, 270, 230, 200, 170] }, { name: "요율 10%", color: "var(--color-blue-600)", values: [380, 330, 270, 210, 150, 110, 70] }, { name: "요율 15%", color: "var(--color-blue-900)", values: [370, 300, 220, 140, 60, 10, 0] }]} />
-          <p className="note mt-2">실제 계산은 MVP 이후에 연결해요. 지금은 예시 값이에요.</p></section>
       </div>
       <section className="card overflow-x-auto"><h2 className="mb-2 font-semibold">정책 변경 이력</h2>
         {history.error && <p className="note">{history.error}</p>}

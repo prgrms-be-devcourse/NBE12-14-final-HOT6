@@ -88,6 +88,7 @@ export type PaymentResponse = {
 
 export type QrStatus = "WAITING" | "USED" | "EXPIRED";
 export type QrCreateResponse = { token: string; amount: number; expiresAt: string };
+export type QrLimit = { maxAmount: number };
 export type QrScanResponse = { merchantId: number; merchantName: string; amount: number; cashbackEligible: boolean; expiresAt: string };
 export type QrStatusResponse = { status: QrStatus; expiresAt: string };
 
