@@ -1,11 +1,19 @@
 import { Suspense } from "react";
 import Header from "@/components/Header";
+import PinPauseNotice from "@/components/PinPauseNotice";
 import PinVerifyPad from "@/components/PinVerifyPad";
 import { safeNext } from "@/lib/format";
 
 async function PinBody({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
-  return <PinVerifyPad doneHref={safeNext(next, "/wallet")} />;
+  const doneHref = safeNext(next, "/wallet");
+  return (
+    <>
+      {/* 결제 비밀번호일 때만 적립 중단을 알린다 */}
+      {doneHref === "/pay/receipt" && <PinPauseNotice />}
+      <PinVerifyPad doneHref={doneHref} />
+    </>
+  );
 }
 
 export default function PinPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {

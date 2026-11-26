@@ -2,6 +2,7 @@ package com.back.nbe1214finalhot6.domain.payment.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.given;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
@@ -11,6 +12,7 @@ import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.entity.Payment;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.repository.PaymentRepository;
+import com.back.nbe1214finalhot6.domain.qr.exception.QrErrorCode;
 import com.back.nbe1214finalhot6.domain.qr.service.QrService;
 import com.back.nbe1214finalhot6.domain.wallet.repository.WalletRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
@@ -193,6 +195,57 @@ class PaymentFacadeTest {
     assertThat(currentResponse.paymentId()).isEqualTo(pastResponse.paymentId());
     assertThat(currentResponse.status()).isEqualTo(PaymentStatus.COMPLETED);
     assertThat(walletRepository.findById(request.walletId()).orElseThrow().getBalance()).isZero();
+  }
+
+  @Test
+  @DisplayName("같은 멱등키 재시도는 QR·가맹점 상태가 바뀌어도(해지 신청 등) 저장된 '완료' 결과를 반환한다 (#252)")
+  void 같은멱등키_QR상태가_바뀌어도_저장된결과반환() {
+    // given : 결제가 완료된 뒤 QR 조회가 오류를 던지게 바꾼다 (해지 신청으로 가맹점이 결제를 받지 않는 상황)
+    PaymentRequest request = preparedRequest();
+    String key = UUID.randomUUID().toString();
+    PaymentResponse past = paymentFacade.pay(key, request);
+    given(qrService.getPaymentTarget(request.qrToken()))
+        .willThrow(new BusinessException(QrErrorCode.QR_NOT_FOUND));
+    // when : 같은 키로 재시도
+    PaymentResponse retried = paymentFacade.pay(key, request);
+    // then : 오류가 아니라 처음 결과를 그대로 받고, 새로 처리하지 않는다
+    assertThat(retried.paymentId()).isEqualTo(past.paymentId());
+    assertThat(retried.status()).isEqualTo(PaymentStatus.COMPLETED);
+    assertThat(walletRepository.findById(request.walletId()).orElseThrow().getBalance()).isZero();
+  }
+
+  @Test
+  @DisplayName("같은 멱등키, '진행중'인 요청은 QR 상태와 무관하게 IDEMPOTENCY_IN_PROGRESS 이다 (#252)")
+  void 같은멱등키_진행중이면_QR상태와_무관하게_진행중오류() {
+    // given
+    PaymentRequest request = preparedRequest();
+    String key = UUID.randomUUID().toString();
+    PaymentResponse response = paymentFacade.pay(key, request);
+    paymentRepository.updateStatusIfCurrent(
+        response.paymentId(), PaymentStatus.COMPLETED, PaymentStatus.PROCESSING);
+    given(qrService.getPaymentTarget(request.qrToken()))
+        .willThrow(new BusinessException(QrErrorCode.QR_NOT_FOUND));
+    // when & then : QR 오류가 아니라 진행 중 오류
+    assertThatThrownBy(() -> paymentFacade.pay(key, request))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(CommonErrorCode.IDEMPOTENCY_IN_PROGRESS);
+  }
+
+  @Test
+  @DisplayName("새 멱등키 요청은 QR·가맹점 상태 검증을 그대로 거친다. 오류면 결제 행이 만들어지지 않는다 (#252)")
+  void 새멱등키는_QR검증을_그대로() {
+    // given : QR 조회가 오류를 던진다
+    Long walletId = fixture.saveWallet(10_000L, 0L);
+    String qrToken = UUID.randomUUID().toString();
+    given(qrService.getPaymentTarget(qrToken)).willThrow(new BusinessException(QrErrorCode.QR_NOT_FOUND));
+    String key = UUID.randomUUID().toString();
+    // when & then
+    assertThatThrownBy(() -> paymentFacade.pay(key, new PaymentRequest(walletId, qrToken, 0L)))
+        .isInstanceOf(BusinessException.class)
+        .extracting(e -> ((BusinessException) e).getErrorCode())
+        .isEqualTo(QrErrorCode.QR_NOT_FOUND);
+    assertThat(paymentRepository.findByWalletIdAndIdempotencyKey(walletId, key)).isEmpty();
   }
 
   @Test

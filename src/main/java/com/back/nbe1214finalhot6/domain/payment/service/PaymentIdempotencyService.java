@@ -72,4 +72,12 @@ public class PaymentIdempotencyService {
     return  p.getCashbackUsedAmount().equals(r.cashbackUsed())
             && Objects.equals(p.getQrToken(), r.qrToken()); //null일수도 있어서 object로비교
   }
+
+  // 같은 멱등키로 이미 접수한 결제가 있으면 true. claim 전에 먼저 확인한다 (QR·가맹점 상태가 바뀌어도 저장된 결과를 돌려주기 위해)
+  @Transactional(readOnly = true)
+  public boolean exists(String key, PaymentRequest request) {
+    return paymentRepository
+            .findByWalletIdAndIdempotencyKey(request.walletId(), key)
+            .isPresent();
+  }
 }

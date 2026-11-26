@@ -1,0 +1,56 @@
+{
+  "scenario": "S2-same-qr",
+  "label": "t50-r3",
+  "environment": {
+    "commit": "fb820fb",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:51:24.027097",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 50,
+    "amount": 10000,
+    "variant": "",
+    "round": 3,
+    "rounds": 5
+  },
+  "wallMs": 60.63,
+  "counts": {
+    "COMPLETED": 1,
+    "QR-003": 49
+  },
+  "latencyMs": {
+    "n": 50,
+    "min": 20.89,
+    "p50": 51.67,
+    "p95": 59.88,
+    "max": 60.08
+  },
+  "groups": {
+    "pay": {
+      "counts": {
+        "COMPLETED": 1,
+        "QR-003": 49
+      },
+      "latencyMs": {
+        "n": 50,
+        "min": 20.89,
+        "p50": 51.67,
+        "p95": 59.88,
+        "max": 60.08
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": true,
+    "completedByQr": 1,
+    "debitLinesAllWallets": 1,
+    "qrStatus": "USED"
+  },
+  "exampleMessages": {
+    "QR-003": "이미 사용된 QR 코드입니다"
+  }
+}

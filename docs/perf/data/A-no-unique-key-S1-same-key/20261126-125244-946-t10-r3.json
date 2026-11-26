@@ -1,0 +1,57 @@
+{
+  "scenario": "A-no-unique-key-S1-same-key",
+  "label": "t10-r3",
+  "environment": {
+    "commit": "9166506",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:52:44.946877",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 10,
+    "amount": 10000,
+    "variant": "no-unique-key",
+    "round": 3,
+    "rounds": 3
+  },
+  "wallMs": 55.96,
+  "counts": {
+    "COMPLETED": 1,
+    "QR-003": 9
+  },
+  "latencyMs": {
+    "n": 10,
+    "min": 41.0,
+    "p50": 49.24,
+    "p95": 55.82,
+    "max": 55.82
+  },
+  "groups": {
+    "pay": {
+      "counts": {
+        "COMPLETED": 1,
+        "QR-003": 9
+      },
+      "latencyMs": {
+        "n": 10,
+        "min": 41.0,
+        "p50": 49.24,
+        "p95": 55.82,
+        "max": 55.82
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": false,
+    "paymentRows": 10,
+    "debitLines": 1,
+    "balance": 90000,
+    "expectedBalance": 90000
+  },
+  "exampleMessages": {
+    "QR-003": "이미 사용된 QR 코드입니다"
+  }
+}

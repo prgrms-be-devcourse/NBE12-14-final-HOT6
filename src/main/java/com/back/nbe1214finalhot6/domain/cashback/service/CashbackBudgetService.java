@@ -58,6 +58,22 @@ public class CashbackBudgetService {
     return AnnualBudgetResponse.from(budget);
   }
 
+  /**
+   * 해당 연도의 연 예산이 없을 때만 새로 만든다. 이미 있으면 바꾸지 않는다. 서버 시작 시 자동 등록이 쓴다.
+   *
+   * <p>확인한 뒤 다른 쪽이 먼저 만들면 연도 유니크 제약으로 실패하며({@code DataIntegrityViolationException}), 호출하는 쪽이 처리한다.
+   *
+   * @return 새로 만들었으면 true
+   */
+  @Transactional
+  public boolean createAnnualIfAbsent(int year, long totalAmount) {
+    if (annualBudgetRepository.existsByBudgetYear(year)) {
+      return false;
+    }
+    annualBudgetRepository.save(CashbackAnnualBudget.create(year, totalAmount));
+    return true;
+  }
+
   @Transactional(readOnly = true)
   public AnnualBudgetResponse getAnnual(int year) {
     return annualBudgetRepository

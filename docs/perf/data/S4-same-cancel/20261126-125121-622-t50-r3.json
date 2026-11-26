@@ -1,0 +1,54 @@
+{
+  "scenario": "S4-same-cancel",
+  "label": "t50-r3",
+  "environment": {
+    "commit": "fb820fb",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:51:21.622256",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 50,
+    "amount": 10000,
+    "variant": "",
+    "round": 3,
+    "rounds": 5
+  },
+  "wallMs": 43.39,
+  "counts": {
+    "CANCELED": 50
+  },
+  "latencyMs": {
+    "n": 50,
+    "min": 7.82,
+    "p50": 23.71,
+    "p95": 40.82,
+    "max": 42.72
+  },
+  "groups": {
+    "cancel": {
+      "counts": {
+        "CANCELED": 50
+      },
+      "latencyMs": {
+        "n": 50,
+        "min": 7.82,
+        "p50": 23.71,
+        "p95": 40.82,
+        "max": 42.72
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": true,
+    "refundLines": 1,
+    "balance": 10000,
+    "expectedBalance": 10000,
+    "canceledPayments": 1,
+    "earningStatus": "CANCELED"
+  },
+  "exampleMessages": {}
+}

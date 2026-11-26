@@ -7,10 +7,9 @@ import { won } from "@/lib/format";
 const W = 720;
 const H = 320;
 const PAD = { l: 62, r: 20, t: 20, b: 40 };
-const PRESETS = [5, 10, 15, 20];
+// 인하 후보. 현재 요율보다 낮은 것만 보여 준다(달 중에는 인하만 한다)
+const PRESETS = [1, 2, 3, 5, 10, 15, 20];
 const Y_TICKS = [0, 0.25, 0.5, 0.75, 1];
-// 가정(서버 값이 아니다): 요율이 기본 요율 대비 1% 오를 때마다 하루 지급이 이 비율(%)만큼 는다고 본다
-const ELASTICITY = 0.3;
 
 const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 const line = (pts: [number, number][]) => pts.map(([a, b], i) => `${i ? "L" : "M"}${a.toFixed(1)} ${b.toFixed(1)}`).join(" ");
@@ -49,7 +48,7 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
     return prior.length ? prior[prior.length - 1].remainingAmount : budgetTotal;
   };
   const dailyPayout = (r: number) =>
-    baseRate > 0 ? Math.max(0, baseDaily * (r / baseRate) * (1 + (ELASTICITY * (r - baseRate)) / baseRate)) : baseDaily;
+    baseRate > 0 ? Math.max(0, baseDaily * (r / baseRate)) : baseDaily; // 수요는 그대로, 요율이 낮아진 만큼 지급이 준다고 본다
   const projectedRemaining = (r: number, d: number) => Math.max(0, actualRemaining(today) - dailyPayout(r) * (d - today));
   const remainingAt = (r: number, d: number) => (d <= today ? actualRemaining(d) : projectedRemaining(r, d));
   const firstDayBelow = (r: number, threshold: number): number | null => {
@@ -63,7 +62,12 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
 
   const xTicks = [1, 5, 10, 15, 20, 25, daysInMonth].filter((d, i, a) => d <= daysInMonth && a.indexOf(d) === i);
   const parsed = Number(rate);
-  const r = rate.trim() && Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), 100) : 0;
+  const maxRate = baseRate > 0 ? baseRate : 30; // 달 중에는 인하만 하므로 현재 요율이 상한이다
+  const r = rate.trim() && Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), maxRate) : 0;
+  const setRate = (v: string) => {
+    const n = Number(v);
+    onRate(v.trim() && Number.isFinite(n) && n > maxRate ? String(maxRate) : v);
+  };
   const reserve = budget.contingencyAmount;
   const stop = reserve * emergencyRatio;
 
@@ -101,10 +105,10 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
             id="rate-range"
             type="range"
             min={0}
-            max={30}
+            max={maxRate}
             step={0.5}
-            value={Math.min(r, 30)}
-            onChange={(e) => onRate(e.target.value)}
+            value={Math.min(r, maxRate)}
+            onChange={(e) => setRate(e.target.value)}
             className="h-2 min-w-40 flex-1 cursor-pointer accent-brand-600"
             aria-label="캐시백 요율 슬라이더"
           />
@@ -113,15 +117,15 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
               inputMode="decimal"
               className="field !w-20 text-right text-lg font-bold tabular-nums"
               value={rate}
-              onChange={(e) => onRate(e.target.value.replace(/[^\d.]/g, ""))}
+              onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ""))}
               aria-label="캐시백 요율 직접 입력"
             />
             <span className="font-bold">%</span>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          {PRESETS.map((p) => (
-            <button key={p} type="button" onClick={() => onRate(String(p))} className={`chip ${r === p ? "chip-on" : ""}`}>
+          {[...PRESETS.filter((p) => p < baseRate), ...(baseRate > 0 ? [baseRate] : [])].map((p) => (
+            <button key={p} type="button" onClick={() => setRate(String(p))} className={`chip ${r === p ? "chip-on" : ""}`}>
               {p}%{p === baseRate ? " (현재)" : ""}
             </button>
           ))}
@@ -206,7 +210,7 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
         {(reachStop || reachZero) && " · "}
         {used === 0
           ? "아직 이번 달 결제가 없어서 하루 지급액을 0원으로 보고 있어요."
-          : `가정: 이번 달 지금까지의 하루 평균 지급·확보액(${won(Math.round(baseDaily))}, 기본 요율 ${baseRate}%)을 기준으로, 요율이 기본 요율 대비 1% 오를 때마다 수요가 ${ELASTICITY}%씩 늘어난다고 보았습니다.`}
+          : `가정: 이번 달 지금까지의 하루 평균 지급·확보액(${won(Math.round(baseDaily))}, 기본 요율 ${baseRate}%)을 기준으로, 수요는 그대로이고 요율이 낮아진 만큼 하루 지급액이 줄어든다고 보았습니다.`}
         {" "}저장 전 미리보기이며, 하루 평균과 남은 예산은 실제 값이고 수요 변화는 가정입니다.
       </p>
     </div>
