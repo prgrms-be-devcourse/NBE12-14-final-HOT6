@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -16,7 +17,14 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
-@Table(name = "users")
+@Table(
+    name = "users",
+    // 이메일·전화번호의 중복 제약(활동 중인 계정끼리, 계정 종류별)은 부분 유니크 인덱스라 schema.sql 에서 만든다.
+    // 아래는 탈퇴한 계정까지 찾는 조회(로그인, 가입 중복 확인)가 쓰는 인덱스다
+    indexes = {
+      @Index(name = "idx_users_email", columnList = "email"),
+      @Index(name = "idx_users_phone", columnList = "phone")
+    })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User {
@@ -28,13 +36,13 @@ public class User {
   @Column(nullable = false, length = 100)
   private String name;
 
-  @Column(nullable = false, unique = true, length = 100)
+  @Column(nullable = false, length = 100)
   private String email;
 
   @Column(nullable = false, length = 255)
   private String passwordHash;
 
-  @Column(nullable = false, unique = true, length = 11)
+  @Column(nullable = false, length = 11)
   private String phone;
 
   @Column(nullable = false, length = 255)

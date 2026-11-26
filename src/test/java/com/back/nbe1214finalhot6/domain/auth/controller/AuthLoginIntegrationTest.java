@@ -82,7 +82,7 @@ class AuthLoginIntegrationTest {
     assertThat(((Number) JsonPath.read(body, "$.data.expiresIn")).longValue()).isEqualTo(1800L);
 
     TokenClaims claims = jwtProvider.parse(token);
-    assertThat(claims.userId()).isEqualTo(userRepository.findByEmail(EMAIL).orElseThrow().getId());
+    assertThat(claims.userId()).isEqualTo(userRepository.findAllByEmail(EMAIL).get(0).getId());
     assertThat(claims.role()).isEqualTo(UserRole.USER);
     // 응답과 토큰 어디에도 해시가 없어야 한다
     assertThat(body).doesNotContain("passwordHash", "pinHash", "$2");
