@@ -13,7 +13,7 @@ const MENUS = [
   { href: "/wallet/history?from=my", label: "이용내역" },
   { href: "/pay/history", label: "결제 내역" },
   { href: "/cashback", label: "캐시백 내역" },
-  { href: "/cashback/notices", label: "알림 (정책 변경 예고)" },
+  { href: "/notices?from=my", label: "공지사항" },
 ];
 
 export default function MyPage() {

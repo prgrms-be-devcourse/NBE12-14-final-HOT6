@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useState } from "react";
 import Header from "@/components/Header";
 import HistoryCard from "@/components/HistoryCard";
 import MonthlyCashbackCard from "@/components/MonthlyCashbackCard";
 import Pager from "@/components/Pager";
 import ReceiptModal from "@/components/ReceiptModal";
-import { EXCLUSION_TEXT, STATUS_BADGE, STATUS_LABEL, getCashbackSummary, getNotices, mmdd, pctText, type Earning, type EarningStatus } from "@/lib/cashbackApi";
+import { EXCLUSION_TEXT, STATUS_BADGE, STATUS_LABEL, getCashbackSummary, mmdd, type Earning, type EarningStatus } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
 import { fmt, getCashbackHistory, PAGE_SIZE, type CashbackItem } from "@/lib/history";
 import type { UserPaymentItem } from "@/lib/types";
@@ -74,9 +73,7 @@ export default function CashbackHistory() {
   const close = useCallback(() => setSel(null), []);
   const summary = useLoad(getCashbackSummary, []);
   const load = useLoad(getCashbackHistory, []);
-  const notices = useLoad(() => getNotices(undefined, 0, 1), []);
   const s = summary.data;
-  const notice = notices.data?.content[0];
   const rows = load.data?.filter(FILTERS[filter].match) ?? [];
   const totalPages = Math.ceil(rows.length / PAGE_SIZE);
   const current = Math.min(page, Math.max(0, totalPages - 1));
@@ -85,13 +82,6 @@ export default function CashbackHistory() {
     <>
       <Header title="캐시백 내역" right={s ? `${s.year}년 ${s.month}월` : ""} />
       <div className="px-5 pb-4">
-        {notice && (
-          <Link href="/cashback/notices" className="mb-3 block rounded-xl border border-amber-500 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
-            <span className="font-semibold">공지</span> · {notice.content}
-            {notice.rate != null && notice.previousRate != null && ` (요율 ${pctText(notice.previousRate)} → ${pctText(notice.rate)})`}
-            <span className="ml-1 underline">전체 보기</span>
-          </Link>
-        )}
         <MonthlyCashbackCard summary={s} />
         <div className="grid grid-cols-3 gap-2 text-center">
           {[["적립 예정", s ? won(s.pendingAmount) : "–"], ["지급 완료", s ? won(s.paidAmount) : "–"], ["제외", s ? `${s.excludedCount}건` : "–"]].map(([k, v]) => (
