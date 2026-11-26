@@ -33,7 +33,13 @@ export default function MyPage() {
           <Link href="/my/profile" className="btn btn-outline btn-sm !w-auto">내정보 수정</Link>
         </section>
         {me.data?.needsRelogin && (
-          <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">회원 정보가 바뀌었어요. 로그아웃 후 다시 로그인하면 적용돼요.</p>
+          <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+            {me.data.role === "OWNER" ? (
+              <>점주 계정으로 바뀌었어요. <LogoutLink href="/merchant/login" className="font-bold underline underline-offset-2">가맹점주 로그인</LogoutLink>에서 다시 로그인해 주세요.</>
+            ) : (
+              "회원 정보가 바뀌었어요. 로그아웃 후 다시 로그인하면 적용돼요."
+            )}
+          </p>
         )}
         <section className="grid grid-cols-2 gap-2">
           <div className="card-gray !p-3"><div className="note">지갑 잔액</div><div className="mt-0.5 font-bold text-slate-900">{wallet.data ? won(wallet.data.devMoney) : "…"}</div></div>

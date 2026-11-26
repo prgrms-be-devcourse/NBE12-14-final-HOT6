@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { ApiError } from "@/lib/api";
 import { getSession, parseSession, readRawSession } from "@/lib/auth";
+import { getMyMerchant } from "@/lib/endpoints";
+import OwnerPinGate from "@/components/OwnerPinGate";
 
 const subscribe = (onChange: () => void) => {
   window.addEventListener("storage", onChange);
@@ -10,9 +13,10 @@ const subscribe = (onChange: () => void) => {
 };
 const subscribeNever = () => () => {};
 
-// 가맹점 등록은 로그인한 이용자(USER)만 할 수 있다. 서버가 토큰으로 회원을 정하기 때문이다.
-// - 로그인하지 않았으면 "로그인하세요" 안내와 로그인 버튼을 보여 준다(로그인과 간편비밀번호 확인 뒤 이 화면으로 돌아온다)
-// - 이미 점주(OWNER)면 이미 가맹점이 있다는 안내, 운영자는 등록할 수 없다는 안내를 보여 준다
+// 가맹점 등록은 로그인한 회원만 할 수 있다. 서버가 토큰으로 회원을 정하기 때문이다.
+// - 로그인하지 않았으면 점주 로그인과 점주 회원가입을 안내한다
+// - 점주(OWNER)는 가맹점이 없을 때만 등록할 수 있다. 이용자(USER)는 등록하면 점주가 된다
+// - 운영자는 등록할 수 없다
 export default function RegisterGate({ children }: { children: React.ReactNode }) {
   const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
   const raw = useSyncExternalStore(subscribe, readRawSession, () => null);
@@ -25,22 +29,18 @@ export default function RegisterGate({ children }: { children: React.ReactNode }
       <div className="space-y-3 px-5 pt-6">
         <section className="card text-center">
           <div className="text-lg font-bold">로그인하세요</div>
-          <p className="note mt-2">가맹점 등록은 이용자 계정으로 로그인한 뒤에 할 수 있어요. 계정이 없다면 먼저 회원가입을 해 주세요.</p>
+          <p className="note mt-2">가맹점 등록은 점주 계정으로 로그인한 뒤에 할 수 있어요. 계정이 없다면 먼저 점주 회원가입을 해 주세요.</p>
         </section>
-        <Link href="/login?next=/merchant/register" className="btn btn-primary">로그인하러 가기</Link>
-        <Link href="/signup" className="btn btn-outline">회원가입</Link>
+        <Link href="/merchant/login" className="btn btn-primary">로그인하러 가기</Link>
+        <Link href="/merchant/signup" className="btn btn-outline">점주 회원가입</Link>
       </div>
     );
   }
   if (session.role === "OWNER") {
     return (
-      <div className="space-y-3 px-5 pt-6">
-        <section className="card text-center">
-          <div className="text-lg font-bold">이미 가맹점이 있어요</div>
-          <p className="note mt-2">점주 한 명은 가맹점을 하나만 등록할 수 있어요.</p>
-        </section>
-        <Link href="/merchant/qr" className="btn btn-primary">QR 생성하러 가기</Link>
-      </div>
+      <OwnerPinGate>
+        <OwnerGate key={session.userId}>{children}</OwnerGate>
+      </OwnerPinGate>
     );
   }
   if (session.role === "ADMIN") {
@@ -48,11 +48,40 @@ export default function RegisterGate({ children }: { children: React.ReactNode }
       <div className="space-y-3 px-5 pt-6">
         <section className="card text-center">
           <div className="text-lg font-bold">운영자 계정으로는 등록할 수 없어요</div>
-          <p className="note mt-2">가맹점 등록은 이용자 계정으로 로그인해서 진행해 주세요.</p>
+          <p className="note mt-2">가맹점 등록은 점주 계정으로 로그인해서 진행해 주세요.</p>
         </section>
-        <Link href="/login?next=/merchant/register" className="btn btn-outline">이용자로 로그인</Link>
+        <Link href="/merchant/login" className="btn btn-outline">점주로 로그인</Link>
       </div>
     );
   }
   return <>{children}</>;
+}
+
+// 점주 한 명은 가맹점 하나: 이미 있으면 안내하고, 없으면 등록 화면을 보여 준다
+function OwnerGate({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<"loading" | "none" | "exists" | "error">("loading");
+
+  useEffect(() => {
+    let alive = true;
+    getMyMerchant().then(
+      () => alive && setState("exists"),
+      (e: unknown) => alive && setState(e instanceof ApiError && e.code === "MER-001" ? "none" : "error"),
+    );
+    return () => { alive = false; };
+  }, []);
+
+  if (state === "loading") return null;
+  if (state === "none") return <>{children}</>;
+  if (state === "error") {
+    return <p role="alert" className="mx-5 mt-6 rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">가맹점 정보를 확인하지 못했어요. 잠시 뒤 다시 열어 주세요.</p>;
+  }
+  return (
+    <div className="space-y-3 px-5 pt-6">
+      <section className="card text-center">
+        <div className="text-lg font-bold">이미 가맹점이 있어요</div>
+        <p className="note mt-2">점주 한 명은 가맹점을 하나만 등록할 수 있어요.</p>
+      </section>
+      <Link href="/merchant/qr" className="btn btn-primary">QR 생성하러 가기</Link>
+    </div>
+  );
 }

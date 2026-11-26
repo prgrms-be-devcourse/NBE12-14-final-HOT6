@@ -25,7 +25,7 @@ BACKEND_URL=http://localhost:8080 npm run dev
 
 ## 백엔드 연동
 
-- **로그인**: `POST /api/auth/login` 으로 받은 토큰을 `localStorage`(`devpay.session`)에 두고, 모든 API 호출에 `Authorization: Bearer` 로 보낸다(`lib/auth.ts`, `lib/api.ts`). 401 이면 세션을 지우고 해당 앱의 로그인 화면으로 보낸다. 화면 접근은 역할(USER·OWNER·ADMIN)로 막는다(`components/AuthGuard.tsx`).
+- **로그인**: 회원·운영자는 `POST /api/auth/login`, 점주는 `POST /api/auth/owner/login` 으로 받은 토큰을 `localStorage`(`devpay.session`)에 두고, 모든 API 호출에 `Authorization: Bearer` 로 보낸다(`lib/auth.ts`, `lib/api.ts`). 401 이면 세션을 지우고 해당 앱의 로그인 화면으로 보낸다. 화면 접근은 역할(USER·OWNER·ADMIN)로 막는다(`components/AuthGuard.tsx`).
 - **가맹점·결제**: `POST /api/merchants`(등록), `PATCH /api/merchants/me`(이름·주소 수정), `POST /api/merchants/me/qr/dynamic`(QR 발급), `POST /api/payments`(QR 결제), `POST /api/payments/{id}/cancel`(점주 취소). 점주의 가맹점은 토큰의 회원으로 서버가 찾는다.
 - **이용자 캐시백**(`lib/cashbackApi.ts`): `GET /api/cashback/summary`·`monthly-limit`·`earnings`(내 캐시백·적립 내역), `GET /api/cashback/preview`(결제 전 미리보기), `GET /api/notices`(공지). 지갑은 서버가 토큰의 회원으로 찾으므로 요청에 지갑 번호를 보내지 않는다.
 - **운영자 캐시백**(`lib/adminApi.ts`): 월 예산 조회, 정책 변경 이력, 소진 예측(`GET /api/admin/cashback/forecast`), 요율 인하, 공지 후 중단, 긴급 중단. 월 예산 배정 화면(`BudgetPlanner`)과 요율 시뮬레이터, 요율별 예상 잔액 차트는 아직 목 데이터다.
