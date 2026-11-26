@@ -69,7 +69,7 @@ public class OperatorSettingAdminService {
    *
    * @param notice 함께 등록할 공지. null 이면 공지하지 않는다
    * @throws com.back.nbe1214finalhot6.common.exception.BusinessException 없는 키이거나 값이 허용 범위를 벗어났을 때
-   *     (SET-001), 공지 내용이 올바르지 않을 때(CSH-015)
+   *     (SET-001), 공지 내용이 올바르지 않을 때(CSH-014)
    */
   @Transactional
   public SettingResponse put(String keyName, long value, SettingNoticeRequest notice) {
@@ -106,7 +106,7 @@ public class OperatorSettingAdminService {
    *
    * @param notice 함께 등록할 공지. null 이면 공지하지 않는다
    * @throws com.back.nbe1214finalhot6.common.exception.BusinessException 없는 키일 때(SET-001), 공지 내용이 올바르지
-   *     않을 때(CSH-015)
+   *     않을 때(CSH-014)
    */
   @Transactional
   public SettingResponse reset(String keyName, SettingNoticeRequest notice) {
@@ -131,7 +131,7 @@ public class OperatorSettingAdminService {
    * 변경을 예약하고 공지한다. 설정마다 예약은 하나다.
    *
    * @throws com.back.nbe1214finalhot6.common.exception.BusinessException 없는 키, 범위를 벗어난 값, 내일보다 이른 적용일,
-   *     지금과 같은 값일 때(SET-001), 이미 예약이 있을 때(SET-002), 공지 내용이 올바르지 않을 때(CSH-015)
+   *     지금과 같은 값일 때(SET-001), 이미 예약이 있을 때(SET-002), 공지 내용이 올바르지 않을 때(CSH-014)
    */
   @Transactional
   public SettingResponse schedule(String keyName, SettingScheduleRequest request) {
