@@ -45,7 +45,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** 지갑 → 모의계좌 환불. 계좌 초기 잔액은 200만원이고, 각 테스트는 지갑에 데브머니를 미리 넣어 시작함. */
+/** 지갑 → 모의계좌 환불. 계좌 초기 잔액은 500만원이고, 각 테스트는 지갑에 데브머니를 미리 넣어 시작함. */
 @IntegrationTest
 class RefundServiceTest {
 

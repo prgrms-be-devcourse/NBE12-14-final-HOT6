@@ -38,19 +38,19 @@ class WalletOpeningServiceTest {
   }
 
   @Test
-  @DisplayName("모의계좌(200만원)와 가입 보너스 원장 1줄, 지갑(잔액 0, ACTIVE)이 만들어진다")
+  @DisplayName("모의계좌(500만원)와 가입 보너스 원장 1줄, 지갑(잔액 0, ACTIVE)이 만들어진다")
   void open_createsAccountLedgerAndWallet() {
     walletOpeningService.open(USER_ID);
 
     Account account = accountRepository.findByUserId(USER_ID).orElseThrow();
-    assertThat(account.getBalance()).isEqualTo(2_000_000L);
+    assertThat(account.getBalance()).isEqualTo(5_000_000L);
 
     List<AccountTransaction> ledgers = ledgersOf(account.getId());
     assertThat(ledgers).hasSize(1);
     AccountTransaction ledger = ledgers.get(0);
     assertThat(ledger.getType()).isEqualTo(AccountTransactionType.SIGNUP_BONUS);
-    assertThat(ledger.getAmount()).isEqualTo(2_000_000L);
-    assertThat(ledger.getBalanceAfter()).isEqualTo(2_000_000L);
+    assertThat(ledger.getAmount()).isEqualTo(5_000_000L);
+    assertThat(ledger.getBalanceAfter()).isEqualTo(5_000_000L);
 
     Wallet wallet = walletRepository.findByUserId(USER_ID).orElseThrow();
     assertThat(wallet.getBalance()).isZero();

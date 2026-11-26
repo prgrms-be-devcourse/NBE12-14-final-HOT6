@@ -59,7 +59,7 @@ class AuthInitDataTest {
   void createsAdminWithHashedSecrets() {
     validInitData().run(null);
 
-    User admin = userRepository.findByEmail(EMAIL).orElseThrow();
+    User admin = userRepository.findAllByEmail(EMAIL).get(0);
     assertThat(admin.getRole()).isEqualTo(UserRole.ADMIN);
     assertThat(admin.getPhone()).isEqualTo(PHONE);
     assertThat(admin.getPasswordHash()).isNotEqualTo(PASSWORD);
@@ -87,7 +87,7 @@ class AuthInitDataTest {
 
     validInitData().run(null);
 
-    User user = userRepository.findByEmail(EMAIL).orElseThrow();
+    User user = userRepository.findAllByEmail(EMAIL).get(0);
     assertThat(user.getRole()).isEqualTo(UserRole.USER);
     assertThat(user.getPasswordHash()).isEqualTo(existingHash);
     assertThat(userRepository.count()).isEqualTo(1);

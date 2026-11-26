@@ -29,7 +29,7 @@ public class WalletOpeningService {
   public void open(Long userId) {
     LocalDateTime now = LocalDateTime.now(clock);
 
-    // 1. 모의계좌 생성(초기 잔액 200만원)
+    // 1. 모의계좌 생성(초기 잔액 500만원)
     Account account = accountRepository.save(Account.create(userId, now));
 
     // 2. 계좌 원장에 가입 보너스 기록

@@ -45,13 +45,13 @@ class AuthServiceWalletTest {
   }
 
   @Test
-  @DisplayName("가입하면 모의계좌(200만원), 지갑(잔액 0, ACTIVE), 가입 보너스 원장이 함께 만들어진다")
+  @DisplayName("가입하면 모의계좌(500만원), 지갑(잔액 0, ACTIVE), 가입 보너스 원장이 함께 만들어진다")
   void signup_opensAccountAndWallet() {
     SignupResponse response = authService.signup(request("open@devpay.com", "01011112222"));
 
     Long userId = response.id();
     Account account = accountRepository.findByUserId(userId).orElseThrow();
-    assertThat(account.getBalance()).isEqualTo(2_000_000L);
+    assertThat(account.getBalance()).isEqualTo(5_000_000L);
     assertThat(
             accountTransactionRepository.findAll().stream()
                 .filter(t -> t.getAccountId().equals(account.getId())))

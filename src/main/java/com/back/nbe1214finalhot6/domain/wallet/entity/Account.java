@@ -24,8 +24,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Account {
 
-  // 가입 시 지급하는 초기 잔액(200만원)
-  public static final long INITIAL_BALANCE = 2_000_000L;
+  // 가입 시 지급하는 초기 잔액(500만원)
+  public static final long INITIAL_BALANCE = 5_000_000L;
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)

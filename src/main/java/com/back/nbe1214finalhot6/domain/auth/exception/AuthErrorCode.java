@@ -22,9 +22,9 @@ public enum AuthErrorCode implements ErrorCode {
   WITHDRAWN_USER("AUTH-004", HttpStatus.UNAUTHORIZED, "탈퇴한 계정입니다. 다시 이용하려면 관리자에게 문의해 주세요."),
 
   // PIN. 401 은 프론트가 "토큰 만료"로 처리하므로 쓰지 않는다. 불일치 메시지에는 남은 횟수를 직접 넣는다.
-  // 잠금은 30분 뒤 자동으로 풀린다(임시 방식, MVP 이후 이메일 인증으로 해제(U7)로 대체 예정)
+  // 잠금은 10분 뒤 자동으로 풀린다(임시 방식, MVP 이후 이메일 인증으로 해제(U7)로 대체 예정)
   PIN_MISMATCH("AUTH-005", HttpStatus.BAD_REQUEST, "PIN이 일치하지 않습니다"),
-  PIN_LOCKED("AUTH-006", HttpStatus.CONFLICT, "PIN이 5회 틀려 잠겼습니다. 잠긴 지 30분이 지나면 다시 시도할 수 있습니다"),
+  PIN_LOCKED("AUTH-006", HttpStatus.CONFLICT, "PIN이 5회 틀려 잠겼습니다. 잠긴 지 10분이 지나면 다시 시도할 수 있습니다"),
 
   // 탈퇴. 점주·운영자는 MVP 에서 탈퇴할 수 없다. 금액이 달라졌으면 메시지에 현재 환불 금액을 직접 넣는다
   WITHDRAW_NOT_ALLOWED("AUTH-007", HttpStatus.CONFLICT, "점주와 운영자는 탈퇴할 수 없습니다"),
