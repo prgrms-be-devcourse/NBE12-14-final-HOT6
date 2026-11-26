@@ -38,7 +38,8 @@ public enum CashbackErrorCode implements ErrorCode {
   PAYOUT_RUN_NOT_FOUND("CSH-013", HttpStatus.NOT_FOUND, "지급 실행 기록을 찾을 수 없습니다"),
 
   // 공지
-  INVALID_NOTICE("CSH-014", HttpStatus.BAD_REQUEST, "공지 내용이 올바르지 않습니다");
+  INVALID_NOTICE("CSH-014", HttpStatus.BAD_REQUEST, "공지 내용이 올바르지 않습니다"),
+  NOTICE_NOT_FOUND("CSH-015", HttpStatus.NOT_FOUND, "공지를 찾을 수 없습니다");
 
   private final String code;
   private final HttpStatus status;

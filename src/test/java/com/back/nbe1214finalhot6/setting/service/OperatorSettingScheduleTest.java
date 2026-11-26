@@ -237,4 +237,24 @@ class OperatorSettingScheduleTest {
         CashbackErrorCode.INVALID_NOTICE);
     assertThat(scheduleRepository.count()).isZero();
   }
+
+  // 목적: 이력은 최근 변경순이고, 적용일이 지난 예약은 조회할 때 반영되어 적용일 00:00 로 남으며, 되돌림은 기본값으로 보이는지 확인한다.
+  @Test
+  @DisplayName("이력은 최근순이고 지난 예약도 담긴다")
+  void history() {
+    adminService.put(NAME, 30_000L);
+    schedule(null, TOMORROW);
+    assertThat(adminService.history(0, 20).content()).hasSize(1);
+
+    nextDay();
+
+    assertThat(adminService.history(0, 20).content())
+        .extracting(
+            h -> h.previousValue(), h -> h.value(), h -> h.reset(), h -> h.changedAt())
+        .containsExactly(
+            org.assertj.core.api.Assertions.tuple(
+                30_000L, 50_000L, true, TOMORROW.atStartOfDay()),
+            org.assertj.core.api.Assertions.tuple(
+                50_000L, 30_000L, false, LocalDateTime.of(2026, 11, 18, 9, 0)));
+  }
 }

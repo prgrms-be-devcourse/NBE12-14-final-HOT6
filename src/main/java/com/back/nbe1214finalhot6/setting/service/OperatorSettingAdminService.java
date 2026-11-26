@@ -1,6 +1,7 @@
 package com.back.nbe1214finalhot6.setting.service;
 
 import com.back.nbe1214finalhot6.setting.SettingKey;
+import com.back.nbe1214finalhot6.setting.dto.SettingHistoryResponse;
 import com.back.nbe1214finalhot6.setting.dto.SettingNoticeRequest;
 import com.back.nbe1214finalhot6.setting.dto.SettingResponse;
 import com.back.nbe1214finalhot6.setting.dto.SettingScheduleRequest;
@@ -12,6 +13,7 @@ import com.back.nbe1214finalhot6.setting.repository.OperatorSettingHistoryReposi
 import com.back.nbe1214finalhot6.setting.repository.OperatorSettingRepository;
 import com.back.nbe1214finalhot6.setting.repository.OperatorSettingScheduleRepository;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
+import com.back.nbe1214finalhot6.common.response.PageResponse;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,6 +23,8 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +57,22 @@ public class OperatorSettingAdminService {
     return Arrays.stream(SettingKey.values())
         .map(key -> SettingResponse.of(key, stored.get(key), schedules.get(key)))
         .toList();
+  }
+
+  /**
+   * 설정 변경 이력을 최근 변경순으로 돌려준다. 적용일이 지난 예약은 먼저 반영해 이력에 남긴다.
+   *
+   * @param size 한 페이지 건수. 100 을 넘으면 100 으로 줄인다
+   */
+  @Transactional
+  public PageResponse<SettingHistoryResponse> history(int page, int size) {
+    Arrays.stream(SettingKey.values()).forEach(this::applyDueSchedule);
+    PageRequest pageable =
+        PageRequest.of(
+            page,
+            Math.min(size, 100),
+            Sort.by(Sort.Order.desc("changedAt"), Sort.Order.desc("id")));
+    return PageResponse.from(historyRepository.findAll(pageable).map(SettingHistoryResponse::from));
   }
 
   /** 공지 없이 바로 바꾼다. */
@@ -201,7 +221,7 @@ public class OperatorSettingAdminService {
         historyRepository.save(OperatorSettingHistory.reset(key, current, null, at));
         settingRepository.delete(stored);
       }
-    } else if (current != schedule.getSettingValue()) {
+    } else if (key.capped(current) != schedule.appliedValue()) {
       if (stored == null) {
         settingRepository.save(
             OperatorSetting.create(key, schedule.appliedValue(), null, at));

@@ -3,8 +3,8 @@ package com.back.nbe1214finalhot6.setting.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -82,22 +82,55 @@ class OperatorSettingAdminControllerTest {
         .andExpect(jsonPath("$.data[1].hardMax").value(1_000_000));
   }
 
-  // 목적: 값 변경이 200 과 변경된 설정을 반환하는지 확인한다.
+  private static final String NOTICE_JSON =
+      """
+      {"title": "제목", "content": "본문", "showOnHome": true, "homeUntil": "2026-11-30"}
+      """;
+  private static final SettingNoticeRequest NOTICE =
+      new SettingNoticeRequest("제목", "본문", true, LocalDate.of(2026, 11, 30));
+
+  private static String updateBody(long value) {
+    return "{\"value\": " + value + ", \"notice\": " + NOTICE_JSON + "}";
+  }
+
+  private static String resetBody() {
+    return "{\"notice\": " + NOTICE_JSON + "}";
+  }
+
+  // 목적: 값 변경이 공지를 서비스에 넘기고 200 과 변경된 설정을 반환하는지 확인한다.
   @Test
   @DisplayName("값 변경은 200 과 변경 결과를 반환한다")
   void put_ok() throws Exception {
-    given(settingService.put(eq(KEY), eq(700_000L), isNull())).willReturn(operatorValue(700_000L));
+    given(settingService.put(KEY, 700_000L, NOTICE)).willReturn(operatorValue(700_000L));
 
     mockMvc
         .perform(
             put("/api/admin/settings/" + KEY)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"value": 700000}
-                    """))
+                .content(updateBody(700_000L)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.value").value(700_000))
         .andExpect(jsonPath("$.data.key").value(KEY));
+  }
+
+  // 목적: 공지 없이는 바꾸거나 되돌릴 수 없는지 확인한다.
+  @Test
+  @DisplayName("공지가 없으면 변경과 되돌리기는 400")
+  void withoutNotice() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/admin/settings/" + KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\": 700000}"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            delete("/api/admin/settings/" + KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+    mockMvc.perform(delete("/api/admin/settings/" + KEY)).andExpect(status().isBadRequest());
+    verifyNoInteractions(settingService);
   }
 
   // 목적: 값이 빠지면 400 으로 걸러지는지 확인한다.
@@ -124,9 +157,7 @@ class OperatorSettingAdminControllerTest {
         .perform(
             put("/api/admin/settings/NO_SUCH_KEY")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"value": 1000}
-                    """))
+                .content(updateBody(1000L)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SET-001"));
   }
@@ -135,50 +166,27 @@ class OperatorSettingAdminControllerTest {
   @Test
   @DisplayName("되돌리기는 200, 없는 키는 400 과 SET-001")
   void reset_okAndInvalid() throws Exception {
-    given(settingService.reset(eq(KEY), isNull()))
+    given(settingService.reset(KEY, NOTICE))
         .willReturn(SettingResponse.of(SettingKey.WALLET_MONTHLY_CHARGE_LIMIT, null));
-    given(settingService.reset(eq("NO_SUCH_KEY"), isNull()))
+    given(settingService.reset("NO_SUCH_KEY", NOTICE))
         .willThrow(new BusinessException(SettingErrorCode.INVALID_SETTING));
 
     mockMvc
-        .perform(delete("/api/admin/settings/" + KEY))
+        .perform(
+            delete("/api/admin/settings/" + KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(resetBody()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.source").value("DEFAULT"))
         .andExpect(jsonPath("$.data.value").value(1_000_000));
 
     mockMvc
-        .perform(delete("/api/admin/settings/NO_SUCH_KEY"))
+        .perform(
+            delete("/api/admin/settings/NO_SUCH_KEY")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(resetBody()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SET-001"));
-  }
-
-  // 목적: 공지를 함께 보내면 서비스에 전달되는지 확인한다.
-  @Test
-  @DisplayName("변경과 되돌리기는 공지를 함께 받는다")
-  void put_andReset_withNotice() throws Exception {
-    SettingNoticeRequest notice = new SettingNoticeRequest("제목", "본문", true, LocalDate.of(2026, 11, 30));
-    given(settingService.put(KEY, 700_000L, notice)).willReturn(operatorValue(700_000L));
-    given(settingService.reset(KEY, notice))
-        .willReturn(SettingResponse.of(SettingKey.WALLET_MONTHLY_CHARGE_LIMIT, null));
-    String body =
-        """
-        {"title": "제목", "content": "본문", "showOnHome": true, "homeUntil": "2026-11-30"}
-        """;
-
-    mockMvc
-        .perform(
-            put("/api/admin/settings/" + KEY)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"value\": 700000, \"notice\": " + body + "}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.value").value(700_000));
-    mockMvc
-        .perform(
-            delete("/api/admin/settings/" + KEY)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"notice\": " + body + "}"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.source").value("DEFAULT"));
   }
 
   // 목적: 예약이 201 과 예약 정보를 반환하고, 공지가 없으면 400 인지 확인한다.

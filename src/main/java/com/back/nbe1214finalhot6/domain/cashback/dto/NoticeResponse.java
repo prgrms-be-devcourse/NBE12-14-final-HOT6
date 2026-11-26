@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
  * @param settingKey 한도 변경 공지의 설정 키. 다른 종류는 null
  * @param previousValue 한도 변경 공지의 이전 값(원). 다른 종류는 null
  * @param newValue 한도 변경 공지의 새 값(원). 다른 종류는 null
+ * @param updatedAt 운영자가 제목이나 본문을 마지막으로 고친 시각. 고친 적이 없으면 null
  */
 public record NoticeResponse(
     Long noticeId,
@@ -34,7 +35,8 @@ public record NoticeResponse(
     BigDecimal previousRate,
     String settingKey,
     Long previousValue,
-    Long newValue) {
+    Long newValue,
+    LocalDateTime updatedAt) {
 
   /** 요율 정보가 없는 공지(소진 예고, 긴급 중단 등). */
   public static NoticeResponse from(CashbackNotice notice) {
@@ -54,6 +56,7 @@ public record NoticeResponse(
         previousRate,
         notice.getSettingKey(),
         notice.getPreviousValue(),
-        notice.getNewValue());
+        notice.getNewValue(),
+        notice.getUpdatedAt());
   }
 }

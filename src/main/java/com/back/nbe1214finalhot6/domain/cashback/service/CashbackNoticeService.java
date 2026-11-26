@@ -2,7 +2,9 @@ package com.back.nbe1214finalhot6.domain.cashback.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeAdminResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeUpdateRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackNotice;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
@@ -25,6 +27,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -104,6 +107,54 @@ public class CashbackNoticeService {
             .findTop5ByStatusAndShowOnHomeTrueAndHomeUntilGreaterThanEqualOrderByCreatedAtDescIdDesc(
                 NoticeStatus.PUBLISHED, LocalDate.now(clock));
     return toResponses(new PageImpl<>(notices)).getContent();
+  }
+
+  /**
+   * 운영자가 보는 공지 목록. 거둔 공지도 포함해 최근 등록순으로 돌려준다. 읽기만 한다.
+   *
+   * @param size 한 페이지 건수. {@value #MAX_PAGE_SIZE} 을 넘으면 그 값으로 줄인다
+   */
+  @Transactional(readOnly = true)
+  public PageResponse<NoticeAdminResponse> listForAdmin(int page, int size) {
+    Page<CashbackNotice> result = noticeRepository.findAll(pageOf(page, size));
+    List<NoticeResponse> notices = toResponses(result).getContent();
+    List<NoticeAdminResponse> content =
+        IntStream.range(0, notices.size())
+            .mapToObj(i -> NoticeAdminResponse.of(result.getContent().get(i), notices.get(i)))
+            .toList();
+    return PageResponse.from(
+        new PageImpl<>(content, result.getPageable(), result.getTotalElements()));
+  }
+
+  /**
+   * 게시 중인 공지의 문구와 홈 노출을 고친다. 알리는 값과 적용일은 바뀌지 않는다.
+   *
+   * @throws BusinessException 없는 공지일 때(CSH-015), 거둔 공지이거나 내용·홈 종료일이 올바르지 않을 때(CSH-014)
+   */
+  @Transactional
+  public NoticeAdminResponse update(Long noticeId, NoticeUpdateRequest request) {
+    CashbackNotice notice =
+        noticeRepository
+            .findById(noticeId)
+            .orElseThrow(() -> new BusinessException(CashbackErrorCode.NOTICE_NOT_FOUND));
+    if (notice.getStatus() == NoticeStatus.WITHDRAWN) {
+      throw new BusinessException(CashbackErrorCode.INVALID_NOTICE, "거둔 공지는 고칠 수 없습니다");
+    }
+    requireText(request.title(), request.content());
+    // 이미 지난 종료일을 그대로 둔 채 문구만 고치는 것은 허용한다
+    boolean sameHome =
+        notice.isShowOnHome() && Objects.equals(notice.getHomeUntil(), request.homeUntil());
+    if (!sameHome) {
+      requireHome(request.showOnHome(), request.homeUntil());
+    }
+    notice.edit(
+        request.title(),
+        request.content(),
+        request.showOnHome(),
+        request.homeUntil(),
+        LocalDateTime.now(clock));
+    return NoticeAdminResponse.of(
+        notice, toResponses(new PageImpl<>(List.of(notice))).getContent().get(0));
   }
 
   private static void requireText(String title, String content) {

@@ -1,6 +1,8 @@
 package com.back.nbe1214finalhot6.setting.controller;
 
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
+import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.setting.dto.SettingHistoryResponse;
 import com.back.nbe1214finalhot6.setting.dto.SettingResetRequest;
 import com.back.nbe1214finalhot6.setting.dto.SettingResponse;
 import com.back.nbe1214finalhot6.setting.dto.SettingScheduleRequest;
@@ -9,6 +11,7 @@ import com.back.nbe1214finalhot6.setting.service.OperatorSettingAdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "운영자 설정", description = "이용자 월 적립 한도, 지갑 보유·월 충전 한도 같은 운영 설정 API")
@@ -38,11 +42,19 @@ public class OperatorSettingAdminController {
     return ResponseEntity.ok(ApiResponse.ok(settingService.list()));
   }
 
+  @Operation(summary = "설정 변경 이력 조회", description = "모든 설정의 변경 이력을 최근 변경순으로 돌려준다. 적용 전인 예약은 담기지 않는다")
+  @GetMapping("/history")
+  public ResponseEntity<ApiResponse<PageResponse<SettingHistoryResponse>>> history(
+      @RequestParam(defaultValue = "0") @Min(0) int page,
+      @RequestParam(defaultValue = "20") @Min(1) int size) {
+    return ResponseEntity.ok(ApiResponse.ok(settingService.history(page, size)));
+  }
+
   @Operation(
       summary = "설정 값 변경",
       description =
           "바로 바꾼다. 값은 키의 최솟값 이상, 하드 상한 이하여야 한다(상한과 같은 값 허용). 현재 값과 같으면 아무것도 바꾸지 않고, 바꾸면 이후부터 적용한다."
-              + " notice 를 주면 공지를 함께 등록한다. 대기 중인 예약은 남는다")
+              + " 공지(notice)가 필수이며 값이 바뀌면 함께 등록한다. 대기 중인 예약은 남는다")
   @PutMapping("/{key}")
   public ResponseEntity<ApiResponse<SettingResponse>> put(
       @PathVariable String key, @Valid @RequestBody SettingUpdateRequest request) {
@@ -52,13 +64,12 @@ public class OperatorSettingAdminController {
 
   @Operation(
       summary = "설정을 기본값으로 되돌림",
-      description = "바로 되돌린다. 운영자가 바꾼 적이 없는 키면 아무것도 바꾸지 않는다. 본문에 notice 를 주면 공지를 함께 등록한다")
+      description = "바로 되돌린다. 본문의 공지(notice)가 필수이며 값이 바뀌면 함께 등록한다. 운영자가 바꾼 적이 없는 키면 아무것도 바꾸지 않는다")
   @DeleteMapping("/{key}")
   public ResponseEntity<ApiResponse<SettingResponse>> reset(
       @PathVariable String key,
-      @Valid @RequestBody(required = false) SettingResetRequest request) {
-    return ResponseEntity.ok(
-        ApiResponse.ok(settingService.reset(key, request == null ? null : request.notice())));
+      @Valid @RequestBody SettingResetRequest request) {
+    return ResponseEntity.ok(ApiResponse.ok(settingService.reset(key, request.notice())));
   }
 
   @Operation(
