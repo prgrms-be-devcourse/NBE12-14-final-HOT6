@@ -23,8 +23,13 @@ public class PaymentFacade {
     // T2 로 넘길 대상(T1 이 선점한 행). 신규 요청일 때만 채워진다 (기존 행이 있으면 아래 catch 에서 끝난다)
     PaymentResponse claimed;
     try {
-          // Transaction 1. 선점처리 claim
-          claimed = paymentIdempotencyService.claim(key, request);
+      // 같은 키로 이미 접수한 요청이면 가맹점·QR 상태를 보기 전에 기존 결과로 처리한다
+      // (해지 신청 뒤 재시도해도 MER-003 이 아니라 저장된 결과를 돌려주기 위해)
+      if (paymentIdempotencyService.exists(key, request)) {
+        throw new DataIntegrityViolationException("이미 접수된 멱등키");
+      }
+      // Transaction 1. 선점처리 claim
+      claimed = paymentIdempotencyService.claim(key, request);
 
     } catch (DataIntegrityViolationException e) { // 기존행이 있는 경우
       PaymentResponse existing = paymentIdempotencyService.findExistingResult(key, request);
