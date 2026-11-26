@@ -1,0 +1,57 @@
+{
+  "scenario": "S3-same-wallet",
+  "label": "t2-r4",
+  "environment": {
+    "commit": "fb820fb",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:51:16.536673",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 2,
+    "amount": 10000,
+    "variant": "",
+    "round": 4,
+    "rounds": 5
+  },
+  "wallMs": 56.28,
+  "counts": {
+    "COMPLETED": 1,
+    "WAL-004": 1
+  },
+  "latencyMs": {
+    "n": 2,
+    "min": 50.23,
+    "p50": 50.23,
+    "p95": 56.25,
+    "max": 56.25
+  },
+  "groups": {
+    "pay": {
+      "counts": {
+        "COMPLETED": 1,
+        "WAL-004": 1
+      },
+      "latencyMs": {
+        "n": 2,
+        "min": 50.23,
+        "p50": 50.23,
+        "p95": 56.25,
+        "max": 56.25
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": true,
+    "completed": 1,
+    "expectedCompleted": 1,
+    "debitLines": 1,
+    "balance": 0
+  },
+  "exampleMessages": {
+    "WAL-004": "데브머니 잔액이 부족합니다"
+  }
+}

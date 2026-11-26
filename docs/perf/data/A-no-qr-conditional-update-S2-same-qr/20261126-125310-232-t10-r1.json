@@ -1,0 +1,56 @@
+{
+  "scenario": "A-no-qr-conditional-update-S2-same-qr",
+  "label": "t10-r1",
+  "environment": {
+    "commit": "bb319f1",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:53:10.232886",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 10,
+    "amount": 10000,
+    "variant": "no-qr-conditional-update",
+    "round": 1,
+    "rounds": 3
+  },
+  "wallMs": 164.91,
+  "counts": {
+    "COMPLETED": 6,
+    "QR-003": 4
+  },
+  "latencyMs": {
+    "n": 10,
+    "min": 39.13,
+    "p50": 61.91,
+    "p95": 161.45,
+    "max": 161.45
+  },
+  "groups": {
+    "pay": {
+      "counts": {
+        "COMPLETED": 6,
+        "QR-003": 4
+      },
+      "latencyMs": {
+        "n": 10,
+        "min": 39.13,
+        "p50": 61.91,
+        "p95": 161.45,
+        "max": 161.45
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": false,
+    "completedByQr": 6,
+    "debitLinesAllWallets": 6,
+    "qrStatus": "USED"
+  },
+  "exampleMessages": {
+    "QR-003": "이미 사용된 QR 코드입니다"
+  }
+}

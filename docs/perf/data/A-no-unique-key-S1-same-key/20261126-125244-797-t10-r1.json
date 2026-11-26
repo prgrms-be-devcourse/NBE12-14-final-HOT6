@@ -1,0 +1,60 @@
+{
+  "scenario": "A-no-unique-key-S1-same-key",
+  "label": "t10-r1",
+  "environment": {
+    "commit": "9166506",
+    "dirty": false,
+    "postgresVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+    "poolSize": 10,
+    "executedAt": "2026-11-26T12:52:44.797897",
+    "javaVersion": "25",
+    "cpus": 10
+  },
+  "conditions": {
+    "threads": 10,
+    "amount": 10000,
+    "variant": "no-unique-key",
+    "round": 1,
+    "rounds": 3
+  },
+  "wallMs": 51.77,
+  "counts": {
+    "COMPLETED": 1,
+    "IncorrectResultSizeDataAccessException": 3,
+    "QR-003": 6
+  },
+  "latencyMs": {
+    "n": 10,
+    "min": 12.78,
+    "p50": 46.22,
+    "p95": 50.31,
+    "max": 50.31
+  },
+  "groups": {
+    "pay": {
+      "counts": {
+        "COMPLETED": 1,
+        "IncorrectResultSizeDataAccessException": 3,
+        "QR-003": 6
+      },
+      "latencyMs": {
+        "n": 10,
+        "min": 12.78,
+        "p50": 46.22,
+        "p95": 50.31,
+        "max": 50.31
+      }
+    }
+  },
+  "checks": {
+    "invariantsOk": false,
+    "paymentRows": 7,
+    "debitLines": 1,
+    "balance": 90000,
+    "expectedBalance": 90000
+  },
+  "exampleMessages": {
+    "QR-003": "이미 사용된 QR 코드입니다",
+    "IncorrectResultSizeDataAccessException": "NonUniqueResultException: Query did not return a unique result: 4 results were returned"
+  }
+}
