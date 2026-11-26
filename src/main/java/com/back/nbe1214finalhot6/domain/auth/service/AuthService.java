@@ -39,6 +39,10 @@ public class AuthService {
   private static final Set<UserRole> USER_SIGNUP_BLOCKING_ROLES =
       Collections.unmodifiableSet(EnumSet.of(UserRole.USER, UserRole.ADMIN));
 
+  // 점주 가입에서 이메일·전화번호가 겹치면 안 되는 계정 종류. 이용자 계정과는 같은 값을 써도 된다
+  private static final Set<UserRole> OWNER_SIGNUP_BLOCKING_ROLES =
+      Collections.unmodifiableSet(EnumSet.of(UserRole.OWNER, UserRole.ADMIN));
+
   // 로그인할 때 확인하는 순서. 활동 중인 계정을 먼저, 그다음 USER, OWNER, ADMIN
   private static final Comparator<User> LOGIN_PRIORITY =
       Comparator.comparing((User user) -> user.getStatus() != UserStatus.ACTIVE)
@@ -51,12 +55,33 @@ public class AuthService {
 
   @Transactional
   public SignupResponse signup(SignupRequest request) {
+    User saved = saveNewUser(request, UserRole.USER, USER_SIGNUP_BLOCKING_ROLES);
+
+    // 같은 트랜잭션에서 모의계좌·가입 보너스 원장·지갑 생성. 하나라도 실패하면 회원 저장까지 롤백됨
+    walletOpeningService.open(saved.getId());
+
+    return SignupResponse.from(saved);
+  }
+
+  /** 점주(OWNER)로 가입한다. 지갑 없이 잔액 0원인 개인 모의계좌만 만든다. */
+  @Transactional
+  public SignupResponse signupOwner(SignupRequest request) {
+    User saved = saveNewUser(request, UserRole.OWNER, OWNER_SIGNUP_BLOCKING_ROLES);
+
+    // 계좌 생성이 실패하면 회원 저장까지 롤백됨
+    walletOpeningService.openOwnerAccount(saved.getId());
+
+    return SignupResponse.from(saved);
+  }
+
+  // 중복을 확인하고 비밀번호·PIN 을 암호화해 저장한다. 호출한 가입의 트랜잭션 안에서 실행된다
+  private User saveNewUser(SignupRequest request, UserRole role, Set<UserRole> blockingRoles) {
     // 이메일 중복이면 예외
-    if (userRepository.existsByRoleInAndEmail(USER_SIGNUP_BLOCKING_ROLES, request.email())) {
+    if (userRepository.existsByRoleInAndEmail(blockingRoles, request.email())) {
       throw new BusinessException(AuthErrorCode.DUPLICATE_EMAIL);
     }
     // 전화번호 중복이면 예외
-    if (userRepository.existsByRoleInAndPhone(USER_SIGNUP_BLOCKING_ROLES, request.phone())) {
+    if (userRepository.existsByRoleInAndPhone(blockingRoles, request.phone())) {
       throw new BusinessException(AuthErrorCode.DUPLICATE_PHONE);
     }
     // 암호화
@@ -64,15 +89,9 @@ public class AuthService {
     String pinHash = passwordEncoder.encode(request.pin());
 
     User user =
-        User.create(
-            request.name(), request.email(), request.phone(), passwordHash, pinHash, UserRole.USER);
+        User.create(request.name(), request.email(), request.phone(), passwordHash, pinHash, role);
 
-    User saved = saveOrThrowDuplicate(user);
-
-    // 같은 트랜잭션에서 모의계좌·가입 보너스 원장·지갑 생성. 하나라도 실패하면 회원 저장까지 롤백됨
-    walletOpeningService.open(saved.getId());
-
-    return SignupResponse.from(saved);
+    return saveOrThrowDuplicate(user);
   }
 
   // 트랜잭션을 두지 않는다. 조회한 뒤에 하는 BCrypt 비교(느림) 동안 DB 연결을 잡고 있지 않기 위해서다.

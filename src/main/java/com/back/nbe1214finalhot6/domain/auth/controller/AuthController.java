@@ -34,6 +34,18 @@ public class AuthController {
   }
 
   @Operation(
+      summary = "점주 가입",
+      description =
+          "점주(OWNER) 계정과 잔액 0원인 개인 모의계좌를 만든다. 지갑은 만들지 않는다. "
+              + "입력 규칙은 회원가입과 같고, 이메일·전화번호는 점주·운영자 계정과만 겹칠 수 없다")
+  @PostMapping("/owners/signup")
+  public ResponseEntity<ApiResponse<SignupResponse>> signupOwner(
+      @Valid @RequestBody SignupRequest request) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.ok(authService.signupOwner(request)));
+  }
+
+  @Operation(
       summary = "로그인",
       description = "이메일·비밀번호로 로그인하고 액세스 토큰을 발급. 실패 사유(이메일 없음·비밀번호 불일치·탈퇴)는 구분하지 않음")
   @PostMapping("/auth/login")

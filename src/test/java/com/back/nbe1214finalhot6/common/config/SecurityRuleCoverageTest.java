@@ -44,7 +44,8 @@ class SecurityRuleCoverageTest {
 
   /** 로그인 없이 열려 있어야 하는 경로. 새로 열 때는 보안 검토 후 추가한다. */
   private static final Set<String> PUBLIC_ENDPOINTS =
-      Set.of("POST /api/auth/login", "POST /api/users/signup");
+      Set.of(
+          "POST /api/auth/login", "POST /api/users/signup", "POST /api/owners/signup");
 
   /** 역할 구분 없이 로그인만 하면 되는 경로. 의도한 공통 경로만 보안 검토 후 추가한다. */
   private static final Set<String> ANY_LOGGED_IN_ENDPOINTS = Set.of("GET /api/users/me");

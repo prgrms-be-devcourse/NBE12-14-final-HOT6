@@ -38,7 +38,8 @@ public class OpenApiConfig {
 
   /** 토큰 없이 부를 수 있는 API. {@link SecurityConfig} 의 "누구나" 규칙과 같아야 한다. */
   private static final Set<String> PUBLIC_OPERATIONS =
-      Set.of("POST /api/auth/login", "POST /api/users/signup");
+      Set.of(
+          "POST /api/auth/login", "POST /api/users/signup", "POST /api/owners/signup");
 
   /** 실패했을 때의 응답 본문. 성공 응답과 같은 틀({@code success/code/message/data})이다. */
   @Schema(name = "ErrorResponse", description = "실패 응답. 성공 응답과 같은 틀이고 data 는 null 이다")

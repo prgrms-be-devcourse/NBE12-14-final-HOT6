@@ -84,6 +84,7 @@ class SecurityConfigTest {
         // 누구나
         Arguments.of("POST", "/api/auth/login", 200, 200, 200, 200),
         Arguments.of("POST", "/api/users/signup", 200, 200, 200, 200),
+        Arguments.of("POST", "/api/owners/signup", 200, 200, 200, 200),
         Arguments.of("GET", "/actuator/health", 200, 200, 200, 200),
         Arguments.of("GET", "/api/auth/login", 401, 200, 200, 200), // 로그인 경로는 POST 만 열려 있다
         // 운영자 전용
