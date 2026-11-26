@@ -21,6 +21,10 @@ public interface MonthlySettlementRepository extends JpaRepository<MonthlySettle
   // 가맹점의 가장 최근 월 정산. 이 달 이후의 일 정산이 아직 월 정산에 묶이지 않은 매출이다.
   Optional<MonthlySettlement> findFirstByMerchantIdOrderBySettlementMonthDesc(Long merchantId);
 
+  // 한 가맹점의 상태별 월 정산 건. 오래된 건부터 읽는다.
+  List<MonthlySettlement> findByMerchantIdAndStatusOrderByIdAsc(
+      Long merchantId, MonthlySettlementStatus status);
+
   // 가맹점의 지급 상태별 월 정산 합계(지급 대기 금액을 구할 때 쓴다).
   @Query(
       "select coalesce(sum(m.payoutAmount), 0) from MonthlySettlement m "

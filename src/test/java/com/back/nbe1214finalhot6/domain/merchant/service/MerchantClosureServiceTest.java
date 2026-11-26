@@ -94,7 +94,7 @@ class MerchantClosureServiceTest {
   }
 
   @Test
-  @DisplayName("정산금과 계좌 잔액으로 갚을 금액을 감당하지 못하면 신청이 거절되고 상태는 그대로다 (MER-005)")
+  @DisplayName("정산금으로 갚을 금액을 감당하지 못하면 신청이 거절되고 상태는 그대로다 (MER-005)")
   void 부족분이_있으면_거절() {
     Long merchantId = saveMerchant();
     // 취소 5,000원이 그날 매출보다 많아 5,000원을 다음으로 넘긴 상태
@@ -111,13 +111,31 @@ class MerchantClosureServiceTest {
   }
 
   @Test
-  @DisplayName("계좌 잔액이 갚을 금액 이상이면 신청할 수 있다")
-  void 계좌_잔액으로_감당() {
+  @DisplayName("계좌 잔액이 충분해도 정산금이 갚을 금액에 모자라면 거절한다 (MER-005)")
+  void 계좌_잔액은_상계에_쓰지_않는다() {
     Long merchantId = saveMerchant();
     saveDaily(merchantId, DAY, 0, 5_000, 0);
     MerchantAccount account = accountRepository.findByMerchantId(merchantId).orElseThrow();
-    account.deposit(5_000);
+    account.deposit(100_000);
     accountRepository.saveAndFlush(account);
+
+    assertThatThrownBy(() -> closureService.request(merchantId))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e ->
+                assertThat(e.getErrorCode())
+                    .isEqualTo(MerchantErrorCode.MERCHANT_CLOSURE_SHORTFALL));
+    assertThat(accountRepository.findByMerchantId(merchantId).orElseThrow().getBalance())
+        .isEqualTo(100_000);
+  }
+
+  @Test
+  @DisplayName("월 정산 건이 아직 없는 정산금이 갚을 금액 이상이면 신청할 수 있다")
+  void 정산금으로_감당() {
+    Long merchantId = saveMerchant();
+    // 하루 전 매출 5,000원이 확정되고, 다음 날 취소 5,000원이 매출 없이 들어와 5,000원을 넘긴 상태
+    saveDaily(merchantId, DAY.minusDays(1), 5_000, 0, 0);
+    saveDaily(merchantId, DAY, 0, 5_000, 0);
 
     ClosureResponse response = closureService.request(merchantId);
 
@@ -138,6 +156,8 @@ class MerchantClosureServiceTest {
 
     assertThat(preview.status()).isEqualTo(MerchantStatus.ACTIVE);
     assertThat(preview.unpaidAmount()).isEqualTo(50_000);
+    // 지급 대기 20,000원은 이미 건이 만들어져 차감에 쓸 수 없고, 월 정산 전 30,000원만 쓸 수 있다
+    assertThat(preview.offsettableAmount()).isEqualTo(30_000);
     assertThat(preview.carryDebt()).isZero();
     assertThat(preview.closable()).isTrue();
     assertThat(preview.shortfall()).isZero();
@@ -172,7 +192,7 @@ class MerchantClosureServiceTest {
     assertThat(preview.carryDebt()).isEqualTo(8_000);
     assertThat(preview.accountBalance()).isEqualTo(3_000);
     assertThat(preview.closable()).isFalse();
-    assertThat(preview.shortfall()).isEqualTo(5_000);
+    assertThat(preview.shortfall()).isEqualTo(8_000);
     assertThat(merchantRepository.findStatusById(merchantId)).contains(MerchantStatus.ACTIVE);
   }
 

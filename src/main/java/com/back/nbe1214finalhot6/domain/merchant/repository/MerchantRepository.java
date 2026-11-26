@@ -2,6 +2,7 @@ package com.back.nbe1214finalhot6.domain.merchant.repository;
 
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,6 +16,9 @@ public interface MerchantRepository extends JpaRepository<Merchant, Long> {
   // 이름 검색은 영업 중인 가맹점만 보여 준다
   Page<Merchant> findByStatusAndNameContainingIgnoreCase(
       MerchantStatus status, String name, Pageable pageable);
+
+  // 해당 상태의 가맹점을 오래된 순으로 읽는다. 해지 정산이 CLOSING 가맹점을 모을 때 쓴다
+  List<Merchant> findByStatusOrderByIdAsc(MerchantStatus status);
 
   // 점주의 가맹점 조회. 점주당 하나만 허용(유일 제약)
   Optional<Merchant> findByOwnerId(Long ownerId);

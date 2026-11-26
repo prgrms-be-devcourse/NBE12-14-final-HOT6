@@ -25,7 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 가맹점 해지 신청. 신청하면 곧바로 CLOSING 이 되어 새 결제와 QR 이 막히고, 철회는 없다.
  *
- * <p>정산금과 계좌 잔액으로 쌓인 부족분(취소·환수)을 갚을 수 없으면 신청을 받지 않는다. 해지 정산은 이후 단계에서 처리한다.
+ * <p>쌓인 부족분(취소·환수)을 아직 지급하지 않은 정산금으로 갚을 수 없으면 신청을 받지 않는다. 점주의 계좌 잔액은 건드리지 않는다. 해지 정산은 이후
+ * 단계에서 처리한다.
  */
 @Service
 @RequiredArgsConstructor
@@ -102,18 +103,22 @@ public class MerchantClosureService {
             .findFirstByMerchantIdOrderBySettlementMonthDesc(merchantId)
             .map(monthly -> monthly.getSettlementMonth().plusMonths(1))
             .orElse(EARLIEST);
+    long unsettledAmount = dailySettlementRepository.sumConfirmedAmountFrom(merchantId, unsettledFrom);
     long unpaidAmount =
         monthlySettlementRepository.sumPayoutAmountByStatus(
                 merchantId, MonthlySettlementStatus.PENDING)
-            + dailySettlementRepository.sumConfirmedAmountFrom(merchantId, unsettledFrom);
+            + unsettledAmount;
 
     long accountBalance =
         accountRepository.findByMerchantId(merchantId).map(MerchantAccount::getBalance).orElse(0L);
 
-    long shortfall = Math.max(0, carryDebt - unpaidAmount - accountBalance);
+    // 해지 정산은 월 정산 건이 아직 없는 정산금에서만 부족분을 차감한다. 이미 만들어진 지급 대기 건은 고치지 않고,
+    // 계좌 잔액은 점주의 돈이라 쓰지 않는다
+    long shortfall = Math.max(0, carryDebt - unsettledAmount);
     return new ClosurePreviewResponse(
         merchant.getStatus(),
         unpaidAmount,
+        unsettledAmount,
         carryDebt,
         accountBalance,
         shortfall == 0,

@@ -90,6 +90,7 @@ class SecurityConfigTest {
         Arguments.of("GET", "/api/admin/settings", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/settlements/daily/run", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/settlements/monthly/run", 401, 403, 403, 200),
+        Arguments.of("POST", "/api/admin/merchants/closures/run", 401, 403, 403, 200),
         Arguments.of("PUT", "/api/admin/cashback/budget/annual/2026", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/cashback/policies/reductions", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/cashback/payouts/run", 401, 403, 403, 200),
