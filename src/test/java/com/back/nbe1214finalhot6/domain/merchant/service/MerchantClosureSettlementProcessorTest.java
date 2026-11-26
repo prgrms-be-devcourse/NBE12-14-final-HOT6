@@ -15,9 +15,10 @@ import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlementStatus;
 import com.back.nbe1214finalhot6.domain.settlement.repository.DailySettlementRepository;
 import com.back.nbe1214finalhot6.domain.settlement.repository.MonthlySettlementRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantWalletRepository;
-import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Account;
+import com.back.nbe1214finalhot6.domain.wallet.entity.AccountTransactionType;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountTransactionRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
 import java.time.LocalDate;
@@ -42,9 +43,8 @@ class MerchantClosureSettlementProcessorTest {
   @Autowired private MerchantClosureDeductionRepository deductionRepository;
   @Autowired private MonthlyPayoutCheck monthlyPayoutCheck;
   @Autowired private MerchantRepository merchantRepository;
-  @Autowired private MerchantWalletService merchantWalletService;
-  @Autowired private MerchantWalletRepository walletRepository;
-  @Autowired private MerchantAccountRepository accountRepository;
+  @Autowired private AccountRepository accountRepository;
+  @Autowired private AccountTransactionRepository accountTransactionRepository;
   @Autowired private DailySettlementRepository dailySettlementRepository;
   @Autowired private MonthlySettlementRepository monthlySettlementRepository;
   @Autowired private MutableClock clock;
@@ -65,7 +65,11 @@ class MerchantClosureSettlementProcessorTest {
     assertThat(monthly.getPayoutAmount()).isEqualTo(40_000);
     assertThat(monthly.isPaid()).isTrue();
     assertThat(accountBalance(merchantId)).isEqualTo(40_000);
-    assertThat(walletBalance(merchantId)).isZero();
+    // 점주 계좌 원장에 월 정산 건 번호로 정산 입금이 남는다
+    assertThat(
+            accountTransactionRepository.findByTypeAndRefKey(
+                AccountTransactionType.SETTLEMENT_PAYOUT, monthly.getId()))
+        .hasValueSatisfying(tx -> assertThat(tx.getAmount()).isEqualTo(40_000));
   }
 
   @Test
@@ -222,7 +226,8 @@ class MerchantClosureSettlementProcessorTest {
         merchantRepository
             .save(Merchant.create(nextOwnerId++, "해지 정산 가맹점", "인천광역시 남동구 1", true))
             .getId();
-    merchantWalletService.createFor(merchantId);
+    // 점주의 모의계좌가 정산 계좌다
+    accountRepository.save(Account.createEmpty(ownerOf(merchantId), LocalDateTime.now(clock)));
     merchantRepository.updateStatusIfCurrent(
         merchantId, MerchantStatus.ACTIVE, MerchantStatus.CLOSING);
     return merchantId;
@@ -251,11 +256,11 @@ class MerchantClosureSettlementProcessorTest {
     return rows.getFirst();
   }
 
-  private long accountBalance(Long merchantId) {
-    return accountRepository.findByMerchantId(merchantId).orElseThrow().getBalance();
+  private Long ownerOf(Long merchantId) {
+    return merchantRepository.findById(merchantId).orElseThrow().getOwnerId();
   }
 
-  private long walletBalance(Long merchantId) {
-    return walletRepository.findByMerchantId(merchantId).orElseThrow().getBalance();
+  private long accountBalance(Long merchantId) {
+    return accountRepository.findByUserId(ownerOf(merchantId)).orElseThrow().getBalance();
   }
 }

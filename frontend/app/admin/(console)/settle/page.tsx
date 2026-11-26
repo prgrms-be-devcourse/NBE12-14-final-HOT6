@@ -16,7 +16,7 @@ const TYPES: { type: ReconciliationType; label: string; note: string }[] = [
   { type: "REFUND_TRANSFER", label: "환불", note: "환불액 = 지갑 차감 = 계좌 입금" },
   { type: "DAILY_NET_SALES", label: "일 순매출", note: "장부 순매출 = 결제 − 취소" },
   { type: "SETTLEMENT_CARRY", label: "확정액·이월", note: "확정액 + 이월 = 순매출 + 전일 이월" },
-  { type: "MONTHLY_PAYOUT", label: "월 지급", note: "월 지급액 = 일 정산 합 = 지갑 원장" },
+  { type: "MONTHLY_PAYOUT", label: "월 지급", note: "월 지급액 = 일 정산 합 = 점주 계좌 원장" },
 ];
 
 type Msg = { ok: boolean; text: string } | null;

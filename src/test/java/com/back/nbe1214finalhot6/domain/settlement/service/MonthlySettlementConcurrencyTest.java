@@ -2,13 +2,14 @@ package com.back.nbe1214finalhot6.domain.settlement.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
+import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.repository.MonthlySettlementRepository;
-import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantWalletTransactionType;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantWalletRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantWalletTransactionRepository;
-import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Account;
+import com.back.nbe1214finalhot6.domain.wallet.entity.AccountTransactionType;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountTransactionRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
 import java.time.LocalDate;
@@ -25,41 +26,49 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 // 여러 스레드가 각자 트랜잭션으로 커밋해야 하므로 @Transactional 을 붙이지 않고, 끝나면 직접 지운다.
 @IntegrationTest
 class MonthlySettlementConcurrencyTest {
 
   private static final int THREADS = 8;
-  private static final Long MERCHANT = 1L;
+  private static final Long OWNER = 8_201L;
   private static final long PAYOUT = 15_000L;
 
   @Autowired MonthlySettlementProcessor processor;
   @Autowired MonthlySettlementRepository monthlyRepository;
-  @Autowired MerchantWalletService walletService;
-  @Autowired MerchantWalletRepository walletRepository;
-  @Autowired MerchantAccountRepository accountRepository;
-  @Autowired MerchantWalletTransactionRepository transactionRepository;
+  @Autowired MerchantRepository merchantRepository;
+  @Autowired AccountRepository accountRepository;
+  @Autowired AccountTransactionRepository accountTransactionRepository;
+  @Autowired JdbcTemplate jdbcTemplate;
   @Autowired MutableClock clock;
+
+  private Long merchantId;
 
   @AfterEach
   void cleanUp() {
-    transactionRepository.deleteAll();
+    jdbcTemplate.update(
+        "delete from account_transaction where account_id in (select id from account where user_id = ?)",
+        OWNER);
+    jdbcTemplate.update("delete from account where user_id = ?", OWNER);
     monthlyRepository.deleteAll();
-    walletRepository.deleteAll();
-    accountRepository.deleteAll();
+    if (merchantId != null) {
+      merchantRepository.deleteById(merchantId);
+    }
   }
 
   @Test
-  @DisplayName("같은 월 정산 건의 출금을 동시에 처리해도 출금은 한 번만 일어나고 지급 완료로 끝난다")
-  void 동시출금_한번만() throws Exception {
-    walletService.createFor(MERCHANT);
+  @DisplayName("같은 월 정산 건의 지급을 동시에 처리해도 점주 계좌 입금은 한 번만 일어나고 지급 완료로 끝난다")
+  void 동시지급_한번만() throws Exception {
+    merchantId =
+        merchantRepository.save(Merchant.create(OWNER, "동시 지급 가맹점", "인천광역시 남동구 1", true)).getId();
+    accountRepository.save(Account.createEmpty(OWNER, LocalDateTime.now(clock)));
     MonthlySettlement settlement =
         monthlyRepository.save(
             MonthlySettlement.create(
-                MERCHANT, LocalDate.of(2026, 10, 1), PAYOUT, LocalDateTime.now(clock)));
+                merchantId, LocalDate.of(2026, 10, 1), PAYOUT, LocalDateTime.now(clock)));
     Long settlementId = settlement.getId();
-    walletService.deposit(MERCHANT, PAYOUT, settlementId);
 
     ExecutorService executor = Executors.newFixedThreadPool(THREADS);
     CountDownLatch ready = new CountDownLatch(THREADS);
@@ -71,7 +80,7 @@ class MonthlySettlementConcurrencyTest {
             () -> {
               ready.countDown();
               start.await();
-              processor.withdrawAndComplete(settlementId);
+              processor.payAndComplete(settlementId);
               return true;
             };
         futures.add(executor.submit(task));
@@ -88,12 +97,9 @@ class MonthlySettlementConcurrencyTest {
 
     assertThat(monthlyRepository.findById(settlementId).orElseThrow().isPaid()).isTrue();
     assertThat(
-            transactionRepository.findByTypeAndRefKey(
-                MerchantWalletTransactionType.PAYOUT_TO_ACCOUNT, settlementId))
-        .isPresent();
-    assertThat(transactionRepository.count()).isEqualTo(2);
-    assertThat(walletRepository.findByMerchantId(MERCHANT).orElseThrow().getBalance()).isZero();
-    assertThat(accountRepository.findByMerchantId(MERCHANT).orElseThrow().getBalance())
-        .isEqualTo(PAYOUT);
+            accountTransactionRepository.findByTypeAndRefKey(
+                AccountTransactionType.SETTLEMENT_PAYOUT, settlementId))
+        .hasValueSatisfying(tx -> assertThat(tx.getAmount()).isEqualTo(PAYOUT));
+    assertThat(accountRepository.findByUserId(OWNER).orElseThrow().getBalance()).isEqualTo(PAYOUT);
   }
 }

@@ -15,8 +15,8 @@ import com.back.nbe1214finalhot6.domain.settlement.entity.DailySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.repository.DailySettlementRepository;
 import com.back.nbe1214finalhot6.domain.settlement.repository.MonthlySettlementRepository;
-import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantAccount;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Account;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
 import java.time.LocalDate;
@@ -32,13 +32,14 @@ import org.springframework.transaction.annotation.Transactional;
 class MerchantClosureServiceTest {
 
   private static final LocalDate DAY = LocalDate.of(2026, 11, 10);
+  private static final Long OWNER_ID = 9_001L;
 
   @Autowired private MerchantClosureService closureService;
   @Autowired private MerchantRepository merchantRepository;
   @Autowired private MerchantClosureRepository closureRepository;
   @Autowired private DailySettlementRepository dailySettlementRepository;
   @Autowired private MonthlySettlementRepository monthlySettlementRepository;
-  @Autowired private MerchantAccountRepository accountRepository;
+  @Autowired private AccountRepository accountRepository;
   @Autowired private MutableClock clock;
 
   @Test
@@ -115,8 +116,8 @@ class MerchantClosureServiceTest {
   void 계좌_잔액은_상계에_쓰지_않는다() {
     Long merchantId = saveMerchant();
     saveDaily(merchantId, DAY, 0, 5_000, 0);
-    MerchantAccount account = accountRepository.findByMerchantId(merchantId).orElseThrow();
-    account.deposit(100_000);
+    Account account = accountRepository.findByUserId(OWNER_ID).orElseThrow();
+    account.credit(100_000);
     accountRepository.saveAndFlush(account);
 
     assertThatThrownBy(() -> closureService.request(merchantId))
@@ -125,7 +126,7 @@ class MerchantClosureServiceTest {
             e ->
                 assertThat(e.getErrorCode())
                     .isEqualTo(MerchantErrorCode.MERCHANT_CLOSURE_SHORTFALL));
-    assertThat(accountRepository.findByMerchantId(merchantId).orElseThrow().getBalance())
+    assertThat(accountRepository.findByUserId(OWNER_ID).orElseThrow().getBalance())
         .isEqualTo(100_000);
   }
 
@@ -183,8 +184,8 @@ class MerchantClosureServiceTest {
   void 미리보기_부족분() {
     Long merchantId = saveMerchant();
     saveDaily(merchantId, DAY, 0, 8_000, 0);
-    MerchantAccount account = accountRepository.findByMerchantId(merchantId).orElseThrow();
-    account.deposit(3_000);
+    Account account = accountRepository.findByUserId(OWNER_ID).orElseThrow();
+    account.credit(3_000);
     accountRepository.saveAndFlush(account);
 
     ClosurePreviewResponse preview = closureService.preview(merchantId);
@@ -198,8 +199,9 @@ class MerchantClosureServiceTest {
 
   private Long saveMerchant() {
     Merchant merchant =
-        merchantRepository.save(Merchant.create(9_001L, "해지 테스트 가맹점", "인천광역시 남동구 1", true));
-    accountRepository.save(MerchantAccount.create(merchant.getId(), LocalDateTime.now(clock)));
+        merchantRepository.save(Merchant.create(OWNER_ID, "해지 테스트 가맹점", "인천광역시 남동구 1", true));
+    // 점주의 모의계좌가 정산 계좌다
+    accountRepository.save(Account.createEmpty(OWNER_ID, LocalDateTime.now(clock)));
     return merchant.getId();
   }
 

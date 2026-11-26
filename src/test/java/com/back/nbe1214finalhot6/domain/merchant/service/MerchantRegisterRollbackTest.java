@@ -2,8 +2,6 @@ package com.back.nbe1214finalhot6.domain.merchant.service;
 
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantWalletRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,20 +19,16 @@ class MerchantRegisterRollbackTest {
 
     @Autowired MerchantService merchantService;
     @Autowired MerchantRepository merchantRepository;
-    @Autowired MerchantWalletRepository merchantWalletRepository;
-    @Autowired MerchantAccountRepository merchantAccountRepository;
     @Autowired PlatformTransactionManager transactionManager;
 
     @AfterEach
     void cleanUp() {
-        merchantWalletRepository.deleteAll();
-        merchantAccountRepository.deleteAll();
         merchantRepository.deleteAll();
     }
 
     @Test
-    @DisplayName("가맹점 등록 트랜잭션이 롤백되면 가맹점, 지갑, 계좌가 모두 함께 사라진다")
-    void 등록트랜잭션_롤백시_가맹점_지갑_계좌_모두_롤백() {
+    @DisplayName("가맹점 등록 트랜잭션이 롤백되면 가맹점도 함께 사라진다")
+    void 등록트랜잭션_롤백시_가맹점_롤백() {
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
 
         assertThatThrownBy(
@@ -48,7 +42,5 @@ class MerchantRegisterRollbackTest {
                 .isInstanceOf(IllegalStateException.class);
 
         assertThat(merchantRepository.count()).isZero();
-        assertThat(merchantWalletRepository.count()).isZero();
-        assertThat(merchantAccountRepository.count()).isZero();
     }
 }
