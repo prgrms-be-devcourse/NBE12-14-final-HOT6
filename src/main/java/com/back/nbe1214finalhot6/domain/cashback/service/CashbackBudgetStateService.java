@@ -17,6 +17,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +43,7 @@ public class CashbackBudgetStateService {
   private final CashbackNoticeService noticeService;
   private final CashbackProperties properties;
   private final Clock clock;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * 예산을 확보한 직후 중단 상태를 판정한다. 예산 확보와 같은 트랜잭션에서 부르며, 호출한 쪽의 트랜잭션에 참여한다. 한 번에 한 단계만 전이하고, 긴급선을
@@ -190,6 +192,10 @@ public class CashbackBudgetStateService {
             ? CashbackBudgetStateLog.byOperator(budgetId, from, to, reason, remainingRate, null, now)
             : CashbackBudgetStateLog.automatic(budgetId, from, to, reason, remainingRate, now));
     registerNotice(snapshot, to, reason, now);
+    // 열려 있는 결제 화면에 알린다. 받는 쪽은 이 트랜잭션이 커밋된 뒤에 처리한다
+    if (to == BudgetStatus.STOPPED) {
+      eventPublisher.publishEvent(new BudgetStoppedEvent(budgetId));
+    }
   }
 
   /**
