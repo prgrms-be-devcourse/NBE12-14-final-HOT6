@@ -29,7 +29,7 @@ BACKEND_URL=http://localhost:8080 npm run dev
 - **가맹점·결제**: `POST /api/merchants`(등록), `PATCH /api/merchants/me`(이름·주소 수정), `POST /api/merchants/me/qr/dynamic`(QR 발급), `POST /api/payments`(QR 결제), `POST /api/payments/{id}/cancel`(점주 취소). 점주의 가맹점은 토큰의 회원으로 서버가 찾는다.
 - **이용자 캐시백**(`lib/cashbackApi.ts`): `GET /api/cashback/summary`·`monthly-limit`·`earnings`(내 캐시백·적립 내역), `GET /api/cashback/preview`(결제 전 미리보기), `GET /api/notices`(공지). 지갑은 서버가 토큰의 회원으로 찾으므로 요청에 지갑 번호를 보내지 않는다.
 - **운영자 캐시백**(`lib/adminApi.ts`): 월 예산 조회, 정책 변경 이력, 소진 예측(`GET /api/admin/cashback/forecast`), 요율 인하, 공지 후 중단, 긴급 중단. 월 예산 배정 화면(`BudgetPlanner`)과 요율 시뮬레이터, 요율별 예상 잔액 차트는 아직 목 데이터다.
-- **점주 정산**(`lib/endpoints.ts`): `GET /api/merchants/me`(내 가맹점), `GET /api/merchants/me/settlements/daily`·`monthly`(일·월 정산), `GET /api/merchants/me/account`(정산 계좌 잔액). 점주용 결제 목록 API 는 아직 없어서 결제 내역 화면은 결제번호로 취소하는 폼만 둔다.
+- **점주 정산**(`lib/endpoints.ts`): `GET /api/merchants/me`(내 가맹점), `GET /api/merchants/me/settlements/daily`·`monthly`(일·월 정산), `GET /api/merchants/me/account`(점주 계좌 잔액. 월 정산금이 바로 들어오는 계좌). 점주용 결제 목록 API 는 아직 없어서 결제 내역 화면은 결제번호로 취소하는 폼만 둔다.
 - **운영자 정산·대사**: `POST /api/admin/settlements/daily/run`·`monthly/run`(정산 수동 실행), `GET`·`POST /api/admin/settlements/reconciliation`(대사 결과 조회·실행)
 - **이용자**: `GET /api/merchants?name=`(가맹점 이름 검색), `GET /api/wallet`(결제 화면의 내 지갑). 가맹점 검색은 이름 부분 일치만 지원하고, 응답에 위치·업종이 없어 지도와 업종 필터는 쓰지 않는다.
 - 가맹점의 적립 대상 여부는 서버가 결정한다: 등록 시 증빙 서류(`revenueProof`)를 첨부하면 적립 대상

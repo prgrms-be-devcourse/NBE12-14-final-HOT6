@@ -33,7 +33,7 @@ export default function MerchantMonthlyPage() {
         if (alive) setAccount({ kind: "ok", data });
       })
       .catch((e) => {
-        if (alive) setAccount({ kind: "error", message: e instanceof ApiError ? e.message : "정산 계좌를 불러오지 못했어요" });
+        if (alive) setAccount({ kind: "error", message: e instanceof ApiError ? e.message : "계좌 잔액을 불러오지 못했어요" });
       });
     return () => {
       alive = false;
@@ -46,11 +46,11 @@ export default function MerchantMonthlyPage() {
       <MerchantTabs />
       <div className="space-y-3 px-5 pb-5">
         <section className="card">
-          <div className="note">정산 계좌 잔액</div>
+          <div className="note">내 계좌 잔액</div>
           {account.kind === "ok" && <div className="amt-in text-2xl font-bold">{won(account.data.balance)}</div>}
           {account.kind === "loading" && <p role="status" className="note mt-1">불러오는 중이에요…</p>}
           {account.kind === "error" && <p role="alert" className="mt-1 text-[13px] font-medium text-red-700">{account.message}</p>}
-          <p className="note mt-2">월 정산 지급액이 지갑을 거쳐 이 계좌로 들어와요.</p>
+          <p className="note mt-2">월 정산 지급액이 내 계좌로 바로 들어와요.</p>
         </section>
 
         <h2 className="px-1.5 pt-2 text-base font-medium">월 정산 내역</h2>
