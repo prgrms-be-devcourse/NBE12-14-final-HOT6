@@ -1,6 +1,7 @@
 package com.back.nbe1214finalhot6.domain.cashback.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -70,6 +71,24 @@ class CashbackPreviewControllerTest {
         .andExpect(jsonPath("$.data.monthlyLimitRemaining").value(4000))
         .andExpect(jsonPath("$.data.exclusionReason").value("NONE"));
     verify(merchantService).isCashbackEligible(7L);
+  }
+
+  // 목적: 로그인한 이용자가 그 가맹점의 점주 본인이면 본인 결제 여부가 서비스 요청에 실려 SELF_PAYMENT 로 안내되는지 확인한다(#301).
+  @Test
+  @DisplayName("본인 가맹점이면 본인 결제로 요청해 SELF_PAYMENT 를 반환한다")
+  void preview_selfPayment() throws Exception {
+    given(merchantService.isCashbackEligible(7L)).willReturn(true);
+    given(merchantService.isOwnedBySamePerson(eq(7L), any())).willReturn(true);
+    given(cashbackService.preview(new CashbackPreviewRequest(1L, true, 12_000L, true)))
+        .willReturn(
+            new CashbackPreviewResponse(
+                false, false, BigDecimal.ZERO, 0L, 4_000L, CashbackExclusionReason.SELF_PAYMENT, false));
+
+    mockMvc
+        .perform(get(URL).param("merchantId", "7").param("walletUsedAmount", "12000"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.earnable").value(false))
+        .andExpect(jsonPath("$.data.exclusionReason").value("SELF_PAYMENT"));
   }
 
   // 목적: 필수 파라미터가 빠지거나 금액이 음수·숫자가 아니면 400 으로 걸러지는지 확인한다.

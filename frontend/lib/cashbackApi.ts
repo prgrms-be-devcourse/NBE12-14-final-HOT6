@@ -9,7 +9,7 @@ export type CashbackSummary = {
 export type MonthlyLimit = { year: number; month: number; limit: number; usedAmount: number; remaining: number };
 export type EarningStatus = "PENDING" | "PAID" | "CANCELED" | "CLAWED_BACK" | "EXCLUDED";
 export type ExclusionCode =
-  | "NONE" | "NOT_ELIGIBLE" | "NO_WALLET_USAGE" | "AMOUNT_TOO_SMALL" | "MONTHLY_LIMIT_EXCEEDED" | "BUDGET_EXHAUSTED";
+  | "NONE" | "SELF_PAYMENT" | "NOT_ELIGIBLE" | "NO_WALLET_USAGE" | "AMOUNT_TOO_SMALL" | "MONTHLY_LIMIT_EXCEEDED" | "BUDGET_EXHAUSTED";
 export type Earning = {
   earningId: number; paymentId: number; status: EarningStatus; amount: number; appliedRate: number | null;
   requestedAt: string; payableAt: string | null; paidAt: string | null; canceledAt: string | null;
@@ -63,7 +63,7 @@ export const STATUS_BADGE: Record<EarningStatus, string> = {
   PENDING: "badge-warn", PAID: "badge-ok", EXCLUDED: "badge-bad", CANCELED: "badge-bad", CLAWED_BACK: "badge-bad",
 };
 export const EXCLUSION_TEXT: Record<ExclusionCode, string> = {
-  NONE: "", NOT_ELIGIBLE: "적립 대상 가맹점 아님", NO_WALLET_USAGE: "데브머니 사용분 없음",
+  NONE: "", SELF_PAYMENT: "본인 가맹점 결제", NOT_ELIGIBLE: "적립 대상 가맹점 아님", NO_WALLET_USAGE: "데브머니 사용분 없음",
   AMOUNT_TOO_SMALL: "적립액 1원 미만", MONTHLY_LIMIT_EXCEEDED: "월 적립 한도 초과", BUDGET_EXHAUSTED: "이번 달 예산 소진",
 };
 export const pctText = (rate: number | null | undefined) => (rate == null ? "" : `${Math.round(rate * 10000) / 100}%`);
@@ -80,6 +80,7 @@ export const getCashbackPreview = (merchantId: number, walletUsedAmount: number)
 // 적립 제외 사유 안내 문구 (미리보기·영수증 공통)
 export const REASON_TEXT: Record<ExclusionCode, string> = {
   NONE: "적립됩니다",
+  SELF_PAYMENT: "본인이 운영하는 가맹점 결제는 적립되지 않아요.",
   NOT_ELIGIBLE: "적립 대상 가맹점이 아니에요. 캐시백 잔액은 이 매장에서도 사용할 수 있어요.",
   NO_WALLET_USAGE: "데브머니로 결제한 금액이 없어 적립되지 않아요.",
   AMOUNT_TOO_SMALL: "적립액이 1원 미만이라 적립되지 않아요.",
@@ -87,10 +88,10 @@ export const REASON_TEXT: Record<ExclusionCode, string> = {
   BUDGET_EXHAUSTED: "이번 달 캐시백 예산이 소진되었거나 적립이 중단되어 적립되지 않아요.",
 };
 
-// 사유 안내의 색: 적립됨=초록, 대상 아님·데브머니 없음·1원 미만=회색, 월 한도 초과=주황, 예산 소진·적립 중단=빨강
+// 사유 안내의 색: 적립됨=초록, 본인 가맹점·대상 아님·데브머니 없음·1원 미만=회색, 월 한도 초과=주황, 예산 소진·적립 중단=빨강
 export type ReasonTone = "ok" | "muted" | "warn" | "bad";
 export const REASON_TONE: Record<ExclusionCode, ReasonTone> = {
-  NONE: "ok", NOT_ELIGIBLE: "muted", NO_WALLET_USAGE: "muted", AMOUNT_TOO_SMALL: "muted",
+  NONE: "ok", SELF_PAYMENT: "muted", NOT_ELIGIBLE: "muted", NO_WALLET_USAGE: "muted", AMOUNT_TOO_SMALL: "muted",
   MONTHLY_LIMIT_EXCEEDED: "warn", BUDGET_EXHAUSTED: "bad",
 };
 export const REASON_TONE_CLASS: Record<ReasonTone, string> = {

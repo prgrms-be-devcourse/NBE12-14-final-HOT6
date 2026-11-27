@@ -6,7 +6,29 @@ export type MerchantRegisterRequest = {
   revenueProof?: string;
 };
 export type MerchantRegisterResponse = { merchantId: number; name: string; address: string; cashbackEligible: boolean };
-export type MerchantResponse = MerchantRegisterResponse;
+// 가맹점 상태. 해지를 신청하면 CLOSING(해지 진행 중), 정산이 모두 끝나면 CLOSED(해지 완료)
+export type MerchantStatus = "ACTIVE" | "CLOSING" | "CLOSED";
+export type MerchantResponse = MerchantRegisterResponse & { status: MerchantStatus };
+
+// 가맹점 해지. 미리보기의 계좌 잔액은 참고용이고 갚을 금액에는 쓰지 않는다
+export type ClosurePreviewResponse = {
+  status: MerchantStatus;
+  unpaidAmount: number; // 아직 계좌로 나가지 않은 정산금
+  offsettableAmount: number; // 그중 갚을 금액에서 차감할 수 있는 정산금
+  carryDebt: number; // 취소로 쌓여 갚아야 하는 금액
+  accountBalance: number;
+  closable: boolean;
+  shortfall: number; // 정산금으로 갚지 못하는 금액
+};
+export type ClosureResponse = { status: MerchantStatus; requestedAt: string };
+export type ClosureSettlementRunResult = {
+  closed: number;
+  held: number;
+  waiting: number;
+  dailyIncomplete: number;
+  failed: number;
+  heldMerchantIds: number[];
+};
 export type MerchantUpdateRequest = { name?: string; address?: string };
 
 // 정산. 날짜는 yyyy-MM-dd, 월은 yyyy-MM

@@ -8,7 +8,7 @@ const TABS = [
   { href: "/merchant/qr", label: "QR 생성", icon: ICONS.qr, match: ["/merchant/qr", "/merchant/paid"] },
   { href: "/merchant/payments", label: "결제 내역", icon: ICONS.receipt, match: ["/merchant/payments"] },
   { href: "/merchant/daily", label: "정산", icon: ICONS.chart, match: ["/merchant/daily", "/merchant/monthly"] },
-  { href: "/merchant/edit", label: "마이페이지", icon: ICONS.user, match: ["/merchant/edit"] },
+  { href: "/merchant/edit", label: "마이페이지", icon: ICONS.user, match: ["/merchant/edit", "/merchant/closure"] },
 ];
 
 export default function MerchantNav() {

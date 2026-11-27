@@ -23,6 +23,10 @@ public interface MerchantRepository extends JpaRepository<Merchant, Long> {
   // 점주의 가맹점 조회. 점주당 하나만 허용(유일 제약)
   Optional<Merchant> findByOwnerId(Long ownerId);
 
+  // 점주의 가맹점 상태만 읽는다. 가맹점이 없으면 비어 있다
+  @Query("select m.status from Merchant m where m.ownerId = :ownerId")
+  Optional<MerchantStatus> findStatusByOwnerId(@Param("ownerId") Long ownerId);
+
   boolean existsByOwnerId(Long ownerId);
 
   // 현재 상태가 from 일 때만 to 로 바꾼다. 해지 신청이 동시에 와도 한 번만 반영된다
@@ -34,4 +38,12 @@ public interface MerchantRepository extends JpaRepository<Merchant, Long> {
   // 상태만 읽는다. 호출한 트랜잭션에 남은 이전 엔티티 값을 읽지 않기 위해 엔티티 대신 값만 조회한다
   @Query("select m.status from Merchant m where m.id = :id")
   Optional<MerchantStatus> findStatusById(@Param("id") Long id);
+
+  // 가맹점 점주와 지갑 주인(이용자)이 같은 사람인지(전화번호가 같은지) 확인한다. 점주가 없는 가맹점은 false
+  @Query(
+      "select count(m) > 0 from Merchant m, User owner, Wallet w, User payer"
+          + " where m.id = :merchantId and owner.id = m.ownerId"
+          + " and w.id = :walletId and payer.id = w.userId"
+          + " and owner.phone = payer.phone")
+  boolean isOwnedBySamePerson(@Param("merchantId") Long merchantId, @Param("walletId") Long walletId);
 }

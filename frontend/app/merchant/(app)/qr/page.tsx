@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import Countdown from "@/components/Countdown";
 import Header from "@/components/Header";
+import MerchantClosedNotice from "@/components/MerchantClosedNotice";
 import { ApiError } from "@/lib/api";
 import { saveCtx } from "@/lib/devContext";
-import { createDynamicQr, getQrLimit, getQrStatus, secondsUntil } from "@/lib/endpoints";
+import { createDynamicQr, getMyMerchant, getQrLimit, getQrStatus, secondsUntil } from "@/lib/endpoints";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
 import type { QrCreateResponse, QrStatus } from "@/lib/types";
@@ -15,7 +16,7 @@ const STATUS_LABEL: Record<QrStatus, string> = { WAITING: "대기중", USED: "�
 const POLL_MS = 2000;
 
 export default function MerchantQrPage() {
-  const [amount, setAmount] = useState(12000);
+  const [amount, setAmount] = useState(0);
   const [qr, setQr] = useState<QrCreateResponse | null>(null);
   const [status, setStatus] = useState<QrStatus | null>(null);
   const [error, setError] = useState("");
@@ -61,6 +62,17 @@ export default function MerchantQrPage() {
   // 한도는 서버가 정한다. 아직 못 불러왔으면 검사하지 않고, 넘기면 서버가 거절한다
   const maxAmount = useLoad(() => getQrLimit(), []).data?.maxAmount;
   const over = maxAmount != null && amount > maxAmount;
+
+  // 해지를 신청했거나 해지된 가맹점은 QR을 만들 수 없다. 상태를 못 읽었으면 폼을 그대로 두고 서버가 거절하게 한다
+  const merchantStatus = useLoad(() => getMyMerchant(), []).data?.status;
+  if (merchantStatus && merchantStatus !== "ACTIVE") {
+    return (
+      <>
+        <Header title="QR 생성" />
+        <div className="px-5 pb-5"><MerchantClosedNotice status={merchantStatus} /></div>
+      </>
+    );
+  }
 
   return (
     <>

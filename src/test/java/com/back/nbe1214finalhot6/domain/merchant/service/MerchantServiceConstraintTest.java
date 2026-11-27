@@ -44,7 +44,7 @@ class MerchantServiceConstraintTest {
     given(merchantRepository.saveAndFlush(any(Merchant.class)))
         .willThrow(violationOf(Merchant.OWNER_UNIQUE, "owner 중복"));
 
-    assertThatThrownBy(() -> merchantService.register(1L, REQUEST))
+    assertThatThrownBy(() -> merchantService.register(1L, REQUEST, null))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED));
@@ -60,6 +60,6 @@ class MerchantServiceConstraintTest {
         violationOf("merchant_name_not_null", "메시지에 " + Merchant.OWNER_UNIQUE + " 가 들어 있어도");
     given(merchantRepository.saveAndFlush(any(Merchant.class))).willThrow(other);
 
-    assertThatThrownBy(() -> merchantService.register(1L, REQUEST)).isSameAs(other);
+    assertThatThrownBy(() -> merchantService.register(1L, REQUEST, null)).isSameAs(other);
   }
 }

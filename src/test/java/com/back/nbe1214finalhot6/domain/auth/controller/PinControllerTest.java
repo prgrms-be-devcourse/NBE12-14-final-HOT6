@@ -112,7 +112,7 @@ class PinControllerTest {
         .andExpect(jsonPath("$.code").value("COM-009"));
   }
 
-  // 목적: 점주(OWNER)는 이용자 기능을 함께 쓰고, 운영자(ADMIN)는 못 쓰며, 로그인하지 않으면 401 인지 확인한다.
+  // 목적: 이용자뿐 아니라 점주(OWNER)도 PIN 을 검증하고, 운영자(ADMIN)는 못 쓰며, 로그인하지 않으면 401 인지 확인한다.
   @Test
   @WithAuthUser(userId = 6L, role = UserRole.OWNER)
   @DisplayName("점주도 PIN 을 검증할 수 있다")

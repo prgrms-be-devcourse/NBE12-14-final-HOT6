@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,7 +18,8 @@ import org.springframework.data.repository.query.Param;
  * 적립 건. 상태를 바꾸는 쿼리는 영속성 컨텍스트를 비우지 않는다. 결제 트랜잭션이 먼저 읽어 둔 엔티티(결제 등)가 분리되면 이후 변경이 저장되지 않기
  * 때문이다.
  */
-public interface CashbackEarningRepository extends JpaRepository<CashbackEarning, Long> {
+public interface CashbackEarningRepository
+    extends JpaRepository<CashbackEarning, Long>, JpaSpecificationExecutor<CashbackEarning> {
 
   /** 결제로 적립 건을 찾는다. {@code reserve} 가 같은 결제를 다시 받았는지 판단하는 멱등 키다. */
   Optional<CashbackEarning> findByPaymentId(Long paymentId);
@@ -179,6 +181,19 @@ public interface CashbackEarningRepository extends JpaRepository<CashbackEarning
       where e.requestedAt >= :from and e.requestedAt < :to and e.status in :statuses
       """)
   long sumAmountRequestedBetween(
+      @Param("from") LocalDateTime from,
+      @Param("to") LocalDateTime to,
+      @Param("statuses") Collection<EarningStatus> statuses);
+
+  /** {@link #sumAmountRequestedBetween} 를 접수일별로 나눈 합계. 적립 건이 없는 날은 결과에 없다. */
+  @Query(
+      """
+      select cast(e.requestedAt as LocalDate) as day, sum(e.amount) as amount
+      from CashbackEarning e
+      where e.requestedAt >= :from and e.requestedAt < :to and e.status in :statuses
+      group by cast(e.requestedAt as LocalDate)
+      """)
+  List<DailyAmount> sumAmountByRequestedDay(
       @Param("from") LocalDateTime from,
       @Param("to") LocalDateTime to,
       @Param("statuses") Collection<EarningStatus> statuses);

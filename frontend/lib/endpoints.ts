@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
 import type {
+  ClosurePreviewResponse, ClosureResponse, ClosureSettlementRunResult,
   DailySettlementResponse, MerchantAccountResponse, MonthlySettlementResponse, MonthlySettlementRunResult,
   ReconciliationResultResponse, SettlementRunResult,
   MerchantPaymentItem, MerchantPaymentsResponse, MerchantRegisterRequest, MerchantRegisterResponse, MerchantResponse, MerchantUpdateRequest, PageResponse, PaymentRequest, PaymentResponse, UserPaymentsResponse,
@@ -52,6 +53,15 @@ export const getMonthlySettlements = (from: string, to: string) =>
   api<MonthlySettlementResponse[]>(`/merchants/me/settlements/monthly?from=${from}&to=${to}`);
 
 export const getMyAccount = () => api<MerchantAccountResponse>("/merchants/me/account");
+
+// 가맹점 해지 (점주). 신청하면 바로 QR 생성과 결제가 막히고 철회할 수 없다
+export const getClosurePreview = () => api<ClosurePreviewResponse>("/merchants/me/closure/preview");
+
+export const requestClosure = () => api<ClosureResponse>("/merchants/me/closure", { method: "POST" });
+
+// 해지 정산 수동 실행 (운영자). 해지 진행 중인 가맹점 전체를 정산하고 해지를 끝낸다
+export const runClosureSettlement = () =>
+  api<ClosureSettlementRunResult>("/admin/merchants/closures/run", { method: "POST" });
 
 // 정산·대사 수동 실행 (운영자). 날짜·월을 생략하면 서버가 어제·지난달로 실행한다
 const withParam = (path: string, key: string, value?: string) => (value ? `${path}?${key}=${value}` : path);

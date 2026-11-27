@@ -1,7 +1,9 @@
 package com.back.nbe1214finalhot6.domain.cashback.controller;
 
 import com.back.nbe1214finalhot6.common.response.ApiResponse;
+import com.back.nbe1214finalhot6.domain.cashback.dto.ForecastAccuracyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.ForecastResponse;
+import com.back.nbe1214finalhot6.domain.cashback.service.CashbackForecastAccuracyService;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackForecastService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CashbackForecastController {
 
   private final CashbackForecastService forecastService;
+  private final CashbackForecastAccuracyService accuracyService;
 
   @Operation(
       summary = "월 예산 소진 예측",
@@ -29,5 +32,15 @@ public class CashbackForecastController {
   public ApiResponse<ForecastResponse> forecast(
       @RequestParam(required = false) Integer year, @RequestParam(required = false) Integer month) {
     return ApiResponse.ok(forecastService.forecast(year, month));
+  }
+
+  @Operation(
+      summary = "소진 예측 오차",
+      description =
+          "하루 한 번 저장한 예측의 하루 예상 수요(중간)와 그날 실제 적립 확보액(취소 제외)을 비교한다."
+              + " 오늘을 뺀 최근 30일 중 예측을 저장한 날만 최근 날짜부터 주고, 차이 크기의 평균과 범위(느림~빠름) 안이었던 날 수를 함께 준다")
+  @GetMapping("/accuracy")
+  public ApiResponse<ForecastAccuracyResponse> accuracy() {
+    return ApiResponse.ok(accuracyService.accuracy());
   }
 }

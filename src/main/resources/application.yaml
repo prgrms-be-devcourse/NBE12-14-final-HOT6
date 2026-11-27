@@ -48,6 +48,13 @@ cashback:
     enabled: true
     annual-budget: 100000000
 
+# 가맹점 주소를 좌표로 바꾸는 네이버 지도(Geocoding). 값은 환경 변수(.env)로만 받고 기본값은 비워 둔다. 키가 비어 있으면 변환을 건너뛰고 위치 없이 저장한다.
+# Client Secret 은 서버에서만 쓰고 코드, 로그, 응답에 남기지 않는다.
+naver:
+  map:
+    client-id: ${NAVER_MAP_CLIENT_ID:}
+    client-secret: ${NAVER_MAP_CLIENT_SECRET:}
+
 # 서버가 시작할 때 최초 운영자 계정을 한 번 만든다. 값은 환경 변수(.env)로만 받고 기본값은 비워 둔다.
 # 다섯 값이 모두 있을 때만 만들고, 같은 이메일·전화번호가 이미 있으면 건드리지 않는다.
 auth:

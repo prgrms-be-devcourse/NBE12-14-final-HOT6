@@ -56,12 +56,12 @@ export default function RegisterGate({ children }: { children: React.ReactNode }
 
 // 점주 한 명은 가맹점 하나: 이미 있으면 안내하고, 없으면 등록 화면을 보여 준다
 function OwnerGate({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<"loading" | "none" | "exists" | "error">("loading");
+  const [state, setState] = useState<"loading" | "none" | "exists" | "closed" | "error">("loading");
 
   useEffect(() => {
     let alive = true;
     getMyMerchant().then(
-      () => alive && setState("exists"),
+      (m) => alive && setState(m.status === "ACTIVE" ? "exists" : "closed"),
       (e: unknown) => alive && setState(e instanceof ApiError && e.code === "MER-001" ? "none" : "error"),
     );
     return () => { alive = false; };
@@ -69,6 +69,17 @@ function OwnerGate({ children }: { children: React.ReactNode }) {
 
   if (state === "loading") return null;
   if (state === "none") return <>{children}</>;
+  if (state === "closed") {
+    return (
+      <div className="space-y-3 px-5 pt-6">
+        <section className="card text-center">
+          <div className="text-lg font-bold">해지한 가맹점이 있어요</div>
+          <p className="note mt-2">점주 한 명은 가맹점을 하나만 등록할 수 있어서, 해지한 뒤에는 다시 등록할 수 없어요.</p>
+        </section>
+        <Link href="/merchant/daily" className="btn btn-outline">정산 보러 가기</Link>
+      </div>
+    );
+  }
   if (state === "error") {
     return <p role="alert" className="mx-5 mt-6 rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">가맹점 정보를 확인하지 못했어요. 잠시 뒤 다시 열어 주세요.</p>;
   }

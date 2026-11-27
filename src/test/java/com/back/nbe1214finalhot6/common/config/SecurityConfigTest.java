@@ -100,24 +100,30 @@ class SecurityConfigTest {
         Arguments.of("POST", "/api/admin/cashback/budget/transfers", 401, 403, 403, 200),
         Arguments.of("GET", "/api/admin/settlements/reconciliation", 401, 403, 403, 200),
         Arguments.of("POST", "/api/admin/settlements/reconciliation/run", 401, 403, 403, 200),
-        // 시민 기능(OWNER 포함, ADMIN 제외)
-        Arguments.of("POST", "/api/payments", 401, 200, 200, 403),
-        Arguments.of("GET", "/api/payments/by-key/k1", 401, 200, 200, 403),
-        Arguments.of("GET", "/api/qr/abc", 401, 200, 200, 403),
-        Arguments.of("GET", "/api/cashback/monthly-limit", 401, 200, 200, 403),
-        Arguments.of("GET", "/api/cashback/earnings", 401, 200, 200, 403),
+        // 이용자 전용(점주·운영자 제외)
+        Arguments.of("POST", "/api/payments", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/payments", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/payments/by-key/k1", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/qr/abc", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/cashback/monthly-limit", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/cashback/earnings", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/cashback/status/stream", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/notices", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/wallet", 401, 200, 403, 403),
+        Arguments.of("POST", "/api/wallet/charges", 401, 200, 403, 403),
+        Arguments.of("POST", "/api/wallet/refunds", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/wallet/account", 401, 200, 403, 403),
+        Arguments.of("GET", "/api/wallet/account/transactions", 401, 200, 403, 403),
+        // 탈퇴는 이용자만(점주 탈퇴는 아직 지원하지 않는다)
+        Arguments.of("POST", "/api/users/withdraw", 401, 200, 403, 403),
+        Arguments.of("POST", "/api/users/withdraw/settle", 401, 200, 403, 403),
+        // QR 한도·상태 조회는 이용자와 점주가 함께 쓴다. 함께 여는 것은 조회(GET)뿐이다
+        Arguments.of("GET", "/api/qr/limit", 401, 200, 200, 403),
         Arguments.of("GET", "/api/qr/abc/status", 401, 200, 200, 403),
-        Arguments.of("GET", "/api/wallet", 401, 200, 200, 403),
-        Arguments.of("POST", "/api/wallet/charges", 401, 200, 200, 403),
-        Arguments.of("POST", "/api/wallet/refunds", 401, 200, 200, 403),
-        Arguments.of("GET", "/api/wallet/account", 401, 200, 200, 403),
-        Arguments.of("GET", "/api/wallet/account/transactions", 401, 200, 200, 403),
-        // 탈퇴는 시민 기능(점주는 통과하지만 서비스가 AUTH-007 로 거절, 운영자는 403)
-        Arguments.of("POST", "/api/users/withdraw", 401, 200, 200, 403),
-        Arguments.of("POST", "/api/users/withdraw/settle", 401, 200, 200, 403),
-        // 가맹점: 등록과 이름 검색은 시민도, 관리는 점주만
+        Arguments.of("POST", "/api/qr/limit", 401, 200, 403, 403),
+        // 가맹점: 이름 검색은 이용자만, 등록과 관리는 점주만
         Arguments.of("POST", "/api/merchants", 401, 403, 200, 403),
-        Arguments.of("GET", "/api/merchants", 401, 200, 200, 403),
+        Arguments.of("GET", "/api/merchants", 401, 200, 403, 403),
         Arguments.of("GET", "/api/merchants/me", 401, 403, 200, 403),
         Arguments.of("GET", "/api/merchants/me/account", 401, 403, 200, 403),
         Arguments.of("PATCH", "/api/merchants/me", 401, 403, 200, 403),
@@ -132,7 +138,7 @@ class SecurityConfigTest {
         Arguments.of("POST", "/api/payments/1/cancel", 401, 403, 200, 403),
         // 내 정보 조회는 모든 로그인 역할이 쓴다(운영자 포함)
         Arguments.of("GET", "/api/users/me", 401, 200, 200, 200),
-        // PIN 검증은 이용자(OWNER 포함)만, 운영자는 못 쓴다
+        // PIN 검증은 이용자와 점주만, 운영자는 못 쓴다
         Arguments.of("POST", "/api/users/pin/verify", 401, 200, 200, 403),
         // 규칙에 없는 경로는 로그인만 하면 된다(ADMIN 포함)
         Arguments.of("GET", "/api/probe/other", 401, 200, 200, 200));

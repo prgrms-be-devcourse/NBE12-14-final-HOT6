@@ -8,11 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
+import com.back.nbe1214finalhot6.domain.cashback.dto.ForecastAccuracyDay;
+import com.back.nbe1214finalhot6.domain.cashback.dto.ForecastAccuracyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.ForecastAssumptions;
 import com.back.nbe1214finalhot6.domain.cashback.dto.ForecastPoint;
 import com.back.nbe1214finalhot6.domain.cashback.dto.ForecastResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.ForecastScenario;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
+import com.back.nbe1214finalhot6.domain.cashback.service.CashbackForecastAccuracyService;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackForecastService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -37,6 +40,7 @@ class CashbackForecastControllerTest {
   @Autowired private MockMvc mockMvc;
   @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private CashbackForecastService forecastService;
+  @MockitoBean private CashbackForecastAccuracyService accuracyService;
 
   private ForecastResponse sample() {
     ForecastScenario scenario =
@@ -104,5 +108,42 @@ class CashbackForecastControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("CSH-007"));
     mockMvc.perform(get(URL).param("year", "abc").param("month", "11")).andExpect(status().isBadRequest());
+  }
+
+  // 목적: 예측 오차가 평균과 날짜별 값으로 내려가는지 확인한다.
+  @Test
+  @DisplayName("예측 오차를 반환한다")
+  void accuracy_ok() throws Exception {
+    given(accuracyService.accuracy())
+        .willReturn(
+            new ForecastAccuracyResponse(
+                20_000L,
+                1,
+                List.of(
+                    new ForecastAccuracyDay(
+                        LocalDate.of(2026, 11, 17),
+                        new BigDecimal("100000.00"),
+                        new BigDecimal("70000.00"),
+                        new BigDecimal("130000.00"),
+                        120_000L,
+                        20_000L,
+                        true,
+                        "v1"))));
+
+    mockMvc
+        .perform(get(URL + "/accuracy"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.averageError").value(20_000))
+        .andExpect(jsonPath("$.data.withinRangeDays").value(1))
+        .andExpect(jsonPath("$.data.days[0].date").value("2026-11-17"))
+        .andExpect(jsonPath("$.data.days[0].actualAmount").value(120_000));
+  }
+
+  // 목적: 운영자가 아니면 예측 오차를 볼 수 없는지 확인한다.
+  @Test
+  @WithMockUser(roles = "USER")
+  @DisplayName("이용자는 예측 오차를 볼 수 없다")
+  void accuracy_forbidden() throws Exception {
+    mockMvc.perform(get(URL + "/accuracy")).andExpect(status().isForbidden());
   }
 }

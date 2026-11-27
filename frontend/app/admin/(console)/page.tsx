@@ -3,6 +3,7 @@
 import Link from "next/link";
 import BarChart from "@/components/BarChart";
 import BudgetGauge from "@/components/BudgetGauge";
+import ForecastAccuracyTable from "@/components/ForecastAccuracyTable";
 import { ApiError } from "@/lib/api";
 import {
   getAdminNotices, getAnnualBudget, getForecast, getMonthlyBudget, getPayoutStatus, getPolicies, getSettings, md, moneyUnit, STATUS_TEXT, thisYearMonth,
@@ -62,7 +63,7 @@ export default function AdminDashboardPage() {
   const errors = [annual.error, budget.error, policies.error, settings.error].filter(Boolean);
 
   const todos = [
-    { k: "지금 지급 가능", v: payouts.data ? `${payouts.data.dueCount.toLocaleString("ko-KR")}건` : "…", sub: payouts.data ? won(payouts.data.dueAmount) : "", href: "/admin/payouts" },
+    { k: "지금 지급 가능", v: payouts.data ? `${payouts.data.dueCount.toLocaleString("ko-KR")}건` : "…", sub: payouts.data ? won(payouts.data.dueAmount) : "", href: "/admin/earnings?tab=payouts" },
     {
       k: "예약된 변경", v: limitCount != null && policies.data ? `${rateCount + limitCount}건` : "…",
       sub: limitCount != null && policies.data ? `적립률 ${rateCount} · 한도 ${limitCount}` : "",
@@ -138,6 +139,7 @@ export default function AdminDashboardPage() {
             ))}
           </dl>
         )}
+        <ForecastAccuracyTable />
       </section>
 
       <section className="card !p-5">

@@ -4,7 +4,13 @@ import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
 
 public record MerchantResponse(
-    Long merchantId, String name, String address, boolean cashbackEligible, MerchantStatus status) {
+    Long merchantId,
+    String name,
+    String address,
+    boolean cashbackEligible,
+    MerchantStatus status,
+    Double latitude,
+    Double longitude) {
 
   public static MerchantResponse from(Merchant merchant) {
     return new MerchantResponse(
@@ -12,6 +18,8 @@ public record MerchantResponse(
         merchant.getName(),
         merchant.getAddress(),
         merchant.isCashbackEligible(),
-        merchant.getStatus());
+        merchant.getStatus(),
+        merchant.getLatitude(),
+        merchant.getLongitude());
   }
 }

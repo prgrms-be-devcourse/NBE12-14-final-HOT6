@@ -36,7 +36,7 @@ class MerchantRegisterRollbackTest {
                         transaction.executeWithoutResult(
                                 status -> {
                                     merchantService.register(
-                                            1L, new MerchantRegisterRequest("롤백 가맹점", "인천광역시 남동구 어딘가 9", null));
+                                            1L, new MerchantRegisterRequest("롤백 가맹점", "인천광역시 남동구 어딘가 9", null), null);
                                     throw new IllegalStateException("등록 이후 실패");
                                 }))
                 .isInstanceOf(IllegalStateException.class);

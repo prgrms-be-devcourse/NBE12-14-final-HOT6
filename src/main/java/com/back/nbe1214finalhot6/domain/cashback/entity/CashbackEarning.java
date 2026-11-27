@@ -32,7 +32,9 @@ import lombok.NoArgsConstructor;
             columnNames = {"payment_id"}),
     indexes = {
       @Index(name = "idx_cashback_earning_status_payable", columnList = "status, payable_at"),
-      @Index(name = "idx_cashback_earning_wallet_requested", columnList = "wallet_id, requested_at")
+      @Index(name = "idx_cashback_earning_wallet_requested", columnList = "wallet_id, requested_at"),
+      // 지갑을 가리지 않고 접수 기간으로 합산한다(소진 예측, 예측 오차)
+      @Index(name = "idx_cashback_earning_requested", columnList = "requested_at")
     })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
