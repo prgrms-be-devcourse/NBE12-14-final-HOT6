@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { won } from "@/lib/format";
 import type { PageResponse } from "@/lib/types";
 
 // 백엔드 캐시백 응답 (이용자용). 지갑은 서버가 토큰의 회원으로 찾는다
@@ -14,10 +15,12 @@ export type Earning = {
   requestedAt: string; payableAt: string | null; paidAt: string | null; canceledAt: string | null;
   exclusionReason: ExclusionCode | null;
 };
-export type NoticeType = "POLICY_CHANGE" | "BUDGET_NOTICE" | "EMERGENCY_STOP" | "STOP_CANCELED";
+export type NoticeType = "POLICY_CHANGE" | "BUDGET_NOTICE" | "EMERGENCY_STOP" | "STOP_CANCELED" | "LIMIT_CHANGE";
 export type Notice = {
-  noticeId: number; type: NoticeType; content: string; effectiveFrom: string; stopAt: string | null; createdAt: string;
+  noticeId: number; type: NoticeType; title: string; content: string; effectiveFrom: string; stopAt: string | null; createdAt: string;
   rate?: number | null; previousRate?: number | null; // 공지 요율 (#161)
+  settingKey?: string | null; previousValue?: number | null; newValue?: number | null; // 한도 변경 공지 (#265)
+  updatedAt?: string | null; // 운영자가 문구를 고친 시각
 };
 
 export const getCashbackSummary = () => api<CashbackSummary>("/cashback/summary");
@@ -28,6 +31,29 @@ export const getEarnings = (status?: EarningStatus, page = 0, size = 20) =>
   api<PageResponse<Earning>>(`/cashback/earnings?page=${page}&size=${size}${status ? `&status=${status}` : ""}`);
 export const getNotices = (type?: NoticeType, page = 0, size = 20) =>
   api<PageResponse<Notice>>(`/notices?${type ? `type=${type}&` : ""}page=${page}&size=${size}`);
+export const NOTICE_TITLE_MAX = 100;
+export const NOTICE_CONTENT_MAX = 500;
+// 홈에 띄울 공지 (최신순, 서버가 5건까지 준다)
+export const getHomeNotices = () => api<Notice[]>("/notices/home");
+
+export const NOTICE_LABEL: Record<NoticeType, string> = {
+  POLICY_CHANGE: "정책 변경", BUDGET_NOTICE: "소진 예고", EMERGENCY_STOP: "적립 중단", STOP_CANCELED: "중단 취소", LIMIT_CHANGE: "한도 변경",
+};
+export const NOTICE_BADGE: Record<NoticeType, string> = {
+  POLICY_CHANGE: "badge-warn", BUDGET_NOTICE: "badge-warn", EMERGENCY_STOP: "badge-bad", STOP_CANCELED: "badge-ok", LIMIT_CHANGE: "badge-info",
+};
+export const LIMIT_NAME: Record<string, string> = {
+  CASHBACK_USER_MONTHLY_LIMIT: "월 적립 한도", WALLET_HOLDING_LIMIT: "지갑 보유 한도", WALLET_MONTHLY_CHARGE_LIMIT: "월 충전 한도",
+};
+
+// 공지가 알리는 값의 변화(요율 또는 한도). 변화가 없는 공지는 null
+export function noticeChange(n: Notice): { name: string; from: string; to: string } | null {
+  if (n.rate != null && n.previousRate != null) return { name: "적립률", from: pctText(n.previousRate), to: pctText(n.rate) };
+  if (n.previousValue != null && n.newValue != null) {
+    return { name: LIMIT_NAME[n.settingKey ?? ""] ?? "한도", from: won(n.previousValue), to: won(n.newValue) };
+  }
+  return null;
+}
 
 // 화면 표시용 라벨
 export const STATUS_LABEL: Record<EarningStatus, string> = {
@@ -73,10 +99,3 @@ export const REASON_TONE_CLASS: Record<ReasonTone, string> = {
   warn: "border-orange-200 bg-orange-50 text-orange-800",
   bad: "border-red-200 bg-red-50 text-red-700",
 };
-
-// 곧 적용될 요율 인하 예고 (오늘 이후에 시작하는 가장 최근 POLICY_CHANGE 공지)
-export async function getUpcomingPolicyChange(): Promise<Notice | null> {
-  const today = new Date().toISOString().slice(0, 10);
-  const page = await getNotices("POLICY_CHANGE", 0, 5);
-  return page.content.find((n) => n.effectiveFrom > today) ?? null;
-}

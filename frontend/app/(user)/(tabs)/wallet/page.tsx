@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import Amount from "@/components/Amount";
 import ChargeLimitNote from "@/components/ChargeLimitNote";
 import Header from "@/components/Header";
+import HomeNoticePopup from "@/components/HomeNoticePopup";
 import { HelpButton, HelpTip } from "@/components/Help";
 import { ICONS } from "@/components/icons";
 import Progress from "@/components/Progress";
@@ -115,6 +116,7 @@ export default function WalletPage() {
       <Suspense fallback={null}>
         <WalletBody />
       </Suspense>
+      <HomeNoticePopup />
     </>
   );
 }

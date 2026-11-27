@@ -6,9 +6,8 @@ import CashbackPausedNotice from "@/components/CashbackPausedNotice";
 import Countdown from "@/components/Countdown";
 import Header from "@/components/Header";
 import SignBoard from "@/components/SignBoard";
-import { ICONS } from "@/components/icons";
 import { ApiError } from "@/lib/api";
-import { getCashbackPreview, getMonthlyLimit, getUpcomingPolicyChange, pctText, REASON_TEXT, REASON_TONE, REASON_TONE_CLASS } from "@/lib/cashbackApi";
+import { getCashbackPreview, getMonthlyLimit, pctText, REASON_TEXT, REASON_TONE, REASON_TONE_CLASS } from "@/lib/cashbackApi";
 import { useCashbackPaused } from "@/lib/cashbackStatus";
 import { loadCtx, saveCtx } from "@/lib/devContext";
 import { getMyWallet, getQrLimit, scanQr, secondsUntil } from "@/lib/endpoints";
@@ -106,9 +105,7 @@ export default function ScanPage() {
     () => (previewKey ? getCashbackPreview(qr!.merchantId, devMoney) : Promise.resolve(null)),
     [previewKey],
   );
-  const upcomingLoad = useLoad(() => getUpcomingPolicyChange(), []);
   const p = previewLoad.data;
-  const upcoming = upcomingLoad.data;
   const eligible = qr?.cashbackEligible ?? true;
   const paused = livePaused ?? p?.paused ?? false;
   // 중단 알림이 미리보기보다 먼저 올 수 있어, 중단이면 이전 미리보기의 적립 예상은 쓰지 않는다
@@ -164,12 +161,6 @@ export default function ScanPage() {
 
         {qr && (
           <>
-            {upcoming && (
-              <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[13px] text-amber-900">
-                <span aria-hidden className="mt-0.5 shrink-0">{ICONS.trendUp}</span>
-                <span><b>정책 변경 예고</b> · {upcoming.content}{upcoming.rate != null && upcoming.previousRate != null && ` (${pctText(upcoming.previousRate)} → ${pctText(upcoming.rate)})`}</span>
-              </div>
-            )}
             {paused && <CashbackPausedNotice />}
 
             <section className="card">

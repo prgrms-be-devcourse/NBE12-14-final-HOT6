@@ -12,6 +12,9 @@ export const ymd = (d: Date) => {
   return `${y}-${pad(m)}-${pad(day)}`;
 };
 
+// "yyyy-MM-dd" 가 속한 달의 말일
+export const monthEnd = (date: string) => `${date.slice(0, 8)}${new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 0).getDate()}`;
+
 export const addDays = (d: Date, days: number) => new Date(d.getTime() + days * 86_400_000);
 
 // n 개월 전 달의 "yyyy-MM" (0 이면 이번 달)
