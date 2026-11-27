@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import Header from "@/components/Header";
-import MapPicker, { type LatLng } from "@/components/MapPicker";
+import AddressSearch from "@/components/AddressSearch";
+import NaverMap from "@/components/NaverMap";
 import RegisterGate from "@/components/RegisterGate";
 import { ApiError } from "@/lib/api";
 import { saveCtx } from "@/lib/devContext";
 import { CATEGORIES } from "@/lib/stores";
 import { registerMerchant } from "@/lib/endpoints";
+import type { MerchantRegisterResponse } from "@/lib/types";
 
 // 가맹점이 없는 점주만 등록할 수 있다(RegisterGate). 로그인하지 않았으면 점주 로그인·회원가입을 안내한다
 export default function MerchantRegisterPage() {
@@ -23,13 +25,12 @@ export default function MerchantRegisterPage() {
 }
 
 function RegisterForm() {
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<MerchantRegisterResponse | null>(null);
   const [needLogin, setNeedLogin] = useState(false); // 등록 중 401(로그인 만료·없음)
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [proof, setProof] = useState<string>("");
   const [category, setCategory] = useState("식당");
-  const [pos, setPos] = useState<LatLng | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -40,8 +41,8 @@ function RegisterForm() {
     setBusy(true);
     try {
       const res = await registerMerchant({ name: name.trim(), address: address.trim(), ...(proof ? { revenueProof: proof } : {}) });
-      saveCtx({ merchantName: res.name, category, merchantAddress: res.address, eligible: res.cashbackEligible, ...(pos ? { lat: pos.lat, lng: pos.lng } : {}) });
-      setDone(true);
+      saveCtx({ merchantName: res.name, category, merchantAddress: res.address, eligible: res.cashbackEligible });
+      setDone(res);
     } catch (err) {
       // 로그인이 풀렸거나 없는 경우: 말없이 로그인 화면으로 보내지 않고 이유를 알려 준다
       if (err instanceof ApiError && err.status === 401) {
@@ -62,6 +63,13 @@ function RegisterForm() {
           <div className="text-lg font-bold">가맹점이 등록되었어요</div>
           <p className="note mt-2">이제 QR 생성과 정산 조회를 쓸 수 있어요.</p>
         </section>
+        <div>
+          <span className="label">등록된 위치</span>
+          {typeof done.latitude === "number" && typeof done.longitude === "number"
+            ? <NaverMap points={[{ lat: done.latitude, lng: done.longitude, title: done.name }]} />
+            : <p className="note">주소의 위치를 확인하지 못했어요. 마이페이지에서 주소를 다시 저장하면 위치를 찾아요.</p>}
+          <p className="note mt-1">{done.address}</p>
+        </div>
         <Link href="/merchant/qr" className="btn btn-primary">QR 생성하러 가기</Link>
       </div>
     );
@@ -71,7 +79,14 @@ function RegisterForm() {
     <>
       <form onSubmit={submit} className="space-y-3 px-5 pb-5">
         <label className="block"><span className="label">가맹점명</span><input className="field" required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label className="block"><span className="label">주소</span><input className="field" required maxLength={200} value={address} onChange={(e) => setAddress(e.target.value)} /></label>
+        <div>
+          <span className="label">주소</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <input className="field min-w-0 flex-1" required readOnly maxLength={200} placeholder="주소 찾기를 눌러 선택하세요" value={address} onChange={(e) => setAddress(e.target.value)} aria-label="주소" />
+            <AddressSearch onSelect={setAddress} />
+          </div>
+          <p className="note mt-1">고른 주소로 위치가 정해져요.</p>
+        </div>
         <label className="block"><span className="label">업종</span><select className="field" value={category} onChange={(e) => setCategory(e.target.value)}>{CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.icon} {c.value}</option>)}</select></label>
         <div className="card space-y-2 !p-3.5">
           <div>
@@ -85,12 +100,7 @@ function RegisterForm() {
               : "증빙이 없으면 적립 제외 가맹점으로 등록돼요"}
           </p>
         </div>
-        <div>
-          <span className="label">지도 (위치 선택)</span>
-          <MapPicker value={pos} onChange={setPos} />
-          <p className="note mt-1">{pos ? `선택한 위치 ${pos.lat.toFixed(5)}, ${pos.lng.toFixed(5)}` : "지도를 눌러 가맹점 위치를 선택하세요"}</p>
-        </div>
-        <p className="note">업종, 위치는 이 기기에만 저장되고 서버로 전송되지 않아요.</p>
+        <p className="note">업종은 이 기기에만 저장되고 서버로 전송되지 않아요.</p>
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-800">{error}</p>}
         {needLogin && <Link href="/merchant/login" className="btn btn-outline">로그인하러 가기</Link>}
         <button type="submit" disabled={busy || !name.trim() || !address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "등록 중…" : "등록"}</button>
