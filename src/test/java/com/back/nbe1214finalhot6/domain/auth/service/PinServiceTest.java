@@ -268,12 +268,12 @@ class PinServiceTest {
   }
 
   @Test
-  @DisplayName("탈퇴한 회원이나 없는 회원이면 COM-009 이다")
+  @DisplayName("탈퇴한 회원이면 AUTH-004, 없는 회원이면 COM-009 이다")
   void withdrawnOrUnknown() {
     User user = save("p7@devpay.com", "01055550007");
     jdbcTemplate.update("update users set status = 'WITHDRAWN' where id = ?", user.getId());
 
-    assertFails(() -> pinService.verify(user.getId(), PIN), CommonErrorCode.RESOURCE_NOT_FOUND);
+    assertFails(() -> pinService.verify(user.getId(), PIN), AuthErrorCode.WITHDRAWN_USER);
     assertFails(() -> pinService.verify(999_999L, PIN), CommonErrorCode.RESOURCE_NOT_FOUND);
   }
 }
