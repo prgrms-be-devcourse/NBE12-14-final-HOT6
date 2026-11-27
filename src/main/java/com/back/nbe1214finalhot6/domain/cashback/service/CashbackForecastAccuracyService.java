@@ -6,12 +6,15 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackForecastSnapshot
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackForecastSnapshotRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
+import com.back.nbe1214finalhot6.domain.cashback.repository.DailyAmount;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,12 +55,20 @@ public class CashbackForecastAccuracyService {
   @Transactional(readOnly = true)
   public ForecastAccuracyResponse accuracy() {
     LocalDate today = LocalDate.now(clock);
+    LocalDate from = today.minusDays(COMPARE_DAYS);
+    // 실제 값은 기간 전체를 한 번에 읽어 날짜별로 나눈다
+    Map<LocalDate, Long> actualByDay =
+        earningRepository
+            .sumAmountByRequestedDay(
+                from.atStartOfDay(), today.atStartOfDay(), CashbackForecastService.DEMAND_STATUSES)
+            .stream()
+            .collect(Collectors.toMap(DailyAmount::getDay, DailyAmount::getAmount));
     List<ForecastAccuracyDay> days =
         snapshotRepository
             .findBySnapshotDateGreaterThanEqualAndSnapshotDateLessThanOrderBySnapshotDateDesc(
-                today.minusDays(COMPARE_DAYS), today)
+                from, today)
             .stream()
-            .map(this::compare)
+            .map(s -> compare(s, actualByDay.getOrDefault(s.getSnapshotDate(), 0L)))
             .toList();
     Long averageError =
         days.isEmpty()
@@ -67,17 +78,10 @@ public class CashbackForecastAccuracyService {
     return new ForecastAccuracyResponse(averageError, within, days);
   }
 
-  // 날짜가 최대 30개라 날마다 합계를 읽는다
-  private ForecastAccuracyDay compare(CashbackForecastSnapshot s) {
-    LocalDate date = s.getSnapshotDate();
-    long actual =
-        earningRepository.sumAmountRequestedBetween(
-            date.atStartOfDay(),
-            date.plusDays(1).atStartOfDay(),
-            CashbackForecastService.DEMAND_STATUSES);
+  private static ForecastAccuracyDay compare(CashbackForecastSnapshot s, long actual) {
     BigDecimal actualValue = BigDecimal.valueOf(actual);
     return new ForecastAccuracyDay(
-        date,
+        s.getSnapshotDate(),
         s.getMidDailyDemand(),
         s.getSlowDailyDemand(),
         s.getFastDailyDemand(),

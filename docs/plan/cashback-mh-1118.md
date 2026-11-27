@@ -454,7 +454,7 @@ erDiagram
 | `limit_month` | 연월 | 월 한도를 차감한 달의 1일. 월 예산을 확보한 달과 같아서 취소 시 이 달의 한도와 월 예산에서 되돌린다. 제외 건은 null |
 | `created_at` | TIMESTAMP | |
 
-인덱스: 지급 대상 조회용 `(status, payable_at)`, 이용자 조회용 `(wallet_id, requested_at)`. 제외 건에도 행을 만들어 적립 내역에 "제외"와 사유를 보여 준다([9절](#9-개발하면서-판단할-것) 8번). A의 `payment`에도 적용 요율·적립액이 복사되어 있지만 원본은 이 테이블이다.
+인덱스: 지급 대상 조회용 `(status, payable_at)`, 이용자 조회용 `(wallet_id, requested_at)`, 접수 기간 합산용 `(requested_at)`(소진 예측·예측 오차, #310). 제외 건에도 행을 만들어 적립 내역에 "제외"와 사유를 보여 준다([9절](#9-개발하면서-판단할-것) 8번). A의 `payment`에도 적용 요율·적립액이 복사되어 있지만 원본은 이 테이블이다.
 
 **`cashback_budget_state_log`** — 중단 상태 전이 이력 (2단계, INSERT only)
 
@@ -532,6 +532,7 @@ erDiagram
 | 11-26 | `cashback_notice`에 `updated_at` 추가(#265) | 고친 공지를 이용자가 알 수 있게 한다 |
 | 11-27 | `cashback_policy_history`에 `reason`, `basis`(JSONB) 추가(#296) | 요율을 왜, 어떤 상황에서 낮췄는지 나중에 확인한다. 컬럼은 null 을 허용해 기존 DB 에서 그대로 추가된다 |
 | 11-27 | `cashback_forecast_snapshot` 추가(#310) | 예측은 조회할 때마다 계산해 남지 않으므로, 맞았는지 비교하려면 그날의 값을 저장해야 한다 |
+| 11-27 | `cashback_earning`에 인덱스 `(requested_at)` 추가(#310) | 지갑을 가리지 않고 접수 기간으로 합산하는 조회가 쓸 인덱스가 없었다(PR #311 리뷰) |
 
 ## 7. 증명할 불변 조건 (테스트)
 
