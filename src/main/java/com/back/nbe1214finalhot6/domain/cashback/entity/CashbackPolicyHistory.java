@@ -8,6 +8,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -17,7 +19,7 @@ import lombok.NoArgsConstructor;
 /**
  * 정책(요율 구간) 변경 이력. 구간을 만들거나 값을 바꿀 때마다 변경 전후 값을 한 행으로 남긴다.
  *
- * <p>변경자는 인증이 머지되기 전까지 null 이다.
+ * <p>사유와 근거는 요율을 인하해 새로 만든 구간의 이력에만 있다. 이 기능이 생기기 전의 이력은 변경자, 사유, 근거가 null 이다.
  */
 @Entity
 @Table(name = "cashback_policy_history")
@@ -62,6 +64,13 @@ public class CashbackPolicyHistory {
   @Column(name = "after_ends_at")
   private LocalDateTime afterEndsAt;
 
+  @Column(name = "reason", length = 200)
+  private String reason;
+
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "basis")
+  private PolicyBasis basis;
+
   private CashbackPolicyHistory(
       PolicyHistoryAction action,
       Long changedBy,
@@ -87,6 +96,19 @@ public class CashbackPolicyHistory {
       CashbackPolicy policy, Long changedBy, LocalDateTime changedAt) {
     return new CashbackPolicyHistory(
         PolicyHistoryAction.CREATE, changedBy, changedAt, null, policy);
+  }
+
+  /** 요율 인하로 만든 구간의 기록. 인하 사유와 그 시점의 근거를 함께 남긴다. */
+  public static CashbackPolicyHistory reduced(
+      CashbackPolicy policy,
+      Long changedBy,
+      LocalDateTime changedAt,
+      String reason,
+      PolicyBasis basis) {
+    CashbackPolicyHistory history = created(policy, changedBy, changedAt);
+    history.reason = reason;
+    history.basis = basis;
+    return history;
   }
 
   /**

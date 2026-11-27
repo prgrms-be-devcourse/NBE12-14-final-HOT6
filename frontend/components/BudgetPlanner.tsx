@@ -11,11 +11,10 @@ const digits = (v: string) => Number(v.replace(/\D/g, "")) || 0;
 const pct = (n: number, whole: number) => (whole > 0 ? Math.round((n / whole) * 100) : 0);
 const totalOf = (m: MonthlyBudget) => m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount;
 
-// view: "month" 는 선택한 달의 현황과 이월, "plan" 은 연·월 배정
-type View = "month" | "plan";
-type Props = { view: View; year: number; thisMonth: number; contingencyRate?: number; onFlash: (message: string) => void; onChanged?: () => void };
+// 위에는 선택한 달의 현황과 이월, 아래에는 연·월 배정
+type Props = { year: number; thisMonth: number; contingencyRate?: number; onFlash: (message: string) => void; onChanged?: () => void };
 
-export default function BudgetPlanner({ view, year, thisMonth, contingencyRate, onFlash, onChanged }: Props) {
+export default function BudgetPlanner({ year, thisMonth, contingencyRate, onFlash, onChanged }: Props) {
   const annualLoad = useLoad(() => getAnnualBudget(year), [year]);
   const monthlyLoad = useLoad(() => listMonthlyBudgets(year), [year]);
   const reload = () => { annualLoad.reload(); monthlyLoad.reload(); };
@@ -34,7 +33,6 @@ export default function BudgetPlanner({ view, year, thisMonth, contingencyRate, 
   return (
     <Planner
       key={version}
-      view={view}
       year={year}
       thisMonth={thisMonth}
       contingencyRate={contingencyRate}
@@ -47,11 +45,11 @@ export default function BudgetPlanner({ view, year, thisMonth, contingencyRate, 
 }
 
 type PlannerProps = {
-  view: View; year: number; thisMonth: number; contingencyRate?: number; savedAnnual: AnnualBudget | null; monthly: MonthlyBudget[];
+  year: number; thisMonth: number; contingencyRate?: number; savedAnnual: AnnualBudget | null; monthly: MonthlyBudget[];
   onFlash: (message: string) => void; onSaved: () => void;
 };
 
-function Planner({ view, year, thisMonth, contingencyRate, savedAnnual, monthly, onFlash, onSaved }: PlannerProps) {
+function Planner({ year, thisMonth, contingencyRate, savedAnnual, monthly, onFlash, onSaved }: PlannerProps) {
   const [annual, setAnnual] = useState(savedAnnual?.totalAmount ?? 0);
   const [alloc, setAlloc] = useState<number[]>(() => {
     const next = Array(12).fill(0) as number[];
@@ -153,7 +151,7 @@ function Planner({ view, year, thisMonth, contingencyRate, savedAnnual, monthly,
         </p>
       )}
 
-      <section aria-label={`${MONTH_LABELS[month - 1]} 예산 분배`} hidden={view !== "month"}>
+      <section className="card !p-5" aria-label={`${MONTH_LABELS[month - 1]} 예산 분배`}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-bold">{MONTH_LABELS[month - 1]} 예산 분배</h3>
           <label className="flex items-center gap-2 text-sm">
@@ -165,7 +163,7 @@ function Planner({ view, year, thisMonth, contingencyRate, savedAnnual, monthly,
         </div>
 
         {!cur ? (
-          <p className="note rounded-lg bg-slate-50 px-3 py-4 text-center">{MONTH_LABELS[month - 1]}은 아직 배정된 예산이 없어요. 예산 배정 탭에서 금액을 넣고 저장해 주세요.</p>
+          <p className="note rounded-lg bg-slate-50 px-3 py-4 text-center">{MONTH_LABELS[month - 1]}은 아직 배정된 예산이 없어요. 아래 월별 예산 배정에서 금액을 넣고 저장해 주세요.</p>
         ) : (
           <>
             <div className="sign mx-auto max-w-md !py-3 text-center">
@@ -182,9 +180,9 @@ function Planner({ view, year, thisMonth, contingencyRate, savedAnnual, monthly,
             <div className="mx-auto h-5 w-px bg-slate-300" aria-hidden />
             <div className="relative grid grid-cols-3 pt-5">
               <div className="absolute left-[16.666%] right-[16.666%] top-0 h-px bg-slate-300" aria-hidden />
+              <FlowCard label="남은 예산" value={left} share={pct(left, assigned)} tone={left < 0 ? "text-red-600" : "text-emerald-600"} note={left < 0 ? "배정 부족" : undefined} />
               <FlowCard label="집행 완료" value={spent} share={usedPct} tone="text-blue-600" />
               <FlowCard label="예약 · 확보" value={reserved} share={reservedPct} tone="text-amber-800" />
-              <FlowCard label="남은 예산" value={left} share={pct(left, assigned)} tone={left < 0 ? "text-red-600" : "text-emerald-600"} note={left < 0 ? "배정 부족" : undefined} />
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
@@ -197,7 +195,7 @@ function Planner({ view, year, thisMonth, contingencyRate, savedAnnual, monthly,
         )}
       </section>
 
-      <section className="space-y-3" aria-label="월별 예산 배정" hidden={view !== "plan"}>
+      <section className="card space-y-3 !p-5" aria-label="월별 예산 배정">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h3 className="font-bold">월별 예산 배정</h3>
           <div className="flex flex-wrap items-center gap-2 text-sm">

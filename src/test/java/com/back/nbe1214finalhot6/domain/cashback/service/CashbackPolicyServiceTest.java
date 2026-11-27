@@ -32,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class CashbackPolicyServiceTest {
 
+  private static final long OPERATOR_ID = 99L;
+
   private static final LocalDateTime NOV_20 = LocalDateTime.of(2026, 11, 20, 0, 0);
   private static final LocalDateTime DEC_1 = LocalDateTime.of(2026, 12, 1, 0, 0);
   private static final LocalDateTime DEC_10 = LocalDateTime.of(2026, 12, 10, 0, 0);
@@ -52,7 +54,7 @@ class CashbackPolicyServiceTest {
   }
 
   private PolicyResponse reduce(String rate, LocalDateTime effectiveAt) {
-    return policyService.reduceRate(new RateReductionRequest(new BigDecimal(rate), effectiveAt));
+    return policyService.reduceRate(new RateReductionRequest(new BigDecimal(rate), effectiveAt, "테스트 사유"), OPERATOR_ID);
   }
 
   private void assertReduceError(String rate, LocalDateTime effectiveAt, CashbackErrorCode code) {
@@ -170,7 +172,8 @@ class CashbackPolicyServiceTest {
     CashbackPolicyHistory history = histories.getFirst();
     assertThat(history.getPolicyId()).isEqualTo(created.policyId());
     assertThat(history.getAction()).isEqualTo(PolicyHistoryAction.CREATE);
-    assertThat(history.getChangedBy()).isNull();
+    assertThat(history.getChangedBy()).isEqualTo(OPERATOR_ID);
+    assertThat(history.getReason()).isEqualTo("테스트 사유");
     assertThat(history.getBeforeRate()).isNull();
     assertThat(history.getAfterRate().toPlainString()).isEqualTo("0.0300");
     assertThat(history.getAfterStartsAt()).isEqualTo(NOV_20);

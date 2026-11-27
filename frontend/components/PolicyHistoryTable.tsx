@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { getPolicyHistory, getSettingHistory } from "@/lib/adminApi";
+import { Fragment, useState } from "react";
+import PolicyBasisDetail from "@/components/PolicyBasisDetail";
+import { getPolicyHistory, getSettingHistory, type PolicyHistory } from "@/lib/adminApi";
 import { LIMIT_NAME, pctText } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
 
 const SIZE = 20;
-type Row = { id: string; kind: "rate" | "limit"; at: string; item: string; change: string; from: string; memo: string };
+type Row = { id: string; kind: "rate" | "limit"; at: string; item: string; change: string; from: string; memo: string; detail?: PolicyHistory };
 const FILTERS = [
   { id: "all", label: "전체" },
   { id: "rate", label: "적립률" },
@@ -25,6 +26,7 @@ export default function PolicyHistoryTable() {
         id: `rate-${h.historyId}`, kind: "rate", at: h.changedAt, item: "적립률",
         change: `${h.beforeRate != null ? `${pctText(h.beforeRate)} → ` : ""}${pctText(h.afterRate)}`,
         from: h.afterStartsAt ?? h.beforeStartsAt ?? "", memo: h.action === "CREATE" ? "구간 생성" : "구간 변경",
+        detail: h.reason || h.basis ? h : undefined,
       })),
       ...limits.content.map((h): Row => ({
         id: `limit-${h.historyId}`, kind: "limit", at: h.changedAt, item: LIMIT_NAME[h.key] ?? h.description,
@@ -33,6 +35,7 @@ export default function PolicyHistoryTable() {
     ];
     return rows.sort((a, b) => b.at.localeCompare(a.at));
   }, []);
+  const [openId, setOpenId] = useState<string | null>(null); // 사유와 근거를 펼친 행
   const rows = load.data?.filter((r) => filter === "all" || r.kind === filter).slice(0, SIZE);
 
   return (
@@ -50,13 +53,25 @@ export default function PolicyHistoryTable() {
           <thead><tr><th>일시</th><th>항목</th><th>변경</th><th>적용 시작</th><th>비고</th></tr></thead>
           <tbody>
             {rows.map((h) => (
-              <tr key={h.id}>
-                <td className="whitespace-nowrap">{dateTime(h.at)}</td>
-                <td className="whitespace-nowrap">{h.item}</td>
-                <td className="whitespace-nowrap tabular-nums">{h.change}</td>
-                <td className="whitespace-nowrap">{dateTime(h.from)}</td>
-                <td className="whitespace-nowrap">{h.memo}</td>
-              </tr>
+              <Fragment key={h.id}>
+                <tr>
+                  <td className="whitespace-nowrap">{dateTime(h.at)}</td>
+                  <td className="whitespace-nowrap">{h.item}</td>
+                  <td className="whitespace-nowrap tabular-nums">{h.change}</td>
+                  <td className="whitespace-nowrap">{dateTime(h.from)}</td>
+                  <td className="whitespace-nowrap">
+                    {h.memo}
+                    {h.detail && (
+                      <button type="button" aria-expanded={openId === h.id} onClick={() => setOpenId(openId === h.id ? null : h.id)} className="ml-2 font-medium text-brand-600 underline">
+                        {openId === h.id ? "접기" : "사유·근거"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+                {h.detail && openId === h.id && (
+                  <tr><td colSpan={5}><PolicyBasisDetail history={h.detail} /></td></tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>

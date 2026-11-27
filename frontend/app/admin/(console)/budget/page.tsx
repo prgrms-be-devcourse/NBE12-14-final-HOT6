@@ -10,10 +10,9 @@ import { pctText } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
 import { useLoad } from "@/lib/useLoad";
 
-type TabId = "month" | "plan" | "stop";
+type TabId = "month" | "stop";
 const TABS: TabItem<TabId>[] = [
-  { id: "month", label: "이번 달 현황 · 이월" },
-  { id: "plan", label: "예산 배정" },
+  { id: "month", label: "예산 현황 · 배정" },
   { id: "stop", label: "적립 중단" },
 ];
 
@@ -85,9 +84,9 @@ function BudgetBody() {
       <Tabs items={TABS} active={tab} onChange={setTab} label="예산 관리 묶음" />
       {saved && <p role="status" className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white">{saved}</p>}
       {/* 입력하던 값이 탭을 오가도 남도록, 예산 화면은 숨기기만 한다 */}
-      <section className="card !p-5" hidden={tab === "stop"}>
-        <BudgetPlanner view={tab === "plan" ? "plan" : "month"} year={year} thisMonth={month} contingencyRate={rules?.contingencyRate} onFlash={flash} />
-      </section>
+      <div hidden={tab !== "month"}>
+        <BudgetPlanner year={year} thisMonth={month} contingencyRate={rules?.contingencyRate} onFlash={flash} />
+      </div>
       {tab === "stop" && <StopControl contingencyRate={rules?.contingencyRate} emergencyRatio={rules?.emergencyRatio} noticeDays={rules?.noticeDays} onFlash={flash} />}
     </div>
   );

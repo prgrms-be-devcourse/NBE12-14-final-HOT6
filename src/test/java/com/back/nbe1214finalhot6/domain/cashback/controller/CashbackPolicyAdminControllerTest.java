@@ -1,7 +1,10 @@
 package com.back.nbe1214finalhot6.domain.cashback.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,7 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
+import com.back.nbe1214finalhot6.domain.auth.security.AuthUser;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PolicyBasis;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyHistoryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.PolicyHistoryAction;
@@ -31,6 +37,9 @@ import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 // 로그인한 사용자(허용 역할)로 호출해서 보안 설정을 거쳐도 통과하는지 함께 확인한다.
 @WebMvcTest(CashbackPolicyAdminController.class)
@@ -50,18 +59,19 @@ class CashbackPolicyAdminControllerTest {
 
   private static final String BODY =
       """
-      {"rate": 0.03, "effectiveAt": "2026-11-20T00:00:00"}
+      {"rate": 0.03, "effectiveAt": "2026-11-20T00:00:00", "reason": "수요 급증"}
       """;
 
   // 목적: 인하 요청이 201 과 공통 응답 형식으로 내려가고 만들어진 구간이 담기는지 확인한다.
   @Test
   @DisplayName("인하 요청이면 201 과 만들어진 구간을 반환한다")
   void reduce_created() throws Exception {
-    given(policyService.reduceRate(any())).willReturn(sample());
+    given(policyService.reduceRate(any(), eq(99L))).willReturn(sample());
 
     mockMvc
         .perform(
             post("/api/admin/cashback/policies/reductions")
+                .with(operator())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(BODY))
         .andExpect(status().isCreated())
@@ -94,6 +104,30 @@ class CashbackPolicyAdminControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  // 목적: 사유가 없거나 공백이거나 200자를 넘으면 400 으로 거르고 서비스를 부르지 않는지 확인한다.
+  @Test
+  @DisplayName("사유가 없거나 200자를 넘으면 400")
+  void reduce_invalidReason() throws Exception {
+    for (String reason : new String[] {"", ", \"reason\": \"  \"", ", \"reason\": \"" + "가".repeat(201) + "\""}) {
+      mockMvc
+          .perform(
+              post("/api/admin/cashback/policies/reductions")
+                  .with(operator())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"rate\": 0.03, \"effectiveAt\": \"2026-11-20T00:00:00\"" + reason + "}"))
+          .andExpect(status().isBadRequest());
+    }
+    verifyNoInteractions(policyService);
+  }
+
+  private static RequestPostProcessor operator() {
+    return authentication(
+        new UsernamePasswordAuthenticationToken(
+            new AuthUser(99L, UserRole.ADMIN),
+            null,
+            List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+  }
+
   // 목적: 서비스가 던지는 도메인 예외가 각각 올바른 상태 코드와 에러 코드로 변환되는지 확인한다.
   @ParameterizedTest
   @CsvSource({
@@ -104,11 +138,12 @@ class CashbackPolicyAdminControllerTest {
   })
   @DisplayName("인하 실패는 에러 코드에 맞는 상태로 변환된다")
   void reduce_errors(CashbackErrorCode errorCode, int httpStatus, String code) throws Exception {
-    given(policyService.reduceRate(any())).willThrow(new BusinessException(errorCode));
+    given(policyService.reduceRate(any(), any())).willThrow(new BusinessException(errorCode));
 
     mockMvc
         .perform(
             post("/api/admin/cashback/policies/reductions")
+                .with(operator())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(BODY))
         .andExpect(status().is(httpStatus))
@@ -174,7 +209,9 @@ class CashbackPolicyAdminControllerTest {
             null,
             new BigDecimal("0.0200"),
             LocalDateTime.of(2026, 11, 18, 12, 0),
-            LocalDateTime.of(2026, 12, 1, 0, 0));
+            LocalDateTime.of(2026, 12, 1, 0, 0),
+            "수요 급증",
+            PolicyBasis.rateOnly(new BigDecimal("0.03")));
     given(policyService.findHistory(7L, 1, 5))
         .willReturn(new PageResponse<>(List.of(created), 1, 5, 6L, 2));
 
@@ -190,7 +227,9 @@ class CashbackPolicyAdminControllerTest {
         .andExpect(jsonPath("$.data.content[0].action").value("CREATE"))
         .andExpect(jsonPath("$.data.content[0].policyId").value(7))
         .andExpect(jsonPath("$.data.content[0].beforeRate").doesNotExist())
-        .andExpect(jsonPath("$.data.content[0].afterRate").value(0.02));
+        .andExpect(jsonPath("$.data.content[0].afterRate").value(0.02))
+        .andExpect(jsonPath("$.data.content[0].reason").value("수요 급증"))
+        .andExpect(jsonPath("$.data.content[0].basis.previousRate").value(0.03));
   }
 
   // 목적: 필터와 페이지를 생략하면 전체, 첫 페이지, 기본 크기 20 으로 조회하는지 확인한다.

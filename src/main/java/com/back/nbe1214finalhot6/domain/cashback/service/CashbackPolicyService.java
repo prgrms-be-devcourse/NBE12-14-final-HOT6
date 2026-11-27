@@ -9,6 +9,7 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicyHistory;
+import com.back.nbe1214finalhot6.domain.cashback.entity.PolicyBasis;
 import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyHistoryRepository;
@@ -43,6 +44,7 @@ public class CashbackPolicyService {
   private final CashbackPolicyHistoryRepository historyRepository;
   private final CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   private final CashbackNoticeService noticeService;
+  private final CashbackPolicyBasisCollector basisCollector;
   private final CashbackProperties properties;
   private final Clock clock;
 
@@ -54,12 +56,13 @@ public class CashbackPolicyService {
    *
    * <p>인하하면 이용자에게 보이는 정책 변경 예고 공지를 한 건 등록한다.
    *
+   * @param operatorId 인하한 운영자의 회원 ID. 이력의 변경자로 남는다
    * @return 새로 만든 구간
    * @throws BusinessException 요율·시각이 올바르지 않거나 현재 요율보다 낮지 않을 때(CSH-003), 월 예산이 없을 때(CSH-004),
    *     구간이 겹칠 때(CSH-002), 이번 달 인하 횟수를 넘을 때(CSH-009)
    */
   @Transactional
-  public PolicyResponse reduceRate(RateReductionRequest request) {
+  public PolicyResponse reduceRate(RateReductionRequest request, Long operatorId) {
     LocalDateTime now = LocalDateTime.now(clock);
     CashbackPolicy.validateRate(request.rate());
     LocalDateTime effectiveAt = request.effectiveAt();
@@ -101,6 +104,9 @@ public class CashbackPolicyService {
           "새 요율은 현재 요율(" + currentRate.toPlainString() + ")보다 낮아야 합니다");
     }
 
+    // 구간을 바꾸기 전의 상황을 근거로 남긴다
+    PolicyBasis basis = basisCollector.collect(currentRate);
+
     CashbackPolicy before = null;
     if (covering != null) {
       before = covering.snapshot();
@@ -114,9 +120,10 @@ public class CashbackPolicyService {
     policyRepository.save(successor);
 
     if (covering != null) {
-      historyRepository.save(CashbackPolicyHistory.updated(before, covering, null, now));
+      historyRepository.save(CashbackPolicyHistory.updated(before, covering, operatorId, now));
     }
-    historyRepository.save(CashbackPolicyHistory.created(successor, null, now));
+    historyRepository.save(
+        CashbackPolicyHistory.reduced(successor, operatorId, now, request.reason(), basis));
     // 이용자에게 보이는 정책 변경 예고. 같은 트랜잭션이라 인하가 롤백되면 공지도 롤백된다
     noticeService.registerPolicyChange(successor, now);
     return PolicyResponse.from(successor);
