@@ -38,7 +38,7 @@ public class CashbackForecastService {
   static final String MODEL_VERSION = "v1";
   private static final int DEMAND_DAYS = 7;
   // 취소(CANCELED)는 예산을 돌려줬으므로 수요에서 뺀다. 제외 건은 적립액이 0 이다
-  private static final Set<EarningStatus> DEMAND_STATUSES =
+  static final Set<EarningStatus> DEMAND_STATUSES =
       Set.of(EarningStatus.PENDING, EarningStatus.PAID, EarningStatus.CLAWED_BACK);
 
   private final CashbackBudgetService budgetService;

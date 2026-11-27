@@ -184,4 +184,17 @@ public interface CashbackEarningRepository
       @Param("from") LocalDateTime from,
       @Param("to") LocalDateTime to,
       @Param("statuses") Collection<EarningStatus> statuses);
+
+  /** {@link #sumAmountRequestedBetween} 를 접수일별로 나눈 합계. 적립 건이 없는 날은 결과에 없다. */
+  @Query(
+      """
+      select cast(e.requestedAt as LocalDate) as day, sum(e.amount) as amount
+      from CashbackEarning e
+      where e.requestedAt >= :from and e.requestedAt < :to and e.status in :statuses
+      group by cast(e.requestedAt as LocalDate)
+      """)
+  List<DailyAmount> sumAmountByRequestedDay(
+      @Param("from") LocalDateTime from,
+      @Param("to") LocalDateTime to,
+      @Param("statuses") Collection<EarningStatus> statuses);
 }
