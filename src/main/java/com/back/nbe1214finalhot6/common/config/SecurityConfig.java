@@ -82,12 +82,10 @@ public class SecurityConfig {
                     // 가맹점주(결제 취소는 /api/payments/** 보다 위에 둔다)
                     .requestMatchers(HttpMethod.POST, "/api/payments/*/cancel")
                     .hasRole("OWNER")
-                    // 가맹점 등록과 이름 검색은 시민도 쓴다(등록하면 OWNER 로 승격된다)
-                    .requestMatchers(HttpMethod.POST, "/api/merchants")
-                    .hasRole("USER")
+                    // 가맹점 이름 검색은 시민도 쓴다
                     .requestMatchers(HttpMethod.GET, "/api/merchants")
                     .hasRole("USER")
-                    // 그 밖의 가맹점 관리(수정, QR 생성)
+                    // 가맹점 등록과 관리(수정, QR 생성)는 점주만
                     .requestMatchers("/api/merchants/**")
                     .hasRole("OWNER")
                     // 시민 기능(OWNER 도 쓴다, ADMIN 은 못 쓴다)

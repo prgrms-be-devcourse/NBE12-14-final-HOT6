@@ -5,7 +5,7 @@ import HomeLink from "@/components/HomeLink";
 import Logo from "@/components/Logo";
 import { safeNext } from "@/lib/format";
 
-// next: 로그인(과 간편비밀번호 확인)을 마친 뒤 돌아갈 화면. 예: 가맹점 등록
+// next: 로그인(과 간편비밀번호 확인)을 마친 뒤 돌아갈 화면
 async function LoginBody({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
   const to = safeNext(next, "");

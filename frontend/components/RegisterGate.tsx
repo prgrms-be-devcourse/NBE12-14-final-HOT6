@@ -13,10 +13,9 @@ const subscribe = (onChange: () => void) => {
 };
 const subscribeNever = () => () => {};
 
-// 가맹점 등록은 로그인한 회원만 할 수 있다. 서버가 토큰으로 회원을 정하기 때문이다.
-// - 로그인하지 않았으면 점주 로그인과 점주 회원가입을 안내한다
-// - 점주(OWNER)는 가맹점이 없을 때만 등록할 수 있다. 이용자(USER)는 등록하면 점주가 된다
-// - 운영자는 등록할 수 없다
+// 가맹점 등록은 점주 계정만 할 수 있다. 서버가 토큰으로 회원을 정하기 때문에 로그인이 필요하다.
+// - 로그인하지 않았거나 점주가 아닌 계정이면 점주 로그인과 점주 회원가입을 안내한다
+// - 점주는 간편비밀번호 확인을 통과하고 가맹점이 없을 때만 등록할 수 있다
 export default function RegisterGate({ children }: { children: React.ReactNode }) {
   const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
   const raw = useSyncExternalStore(subscribe, readRawSession, () => null);
@@ -36,25 +35,23 @@ export default function RegisterGate({ children }: { children: React.ReactNode }
       </div>
     );
   }
-  if (session.role === "OWNER") {
-    return (
-      <OwnerPinGate>
-        <OwnerGate key={session.userId}>{children}</OwnerGate>
-      </OwnerPinGate>
-    );
-  }
-  if (session.role === "ADMIN") {
+  if (session.role !== "OWNER") {
     return (
       <div className="space-y-3 px-5 pt-6">
         <section className="card text-center">
-          <div className="text-lg font-bold">운영자 계정으로는 등록할 수 없어요</div>
-          <p className="note mt-2">가맹점 등록은 점주 계정으로 로그인해서 진행해 주세요.</p>
+          <div className="text-lg font-bold">점주 계정이 필요해요</div>
+          <p className="note mt-2">지금 로그인한 계정으로는 가맹점을 등록할 수 없어요. 점주 계정으로 로그인하거나 점주 회원가입을 해 주세요.</p>
         </section>
-        <Link href="/merchant/login" className="btn btn-outline">점주로 로그인</Link>
+        <Link href="/merchant/login" className="btn btn-primary">가맹점주 로그인</Link>
+        <Link href="/merchant/signup" className="btn btn-outline">점주 회원가입</Link>
       </div>
     );
   }
-  return <>{children}</>;
+  return (
+    <OwnerPinGate>
+      <OwnerGate key={session.userId}>{children}</OwnerGate>
+    </OwnerPinGate>
+  );
 }
 
 // 점주 한 명은 가맹점 하나: 이미 있으면 안내하고, 없으면 등록 화면을 보여 준다

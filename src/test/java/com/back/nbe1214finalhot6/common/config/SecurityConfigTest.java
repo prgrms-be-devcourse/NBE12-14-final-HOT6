@@ -116,7 +116,7 @@ class SecurityConfigTest {
         Arguments.of("POST", "/api/users/withdraw", 401, 200, 200, 403),
         Arguments.of("POST", "/api/users/withdraw/settle", 401, 200, 200, 403),
         // 가맹점: 등록과 이름 검색은 시민도, 관리는 점주만
-        Arguments.of("POST", "/api/merchants", 401, 200, 200, 403),
+        Arguments.of("POST", "/api/merchants", 401, 403, 200, 403),
         Arguments.of("GET", "/api/merchants", 401, 200, 200, 403),
         Arguments.of("GET", "/api/merchants/me", 401, 403, 200, 403),
         Arguments.of("GET", "/api/merchants/me/account", 401, 403, 200, 403),

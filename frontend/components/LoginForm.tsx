@@ -6,7 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { type Audience, canEnter, clearSession, HOME_PATH, LOGIN_API, saveLogin } from "@/lib/auth";
 
 // 이메일·비밀번호로 로그인한다. 이 화면(audience)에 들어올 수 없는 역할의 계정이면 안내한다.
-// - next: 이용자 로그인 뒤 (간편비밀번호 확인을 거쳐) 돌아갈 화면. 예: 가맹점 등록
+// - next: 이용자 로그인 뒤 (간편비밀번호 확인을 거쳐) 돌아갈 화면
 // - 점주 화면은 점주 로그인 API 를, 회원·운영자 화면은 기존 로그인 API 를 부른다. 같은 이메일의 계정은 이것으로 구분된다
 export default function LoginForm({ audience, next }: { audience: Audience; next?: string }) {
   const router = useRouter();
