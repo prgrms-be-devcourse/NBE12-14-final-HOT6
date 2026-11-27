@@ -48,7 +48,7 @@ public class CashbackService {
    * <p>이용자 월 한도가 모자라면 남은 한도만큼만 적립한다(부분 적립). 남은 한도가 없거나 예산이 부족하면 예외 없이 0원과 사유를 돌려주며, 결제는 그대로
    * 진행한다. 예산은 줄여서 확보하지 않고 전액 아니면 0원이다. 제외된 결제도 적립 건을 남긴다. 같은 결제 ID 로 다시 호출하면 새로 확보하지 않고 처음 결과를 돌려준다.
    *
-   * <p>제외 사유는 먼저 걸리는 하나만 쓴다: 적립 대상 아님, 데브머니 사용분 없음, 적립액 1원 미만, 월 한도 초과, 예산 소진 순이다. 요율은 최초
+   * <p>제외 사유는 먼저 걸리는 하나만 쓴다: 본인 가맹점 결제, 적립 대상 아님, 데브머니 사용분 없음, 적립액 1원 미만, 월 한도 초과, 예산 소진 순이다. 요율은 최초
    * 접수 시각 기준이고 적립액은 소수점 이하를 버린다. 월은 접수 시각의 월이다.
    *
    * <p>예산은 결제 트랜잭션에서 경합이 가장 큰 자원이라 마지막에 확보한다. 예산 확보가 실패하면 먼저 차감한 월 한도를 되돌린다.
@@ -66,7 +66,11 @@ public class CashbackService {
     YearMonth month = YearMonth.from(requestedAt);
     LocalDateTime now = LocalDateTime.now(clock);
 
-    Quote quote = quote(command.cashbackEligible(), command.walletUsedAmount(), requestedAt);
+    // 본인 가맹점 결제는 캐시백 적립 불가. 한도·예산을 확보하지 않고 제외 건만 남긴다
+    Quote quote =
+        command.selfPayment()
+            ? Quote.excluded(CashbackExclusionReason.SELF_PAYMENT)
+            : quote(command.cashbackEligible(), command.walletUsedAmount(), requestedAt);
     if (quote.exclusionReason() != CashbackExclusionReason.NONE) {
       return exclude(command, quote.exclusionReason(), month, limit, now);
     }
@@ -114,7 +118,7 @@ public class CashbackService {
   /**
    * 결제 전에 받을 수 있는 캐시백을 미리 계산한다. 읽기만 하며 월 한도·예산·적립 건을 바꾸지 않는다. 결제 도메인이나 화면이 호출한다.
    *
-   * <p>판정은 {@link #reserve} 와 같은 순서와 규칙이다: 적립 대상, 데브머니 사용분, 요율, 내림 계산, 월 한도(남은 한도만큼으로 줄임), 예산(줄이지 않음). 지금(서버 시각) 기준의 예상 값이라
+   * <p>판정은 {@link #reserve} 와 같은 순서와 규칙이다: 본인 가맹점 결제, 적립 대상, 데브머니 사용분, 요율, 내림 계산, 월 한도(남은 한도만큼으로 줄임), 예산(줄이지 않음). 지금(서버 시각) 기준의 예상 값이라
    * 결제가 확정되는 사이에 예산·한도·요율이 바뀌면 실제 적립은 달라질 수 있다.
    */
   @Transactional(readOnly = true)
@@ -125,7 +129,11 @@ public class CashbackService {
     long remaining = remaining(request.walletId(), month, limit);
     boolean paused = budgetService.isPaused(month.getYear(), month.getMonthValue());
 
-    Quote quote = quote(request.cashbackEligible(), request.walletUsedAmount(), now);
+    // 본인 가맹점 결제는 다른 조건을 보기 전에 제외한다(#301)
+    Quote quote =
+        request.selfPayment()
+            ? Quote.excluded(CashbackExclusionReason.SELF_PAYMENT)
+            : quote(request.cashbackEligible(), request.walletUsedAmount(), now);
     CashbackExclusionReason reason = quote.exclusionReason();
     // 남은 한도가 모자라면 남은 한도만큼으로 줄인다(부분 적립). 남은 한도가 없으면 제외다
     long expected = quote.amount();

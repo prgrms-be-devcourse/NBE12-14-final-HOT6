@@ -76,11 +76,13 @@ function RegisterForm() {
         <div className="card space-y-2 !p-3.5">
           <div>
             <span className="block text-sm font-semibold">캐시백 적립 대상 증빙</span>
-            <span className="note">연매출 30억 미만 증빙 서류를 첨부하면 적립 대상 가맹점으로 자동 승인돼요. 서류 내용은 검증하지 않고, 첨부 여부로만 결정합니다.</span>
+            <span className="note">연매출 30억 미만 증빙 서류를 첨부해 주세요.</span>
           </div>
           <input type="file" aria-label="증빙 서류 첨부" onChange={(e) => setProof(e.target.files?.[0]?.name ?? "")} className="block w-full text-[13px] file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-[13px] file:font-semibold file:text-blue-700" />
           <p role="status" className={`rounded-lg px-3 py-2 text-[13px] font-medium ${proof ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
-            {proof ? `증빙 첨부됨 (${proof}) → 적립 대상 가맹점으로 등록돼요` : "증빙이 없으면 적립 제외 가맹점으로 등록돼요"}
+            {proof
+              ? <><span className="block break-all">증빙 첨부됨 ({proof})</span><span className="block">적립 대상 가맹점으로 등록돼요</span></>
+              : "증빙이 없으면 적립 제외 가맹점으로 등록돼요"}
           </p>
         </div>
         <div>

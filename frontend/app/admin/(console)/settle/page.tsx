@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { addDays, ymd } from "@/lib/dates";
-import { getReconciliations, runDailySettlement, runMonthlySettlement, runReconciliation } from "@/lib/endpoints";
+import { getReconciliations, runClosureSettlement, runDailySettlement, runMonthlySettlement, runReconciliation } from "@/lib/endpoints";
 import type { ReconciliationResultResponse, ReconciliationType } from "@/lib/types";
 
 const TYPES: { type: ReconciliationType; label: string; note: string }[] = [
@@ -26,7 +26,7 @@ const fmtTime = (iso: string) => iso.slice(0, 16).replace("T", " ");
 const errText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback);
 
 export default function AdminSettlePage() {
-  const [tab, setTab] = useState<"일 정산" | "월 정산">("일 정산");
+  const [tab, setTab] = useState<"일 정산" | "월 정산" | "해지 정산">("일 정산");
   const [date, setDate] = useState("");
   const [month, setMonth] = useState("");
   const [running, setRunning] = useState(false);
@@ -54,9 +54,17 @@ export default function AdminSettlePage() {
       if (tab === "일 정산") {
         const r = await runDailySettlement(date || undefined);
         setRunMsg({ ok: r.failed === 0, text: `${r.date} 일 정산: 새로 만든 건 ${r.created}, 이미 있어 건너뜀 ${r.skipped}, 실패 ${r.failed}` });
-      } else {
+      } else if (tab === "월 정산") {
         const r = await runMonthlySettlement(month || undefined);
         setRunMsg({ ok: r.failed === 0, text: `${r.month} 월 정산: 새로 만든 건 ${r.created}, 지급 완료 ${r.paid}, 실패 ${r.failed}` });
+      } else {
+        const r = await runClosureSettlement();
+        const held = r.held > 0 ? ` (가맹점 #${r.heldMerchantIds.join(", #")})` : "";
+        const hint = r.dailyIncomplete > 0 ? " · 일 정산이 덜 끝난 가맹점이 있어요. 일 정산을 먼저 실행해 주세요" : "";
+        setRunMsg({
+          ok: r.failed === 0 && r.held === 0 && r.dailyIncomplete === 0,
+          text: `해지 정산: 해지 완료 ${r.closed}, 보류 ${r.held}${held}, 신청일이 지나지 않아 대기 ${r.waiting}, 일 정산 미완료 ${r.dailyIncomplete}, 실패 ${r.failed}${hint}`,
+        });
       }
     } catch (e) {
       setRunMsg({ ok: false, text: errText(e, "정산을 실행하지 못했어요") });
@@ -94,23 +102,25 @@ export default function AdminSettlePage() {
       <h1 className="text-2xl font-semibold">정산 · 원장 대사</h1>
 
       <section className="card">
-        <h2 className="mb-2 font-semibold">일 / 월 정산 실행</h2>
+        <h2 className="mb-2 font-semibold">일 / 월 / 해지 정산 실행</h2>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex gap-2" role="tablist">
-            {(["일 정산", "월 정산"] as const).map((t) => (
+            {(["일 정산", "월 정산", "해지 정산"] as const).map((t) => (
               <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => { setTab(t); setRunMsg(null); }} className={`chip ${tab === t ? "chip-on" : ""}`}>{t}</button>
             ))}
           </div>
-          {tab === "일 정산" ? (
+          {tab === "일 정산" && (
             <label className="block"><span className="label">날짜 (비우면 어제)</span><input type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} /></label>
-          ) : (
+          )}
+          {tab === "월 정산" && (
             <label className="block"><span className="label">월 (비우면 지난달)</span><input type="month" className="field" value={month} onChange={(e) => setMonth(e.target.value)} /></label>
           )}
+          {tab === "해지 정산" && <p className="note pb-2">해지를 신청한 가맹점 전체를 정산하고 해지를 끝내요</p>}
           <button type="button" onClick={runSettlement} disabled={running} className="btn btn-primary btn-sm !w-auto disabled:opacity-40">{running ? "실행 중…" : "정산 실행"}</button>
         </div>
         {runMsg && <p role={runMsg.ok ? "status" : "alert"} className={`mt-3 rounded-lg px-3 py-2 text-sm font-medium ${runMsg.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>{runMsg.text}</p>}
         <p className="note mt-2">
-          • 일 정산은 어제까지, 월 정산은 지난달까지 실행할 수 있어요 • 이미 만든 정산과 지급은 건너뛰므로 다시 실행해도 중복되지 않아요 • 월 정산은 해당 달의 일 정산이 끝난 뒤에 실행해요
+          • 일 정산은 어제까지, 월 정산은 지난달까지 실행할 수 있어요 • 이미 만든 정산과 지급은 건너뛰므로 다시 실행해도 중복되지 않아요 • 월 정산은 해당 달의 일 정산이 끝난 뒤에 실행해요 • 해지 정산은 신청 다음 날부터 처리되고, 일 정산 → 해지 정산 → 대사 순서로 실행해요
         </p>
       </section>
 

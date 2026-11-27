@@ -39,7 +39,10 @@ public enum CashbackErrorCode implements ErrorCode {
 
   // 공지
   INVALID_NOTICE("CSH-014", HttpStatus.BAD_REQUEST, "공지 내용이 올바르지 않습니다"),
-  NOTICE_NOT_FOUND("CSH-015", HttpStatus.NOT_FOUND, "공지를 찾을 수 없습니다");
+  NOTICE_NOT_FOUND("CSH-015", HttpStatus.NOT_FOUND, "공지를 찾을 수 없습니다"),
+
+  // 운영자 조회
+  INVALID_SEARCH_PERIOD("CSH-016", HttpStatus.BAD_REQUEST, "조회 기간의 시작일이 종료일보다 늦습니다");
 
   private final String code;
   private final HttpStatus status;

@@ -297,6 +297,7 @@ class MerchantControllerTest {
   }
 
   @Test
+  @WithAuthUser(userId = 2L, role = UserRole.USER) // 이름 검색은 이용자 기능
   @DisplayName("이름으로 검색하면 200 과 목록·페이지 정보를 반환한다")
   void 이름검색성공() throws Exception {
     given(merchantService.search("분식", 0, 20))
@@ -324,6 +325,7 @@ class MerchantControllerTest {
   }
 
   @Test
+  @WithAuthUser(userId = 2L, role = UserRole.USER) // 이름 검색은 이용자 기능
   @DisplayName("page 와 size 는 기본값 0, 20 이고 값을 보내면 그대로 전달된다")
   void 검색페이징파라미터전달() throws Exception {
     given(merchantService.search(any(), eq(0), eq(20)))
@@ -343,6 +345,7 @@ class MerchantControllerTest {
   }
 
   @Test
+  @WithAuthUser(userId = 2L, role = UserRole.USER) // 이름 검색은 이용자 기능
   @DisplayName("잘못된 검색 요청이면 400")
   void 잘못된검색요청이면400() throws Exception {
     expectInvalidRequest(get("/api/merchants"));

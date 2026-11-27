@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import LogoutLink from "@/components/LogoutLink";
@@ -82,6 +83,7 @@ export default function MerchantEditPage() {
           ? <div className="flex gap-2.5"><button type="button" onClick={() => setEditing(false)} className="btn btn-outline">취소</button><button type="button" onClick={save} disabled={busy || !f.name.trim() || !f.address.trim()} className="btn btn-primary disabled:opacity-40">{busy ? "저장 중…" : "저장"}</button></div>
           : <button type="button" onClick={() => setEditing(true)} disabled={!loaded} className="btn btn-outline disabled:opacity-40">수정</button>}
 
+        <Link href="/merchant/closure" className="btn btn-danger">가맹점 해지</Link>
         <LogoutLink href="/merchant/login" className="btn btn-outline">로그아웃</LogoutLink>
         <p className="note">가맹점명과 주소는 서버에 저장돼요. 지도 위치는 이 기기에서만 보이고 서버에는 저장되지 않아요.</p>
       </div>
