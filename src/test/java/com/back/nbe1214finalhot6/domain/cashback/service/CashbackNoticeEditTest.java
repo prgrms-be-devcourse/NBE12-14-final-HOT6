@@ -107,6 +107,28 @@ class CashbackNoticeEditTest {
         .isEqualTo(CashbackErrorCode.NOTICE_NOT_FOUND);
   }
 
+  // 목적: 홈 종료일이 적용일보다 이르면 등록과 수정을 거절하고, 적용일과 같으면 받는지 확인한다.
+  @Test
+  @DisplayName("홈 종료일은 적용일 이후여야 한다")
+  void homeUntilNotBeforeEffectiveDate() {
+    LocalDate effective = TODAY.plusDays(10);
+
+    assertInvalid(() -> scheduledNotice(effective, effective.minusDays(1)));
+    Long id = scheduledNotice(effective, effective);
+
+    assertInvalid(() -> noticeService.update(id, request("제목", "본문", true, effective.minusDays(1))));
+    noticeService.update(id, request("제목", "본문", true, effective.plusDays(1)));
+  }
+
+  private Long scheduledNotice(LocalDate effective, LocalDate homeUntil) {
+    return noticeService.registerLimitChange(
+        "CASHBACK_USER_MONTHLY_LIMIT",
+        50_000L,
+        40_000L,
+        effective,
+        new SettingNoticeRequest("제목", "본문", true, homeUntil));
+  }
+
   private static void assertInvalid(Runnable action) {
     assertThatThrownBy(action::run)
         .isInstanceOf(BusinessException.class)

@@ -67,7 +67,7 @@ public class CashbackNoticeService {
    * 한도를 바꾸거나 예약할 때 알리는 공지를 등록한다.
    *
    * @return 등록한 공지 ID
-   * @throws BusinessException 제목·본문이 비었거나 길 때, 홈에 띄우는데 종료일이 없거나 지났을 때(CSH-014)
+   * @throws BusinessException 제목·본문이 비었거나 길 때, 홈에 띄우는데 종료일이 없거나 오늘·적용일보다 이를 때(CSH-014)
    */
   @Transactional
   public Long registerLimitChange(
@@ -77,7 +77,7 @@ public class CashbackNoticeService {
       LocalDate effectiveFrom,
       SettingNoticeRequest notice) {
     requireText(notice.title(), notice.content());
-    requireHome(notice.showOnHome(), notice.homeUntil());
+    requireHome(notice.showOnHome(), notice.homeUntil(), effectiveFrom);
     return noticeRepository
         .save(
             CashbackNotice.limitChange(
@@ -145,7 +145,7 @@ public class CashbackNoticeService {
     boolean sameHome =
         notice.isShowOnHome() && Objects.equals(notice.getHomeUntil(), request.homeUntil());
     if (!sameHome) {
-      requireHome(request.showOnHome(), request.homeUntil());
+      requireHome(request.showOnHome(), request.homeUntil(), notice.getEffectiveFrom());
     }
     notice.edit(
         request.title(),
@@ -169,10 +169,17 @@ public class CashbackNoticeService {
     }
   }
 
-  private void requireHome(boolean showOnHome, LocalDate homeUntil) {
-    if (showOnHome && (homeUntil == null || homeUntil.isBefore(LocalDate.now(clock)))) {
+  // 적용되기 전에 홈에서 내려가지 않도록 종료일은 오늘과 적용일 이후여야 한다
+  private void requireHome(boolean showOnHome, LocalDate homeUntil, LocalDate effectiveFrom) {
+    if (!showOnHome) {
+      return;
+    }
+    LocalDate today = LocalDate.now(clock);
+    LocalDate earliest =
+        effectiveFrom != null && effectiveFrom.isAfter(today) ? effectiveFrom : today;
+    if (homeUntil == null || homeUntil.isBefore(earliest)) {
       throw new BusinessException(
-          CashbackErrorCode.INVALID_NOTICE, "홈에 띄우려면 오늘 이후의 종료일이 필요합니다");
+          CashbackErrorCode.INVALID_NOTICE, "홈에 띄우려면 오늘과 적용일 이후의 종료일이 필요합니다");
     }
   }
 
