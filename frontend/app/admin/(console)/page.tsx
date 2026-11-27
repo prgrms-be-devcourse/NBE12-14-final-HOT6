@@ -74,7 +74,7 @@ export default function AdminDashboardPage() {
       {errors.length > 0 && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{errors[0]}</p>}
       {!budget.loading && !budget.error && !b && (
         <div role="alert" className="rounded-xl border border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          이번 달 예산이 아직 없어요. <Link href="/admin/budget?tab=plan" className="font-bold underline">예산 관리에서 배정하기</Link>
+          이번 달 예산이 아직 없어요. <Link href="/admin/budget" className="font-bold underline">예산 관리에서 배정하기</Link>
         </div>
       )}
       {b && b.warning !== "NONE" && (
