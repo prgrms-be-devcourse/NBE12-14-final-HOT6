@@ -33,7 +33,7 @@ const koDate = (date: string) => `${Number(date.slice(5, 7))}월 ${Number(date.s
 function SettingCard({ setting, onSaved }: { setting: OperatorSetting; onSaved: (message: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string | null>(null); // 손대기 전에는 현재 값을 보여 준다
-  const [chosen, setMethod] = useState<Method>("NOW");
+  const [method, setMethod] = useState<Method>("NOW");
   const [date, setDate] = useState("");
   // 공지 문구와 홈 종료일은 직접 고치기 전까지 입력한 값에 맞춘 초안을 보여 준다
   const [titleInput, setTitle] = useState<string | null>(null);
@@ -43,8 +43,6 @@ function SettingCard({ setting, onSaved }: { setting: OperatorSetting; onSaved: 
 
   const name = LIMIT_NAME[setting.key] ?? setting.description.replace("(원)", "");
   const scheduled = setting.scheduled ?? null;
-  // 설정마다 예약은 하나라, 예약이 있으면 날짜 예약을 고를 수 없다
-  const method: Method = scheduled && chosen === "SCHEDULE" ? "NOW" : chosen;
   const input = draft ?? String(setting.value);
   const next = Number(input);
   const today = ymd(new Date());
@@ -68,16 +66,15 @@ function SettingCard({ setting, onSaved }: { setting: OperatorSetting; onSaved: 
     method === "SCHEDULE" && (!date || date < tomorrow) ? "적용일은 내일 이후로 골라 주세요"
     : !title.trim() || title.length > NOTICE_TITLE_MAX ? `공지 제목은 ${NOTICE_TITLE_MAX}자까지 입력해 주세요`
     : !content.trim() || content.length > NOTICE_CONTENT_MAX ? `공지 본문은 ${NOTICE_CONTENT_MAX}자까지 입력해 주세요`
-    : showOnHome && (!homeUntil || homeUntil < today) ? "홈에 띄우는 마지막 날은 오늘 이후여야 해요"
+    : showOnHome && (!homeUntil || homeUntil < effective) ? `홈에 띄우는 마지막 날은 ${method === "SCHEDULE" ? "적용일" : "오늘"} 이후여야 해요`
     : "";
 
   const impact = IMPACT[setting.key];
   const lowered = next < setting.value ? impact?.lowered?.(next) : undefined;
-  const pending = scheduled ? ` 대기 중인 예약은 남아 ${koDate(scheduled.effectiveDate)}에 ${won(scheduled.value)}이 돼요.` : "";
   const message =
     method === "SCHEDULE"
       ? `${date && koDate(date)} 00:00부터 ${nextText}. 공지는 지금 등록돼요. ${lowered ?? ""} 예약할까요?`
-      : `${won(setting.value)} → ${nextText}. ${impact?.apply ?? ""} ${lowered ?? ""}${pending} 공지가 함께 등록돼요. 바꿀까요?`;
+      : `${won(setting.value)} → ${nextText}. ${impact?.apply ?? ""} ${lowered ?? ""} 공지가 함께 등록돼요. 바꿀까요?`;
 
   const clear = () => {
     setEditing(false); setDraft(null); setMethod("NOW"); setDate(""); setTitle(null); setContent(null); setShowOnHome(true); setHomeUntil(null);
@@ -118,7 +115,10 @@ function SettingCard({ setting, onSaved }: { setting: OperatorSetting; onSaved: 
         </div>
       )}
 
-      {!editing ? (
+      {/* 예약이 남은 채 바꾸면 예약 공지와 값이 어긋나므로, 취소해야 바꿀 수 있다 */}
+      {scheduled ? (
+        <p className="note">값을 바꾸거나 새로 예약하려면 지금 예약을 먼저 취소해 주세요.</p>
+      ) : !editing ? (
         <button type="button" onClick={() => setEditing(true)} className="btn btn-outline btn-sm !w-auto">변경</button>
       ) : (
       <div className="space-y-3 border-t border-slate-100 pt-3">
@@ -137,12 +137,11 @@ function SettingCard({ setting, onSaved }: { setting: OperatorSetting; onSaved: 
           <>
             <div className="flex flex-wrap gap-2" role="group" aria-label={`${name} 바꾸는 방법`}>
               {METHODS.map((m) => (
-                <button key={m.value} type="button" aria-pressed={method === m.value} disabled={m.value === "SCHEDULE" && !!scheduled} onClick={() => setMethod(m.value)} className={`chip disabled:opacity-40 ${method === m.value ? "chip-on" : ""}`}>
+                <button key={m.value} type="button" aria-pressed={method === m.value} onClick={() => setMethod(m.value)} className={`chip ${method === m.value ? "chip-on" : ""}`}>
                   {m.label}
                 </button>
               ))}
             </div>
-            {scheduled && <p className="note">예약은 하나만 할 수 있어요. 새로 예약하려면 지금 예약을 먼저 취소해 주세요.</p>}
             {method === "SCHEDULE" && (
               <label className="block">
                 <span className="label">적용일(00:00부터)</span>
@@ -152,7 +151,7 @@ function SettingCard({ setting, onSaved }: { setting: OperatorSetting; onSaved: 
             <NoticeFields
                 name={name}
                 value={{ title, content, showOnHome, homeUntil }}
-                minHomeUntil={today}
+                minHomeUntil={effective}
                 onChange={(patch) => {
                   if (patch.title !== undefined) setTitle(patch.title);
                   if (patch.content !== undefined) setContent(patch.content);

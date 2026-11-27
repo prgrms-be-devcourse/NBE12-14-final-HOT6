@@ -14,8 +14,10 @@ type Props = { item: AdminNotice; onClose: () => void; onSaved: () => void };
 export default function NoticeEditModal({ item, onClose, onSaved }: Props) {
   const n = item.notice;
   const today = ymd(new Date());
+  // 홈 종료일은 오늘과 적용일 이후여야 한다
+  const minHomeUntil = n.effectiveFrom && n.effectiveFrom.slice(0, 10) > today ? n.effectiveFrom.slice(0, 10) : today;
   const [draft, setDraft] = useState<NoticeDraft>({
-    title: n.title, content: n.content, showOnHome: item.showOnHome, homeUntil: item.homeUntil ?? monthEnd(today),
+    title: n.title, content: n.content, showOnHome: item.showOnHome, homeUntil: item.homeUntil ?? monthEnd(minHomeUntil),
   });
   const [saving, setSaving] = useState(false);
   const [apiError, setApiError] = useState("");
@@ -33,7 +35,7 @@ export default function NoticeEditModal({ item, onClose, onSaved }: Props) {
     !draft.title.trim() ? "공지 제목을 입력해 주세요"
     : !draft.content.trim() ? "공지 본문을 입력해 주세요"
     // 지난 종료일을 그대로 둔 채 문구만 고치는 것은 된다
-    : draft.showOnHome && homeChanged && (!draft.homeUntil || draft.homeUntil < today) ? "홈에 띄우는 마지막 날은 오늘 이후여야 해요"
+    : draft.showOnHome && homeChanged && (!draft.homeUntil || draft.homeUntil < minHomeUntil) ? "홈에 띄우는 마지막 날은 오늘과 적용일 이후여야 해요"
     : "";
 
   const save = async () => {
@@ -73,7 +75,7 @@ export default function NoticeEditModal({ item, onClose, onSaved }: Props) {
           ) : (
             <>
               <p className="note">알리는 값과 적용일은 고칠 수 없어요. 값을 바꾸려면 정책 관리에서 변경해 주세요.</p>
-              <NoticeFields name={n.title} value={draft} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} minHomeUntil={today} />
+              <NoticeFields name={n.title} value={draft} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} minHomeUntil={minHomeUntil} />
               {textChanged && <p className="note">저장하면 이용자 화면에 &quot;수정됨&quot;과 날짜가 보여요.</p>}
               {(error || apiError) && <p role="alert" className="text-[13px] font-medium text-red-600">{error || apiError}</p>}
               <button type="button" disabled={saving || !!error || (!textChanged && !homeChanged)} onClick={save} className="btn btn-primary disabled:opacity-40">저장</button>
