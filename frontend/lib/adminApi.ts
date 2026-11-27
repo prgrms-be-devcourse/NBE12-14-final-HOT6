@@ -86,6 +86,12 @@ export const updateNotice = (noticeId: number, body: SettingNotice) => api<Admin
 export type Policy = { policyId: number; rate: number; startsAt: string; endsAt: string | null };
 export const getPolicies = () => api<Policy[]>(`${BASE}/policies`);
 export const getForecast = () => api<Forecast>(`${BASE}/forecast`);
+// 하루 한 번 저장한 예측의 하루 예상 수요와 그날 실제 확보액의 비교. 최근 날짜부터
+export type ForecastAccuracy = {
+  averageError: number | null; withinRangeDays: number;
+  days: { date: string; predictedDemand: number; slowDemand: number; fastDemand: number; actualAmount: number; difference: number; withinRange: boolean; modelVersion: string }[];
+};
+export const getForecastAccuracy = () => api<ForecastAccuracy>(`${BASE}/forecast/accuracy`);
 export const reduceRate = (rate: number, effectiveAt: string) =>
   api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt } });
 export const noticeStop = (year: number, month: number) => api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}/notice-stop`, { method: "POST" });

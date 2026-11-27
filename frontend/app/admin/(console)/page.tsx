@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import BarChart from "@/components/BarChart";
+import ForecastAccuracyTable from "@/components/ForecastAccuracyTable";
 import { ApiError } from "@/lib/api";
 import {
   getAdminNotices, getForecast, getMonthlyBudget, getPayoutStatus, getPolicies, getSettings, md, moneyUnit, STATUS_TEXT, thisYearMonth,
@@ -126,6 +127,7 @@ export default function AdminDashboardPage() {
             ))}
           </dl>
         )}
+        <ForecastAccuracyTable />
       </section>
 
       <section className="card !p-5">
