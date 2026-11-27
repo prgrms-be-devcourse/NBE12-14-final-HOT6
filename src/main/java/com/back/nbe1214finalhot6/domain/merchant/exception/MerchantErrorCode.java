@@ -13,7 +13,9 @@ public enum MerchantErrorCode implements ErrorCode {
   MERCHANT_CLOSING("MER-003", HttpStatus.CONFLICT, "해지 신청이 접수된 가맹점이라 사용할 수 없습니다"),
   MERCHANT_CLOSED("MER-004", HttpStatus.CONFLICT, "해지된 가맹점입니다"),
   MERCHANT_CLOSURE_SHORTFALL(
-      "MER-005", HttpStatus.CONFLICT, "취소·환수로 정산금보다 갚을 금액이 많아 해지를 신청할 수 없습니다. 부족한 금액을 먼저 정리해 주세요");
+      "MER-005", HttpStatus.CONFLICT, "취소·환수로 정산금보다 갚을 금액이 많아 해지를 신청할 수 없습니다. 부족한 금액을 먼저 정리해 주세요"),
+  MERCHANT_ADDRESS_NOT_FOUND(
+      "MER-006", HttpStatus.BAD_REQUEST, "주소를 찾을 수 없습니다. 주소 찾기에서 도로명 주소를 선택해 주세요");
 
   private final String code;
   private final HttpStatus status;

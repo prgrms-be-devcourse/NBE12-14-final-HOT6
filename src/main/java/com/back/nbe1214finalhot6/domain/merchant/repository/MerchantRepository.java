@@ -23,6 +23,10 @@ public interface MerchantRepository extends JpaRepository<Merchant, Long> {
   // 점주의 가맹점 조회. 점주당 하나만 허용(유일 제약)
   Optional<Merchant> findByOwnerId(Long ownerId);
 
+  // 점주의 가맹점 상태만 읽는다. 가맹점이 없으면 비어 있다
+  @Query("select m.status from Merchant m where m.ownerId = :ownerId")
+  Optional<MerchantStatus> findStatusByOwnerId(@Param("ownerId") Long ownerId);
+
   boolean existsByOwnerId(Long ownerId);
 
   // 현재 상태가 from 일 때만 to 로 바꾼다. 해지 신청이 동시에 와도 한 번만 반영된다

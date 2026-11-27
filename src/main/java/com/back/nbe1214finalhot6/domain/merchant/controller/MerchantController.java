@@ -10,6 +10,7 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantRegistrationFacade;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
+import com.back.nbe1214finalhot6.domain.merchant.service.MerchantUpdateFacade;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -35,13 +36,14 @@ public class MerchantController {
 
   private final MerchantService merchantService;
   private final MerchantRegistrationFacade registrationFacade;
+  private final MerchantUpdateFacade updateFacade;
   private final OwnedResources ownedResources;
 
   @Operation(
       summary = "가맹점 등록",
       description =
-          "로그인한 회원의 가맹점을 등록한다. 연매출 30억 미만 증빙 서류(revenueProof)를 첨부하면 적립 대상으로 자동 승인되고, 첨부하지 않으면 적립 대상에서 제외된다. "
-              + "등록한 회원은 점주(OWNER)가 되며, 점주 기능은 새 토큰(재로그인 또는 재발급)을 받은 뒤에 쓸 수 있다. "
+          "로그인한 점주의 가맹점을 등록한다. 연매출 30억 미만 증빙 서류(revenueProof)를 첨부하면 적립 대상으로 자동 승인되고, 첨부하지 않으면 적립 대상에서 제외된다. "
+              + "주소는 서버가 좌표로 바꿔 저장하며(좌표는 요청으로 받지 않는다), 주소를 찾지 못하면 400(MER-006)이다. 외부 서비스가 실패하거나 설정이 비어 있으면 위치 없이 등록한다. "
               + "점주 한 명당 가맹점은 하나만 등록할 수 있다(이미 등록했으면 409)")
   @PostMapping
   public ResponseEntity<ApiResponse<MerchantRegisterResponse>> register(
@@ -62,11 +64,12 @@ public class MerchantController {
       summary = "가맹점 수정",
       description =
           "로그인한 점주의 가맹점을 수정한다(가맹점 번호는 토큰의 회원으로 찾는다). "
-              + "이름, 주소 중 요청에 포함된 항목만 수정한다. 포함되지 않은 항목은 기존 값을 유지하며, 적립 대상 여부는 수정할 수 없다")
+              + "이름, 주소 중 요청에 포함된 항목만 수정한다. 포함되지 않은 항목은 기존 값을 유지하며, 적립 대상 여부는 수정할 수 없다. "
+              + "주소가 바뀌면 서버가 좌표를 다시 정하고(찾지 못하면 400 MER-006, 외부 서비스가 실패하면 좌표를 비운다), 좌표가 비어 있는 가맹점은 수정할 때 변환을 다시 시도한다")
   @PatchMapping("/me")
   public ApiResponse<MerchantResponse> update(
       @AuthenticationPrincipal AuthUser user, @Valid @RequestBody MerchantUpdateRequest request) {
-    return ApiResponse.ok(merchantService.update(ownedResources.merchantIdOf(user), request));
+    return ApiResponse.ok(updateFacade.update(ownedResources.merchantIdOf(user), request));
   }
 
   @Operation(
