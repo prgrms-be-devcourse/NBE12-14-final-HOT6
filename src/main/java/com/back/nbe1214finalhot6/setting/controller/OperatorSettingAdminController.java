@@ -54,7 +54,7 @@ public class OperatorSettingAdminController {
       summary = "설정 값 변경",
       description =
           "바로 바꾼다. 값은 키의 최솟값 이상, 하드 상한 이하여야 한다(상한과 같은 값 허용). 현재 값과 같으면 아무것도 바꾸지 않고, 바꾸면 이후부터 적용한다."
-              + " 공지(notice)가 필수이며 값이 바뀌면 함께 등록한다. 대기 중인 예약은 남는다")
+              + " 공지(notice)가 필수이며 값이 바뀌면 함께 등록한다. 대기 중인 예약이 있으면 409(SET-002)")
   @PutMapping("/{key}")
   public ResponseEntity<ApiResponse<SettingResponse>> put(
       @PathVariable String key, @Valid @RequestBody SettingUpdateRequest request) {
@@ -64,7 +64,7 @@ public class OperatorSettingAdminController {
 
   @Operation(
       summary = "설정을 기본값으로 되돌림",
-      description = "바로 되돌린다. 본문의 공지(notice)가 필수이며 값이 바뀌면 함께 등록한다. 운영자가 바꾼 적이 없는 키면 아무것도 바꾸지 않는다")
+      description = "바로 되돌린다. 본문의 공지(notice)가 필수이며 값이 바뀌면 함께 등록한다. 운영자가 바꾼 적이 없는 키면 아무것도 바꾸지 않는다. 대기 중인 예약이 있으면 409(SET-002)")
   @DeleteMapping("/{key}")
   public ResponseEntity<ApiResponse<SettingResponse>> reset(
       @PathVariable String key,

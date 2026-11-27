@@ -174,18 +174,24 @@ class OperatorSettingScheduleTest {
     assertThat(settingService.getLong(KEY)).isEqualTo(40_000L);
   }
 
-  // 목적: 예약 중에 바로 바꾸면 지금은 바꾼 값이고, 예약은 남아 적용일에 예약 값이 되는지 확인한다.
+  // 목적: 예약이 남은 채 바로 바꾸거나 되돌리면 SET-002 로 거절하고 값·이력·공지가 늘지 않으며, 취소하면 바꿀 수 있는지 확인한다.
   @Test
-  @DisplayName("예약 중에 바로 바꿔도 적용일에는 예약 값이다")
-  void immediateChangeKeepsSchedule() {
+  @DisplayName("예약이 있으면 바로 바꾸거나 되돌릴 수 없다")
+  void immediateChangeRejectedWhileScheduled() {
+    adminService.put(NAME, 30_000L);
     schedule(40_000L, TOMORROW);
 
-    SettingResponse changed = adminService.put(NAME, 45_000L);
+    assertError(
+        () -> adminService.put(NAME, 45_000L, NOTICE), SettingErrorCode.SCHEDULE_ALREADY_EXISTS);
+    assertError(
+        () -> adminService.reset(NAME, NOTICE), SettingErrorCode.SCHEDULE_ALREADY_EXISTS);
+    assertThat(settingService.getLong(KEY)).isEqualTo(30_000L);
+    assertThat(historyRepository.findAllBySettingKeyOrderByIdAsc(KEY)).hasSize(1);
+    assertThat(noticeService.list(null, 0, 20).content()).hasSize(1);
 
-    assertThat(changed.value()).isEqualTo(45_000L);
-    assertThat(changed.scheduled().value()).isEqualTo(40_000L);
-    nextDay();
-    assertThat(settingService.getLong(KEY)).isEqualTo(40_000L);
+    adminService.cancelSchedule(NAME);
+
+    assertThat(adminService.put(NAME, 45_000L, NOTICE).value()).isEqualTo(45_000L);
   }
 
   // 목적: 적용일이 지난 뒤 바로 바꾸면 예약을 먼저 반영하고 그 값에서 바꾸는지 확인한다.
