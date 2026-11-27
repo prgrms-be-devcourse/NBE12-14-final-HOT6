@@ -15,8 +15,6 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantWalletRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,34 +39,21 @@ class MerchantRegistrationFacadeTest {
   @Autowired MerchantRegistrationFacade facade;
   @Autowired UserRepository userRepository;
   @Autowired MerchantRepository merchantRepository;
-  @Autowired MerchantWalletRepository merchantWalletRepository;
-  @Autowired MerchantAccountRepository merchantAccountRepository;
   @Autowired JdbcTemplate jdbcTemplate;
 
   // 이 테스트가 만든 회원 번호. 정리와 개수 비교를 이 테스트가 만든 것으로만 한정한다(다른 테스트가 남긴 데이터와 섞이지 않게)
   private final List<Long> userIds = new ArrayList<>();
   private long merchantsBefore;
-  private long walletsBefore;
-  private long accountsBefore;
 
   @BeforeEach
   void countBefore() {
     merchantsBefore = merchantRepository.count();
-    walletsBefore = merchantWalletRepository.count();
-    accountsBefore = merchantAccountRepository.count();
   }
 
   @AfterEach
   void cleanUp() {
     for (Long userId : userIds) {
-      merchantRepository
-          .findByOwnerId(userId)
-          .ifPresent(
-              merchant -> {
-                merchantAccountRepository.findByMerchantId(merchant.getId()).ifPresent(merchantAccountRepository::delete);
-                merchantWalletRepository.findByMerchantId(merchant.getId()).ifPresent(merchantWalletRepository::delete);
-                merchantRepository.delete(merchant);
-              });
+      merchantRepository.findByOwnerId(userId).ifPresent(merchantRepository::delete);
     }
     userRepository.deleteAllById(userIds);
     userIds.clear();
@@ -77,14 +62,6 @@ class MerchantRegistrationFacadeTest {
   // 테스트 시작 뒤 새로 생긴 개수
   private long newMerchants() {
     return merchantRepository.count() - merchantsBefore;
-  }
-
-  private long newWallets() {
-    return merchantWalletRepository.count() - walletsBefore;
-  }
-
-  private long newAccounts() {
-    return merchantAccountRepository.count() - accountsBefore;
   }
 
   // 목적: 등록하면 가맹점이 만들어지고, 등록한 회원이 USER → OWNER 로 승격되는지 확인한다.
@@ -130,15 +107,13 @@ class MerchantRegistrationFacadeTest {
   }
 
   @Test
-  @DisplayName("운영자는 등록할 수 없고(COM-008) 가맹점·지갑·계좌가 하나도 남지 않는다")
+  @DisplayName("운영자는 등록할 수 없고(COM-008) 가맹점이 남지 않는다")
   void adminCannotRegister() {
     User admin = save("admin@devpay.com", "01011110003", UserRole.ADMIN);
 
     assertFails(() -> facade.register(authUser(admin), request()), CommonErrorCode.FORBIDDEN);
 
     assertThat(newMerchants()).isZero();
-    assertThat(newWallets()).isZero();
-    assertThat(newAccounts()).isZero();
     assertThat(roleOf(admin.getId())).isEqualTo("ADMIN");
   }
 
@@ -194,7 +169,6 @@ class MerchantRegistrationFacadeTest {
     }
 
     assertThat(newMerchants()).isEqualTo(1);
-    assertThat(newWallets()).isEqualTo(1);
     assertThat(roleOf(user.getId())).isEqualTo("OWNER");
   }
 

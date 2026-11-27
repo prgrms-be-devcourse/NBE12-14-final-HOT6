@@ -36,7 +36,7 @@ public interface MonthlySettlementRepository extends JpaRepository<MonthlySettle
   List<MonthlySettlement> findByMerchantIdAndSettlementMonthBetweenOrderBySettlementMonthAsc(
       Long merchantId, LocalDate from, LocalDate to);
 
-  // 같은 건의 출금·지급 완료가 동시에 진행되지 않게 잠그고 읽음. 락 순서는 정산 건 → 지갑
+  // 같은 건의 지급과 지급 완료가 동시에 진행되지 않게 잠그고 읽음. 락 순서는 정산 건 → 점주 계좌
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   Optional<MonthlySettlement> findWithLockById(Long id);
 }

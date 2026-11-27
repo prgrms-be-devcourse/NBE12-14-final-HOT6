@@ -8,8 +8,8 @@ import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantClosureRepository;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
-import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantAccount;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Account;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ class MerchantClosureConcurrencyTest {
   @Autowired private MerchantClosureService closureService;
   @Autowired private MerchantRepository merchantRepository;
   @Autowired private MerchantClosureRepository closureRepository;
-  @Autowired private MerchantAccountRepository accountRepository;
+  @Autowired private AccountRepository accountRepository;
 
   @Test
   @DisplayName("같은 가맹점이 동시에 해지를 신청해도 한 번만 접수되고 나머지는 MER-003 이다")
@@ -41,7 +41,7 @@ class MerchantClosureConcurrencyTest {
     Merchant merchant =
         merchantRepository.save(Merchant.create(9_101L, "동시 해지 가맹점", "인천광역시 남동구 1", true));
     Long merchantId = merchant.getId();
-    accountRepository.save(MerchantAccount.create(merchantId, LocalDateTime.now()));
+    accountRepository.save(Account.createEmpty(9_101L, LocalDateTime.now()));
     ExecutorService executor = Executors.newFixedThreadPool(THREADS);
     CountDownLatch ready = new CountDownLatch(THREADS);
     CountDownLatch start = new CountDownLatch(1);
@@ -83,7 +83,7 @@ class MerchantClosureConcurrencyTest {
     } finally {
       executor.shutdownNow();
       closureRepository.findByMerchantId(merchantId).ifPresent(closureRepository::delete);
-      accountRepository.findByMerchantId(merchantId).ifPresent(accountRepository::delete);
+      accountRepository.findByUserId(9_101L).ifPresent(accountRepository::delete);
       merchantRepository.deleteById(merchantId);
     }
   }

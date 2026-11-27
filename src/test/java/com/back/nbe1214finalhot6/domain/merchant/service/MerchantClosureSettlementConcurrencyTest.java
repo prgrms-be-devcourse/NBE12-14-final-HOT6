@@ -8,8 +8,8 @@ import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantClosureSettlementProcessor.Outcome;
 import com.back.nbe1214finalhot6.domain.settlement.entity.DailySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.repository.DailySettlementRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
-import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Account;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,12 +33,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 class MerchantClosureSettlementConcurrencyTest {
 
   private static final int THREADS = 8;
+  private static final Long OWNER_ID = 9_501L;
   private static final LocalDate DAY = LocalDate.of(2026, 11, 10);
 
   @Autowired private MerchantClosureSettlementProcessor processor;
   @Autowired private MerchantRepository merchantRepository;
-  @Autowired private MerchantWalletService merchantWalletService;
-  @Autowired private MerchantAccountRepository accountRepository;
+  @Autowired private AccountRepository accountRepository;
   @Autowired private DailySettlementRepository dailySettlementRepository;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private PlatformTransactionManager transactionManager;
@@ -48,9 +48,9 @@ class MerchantClosureSettlementConcurrencyTest {
   void 동시에_실행해도_한번만_지급() throws Exception {
     Long merchantId =
         merchantRepository
-            .save(Merchant.create(9_501L, "동시 해지 정산 가맹점", "인천광역시 남동구 1", true))
+            .save(Merchant.create(OWNER_ID, "동시 해지 정산 가맹점", "인천광역시 남동구 1", true))
             .getId();
-    merchantWalletService.createFor(merchantId);
+    accountRepository.save(Account.createEmpty(OWNER_ID, LocalDateTime.now()));
     // 수정 쿼리는 트랜잭션이 필요해서, 이 테스트에는 트랜잭션이 없으므로 직접 열어서 호출한다
     new TransactionTemplate(transactionManager)
         .executeWithoutResult(
@@ -90,17 +90,16 @@ class MerchantClosureSettlementConcurrencyTest {
 
       assertThat(closed).isEqualTo(1);
       assertThat(already).isEqualTo(THREADS - 1);
-      assertThat(accountRepository.findByMerchantId(merchantId).orElseThrow().getBalance())
+      assertThat(accountRepository.findByUserId(OWNER_ID).orElseThrow().getBalance())
           .isEqualTo(30_000);
       assertThat(merchantRepository.findStatusById(merchantId)).contains(MerchantStatus.CLOSED);
     } finally {
       executor.shutdownNow();
       jdbcTemplate.update(
-          "delete from merchant_wallet_transaction where wallet_id in "
-              + "(select id from merchant_wallet where merchant_id = ?)",
-          merchantId);
-      jdbcTemplate.update("delete from merchant_wallet where merchant_id = ?", merchantId);
-      jdbcTemplate.update("delete from merchant_account where merchant_id = ?", merchantId);
+          "delete from account_transaction where account_id in "
+              + "(select id from account where user_id = ?)",
+          OWNER_ID);
+      jdbcTemplate.update("delete from account where user_id = ?", OWNER_ID);
       jdbcTemplate.update("delete from merchant_closure_deduction where merchant_id = ?", merchantId);
       jdbcTemplate.update("delete from monthly_settlement where merchant_id = ?", merchantId);
       jdbcTemplate.update("delete from daily_settlement where merchant_id = ?", merchantId);

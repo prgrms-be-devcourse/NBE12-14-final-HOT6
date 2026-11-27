@@ -13,8 +13,8 @@ import com.back.nbe1214finalhot6.domain.settlement.entity.DailySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.repository.DailySettlementRepository;
 import com.back.nbe1214finalhot6.domain.settlement.repository.MonthlySettlementRepository;
 import com.back.nbe1214finalhot6.domain.settlement.service.MonthlySettlementService;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
-import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Account;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import com.back.nbe1214finalhot6.support.MutableClock;
 import java.time.LocalDate;
@@ -36,8 +36,7 @@ class MerchantClosureSettlementServiceTest {
   @Autowired private MonthlySettlementService monthlySettlementService;
   @Autowired private MerchantRepository merchantRepository;
   @Autowired private MerchantClosureRepository closureRepository;
-  @Autowired private MerchantWalletService merchantWalletService;
-  @Autowired private MerchantAccountRepository accountRepository;
+  @Autowired private AccountRepository accountRepository;
   @Autowired private DailySettlementRepository dailySettlementRepository;
   @Autowired private MonthlySettlementRepository monthlySettlementRepository;
   @Autowired private MutableClock clock;
@@ -83,7 +82,7 @@ class MerchantClosureSettlementServiceTest {
     assertThat(result.closed()).isEqualTo(1);
     assertThat(result.held()).isZero();
     assertThat(statusOf(merchantId)).isEqualTo(MerchantStatus.CLOSED);
-    assertThat(accountRepository.findByMerchantId(merchantId).orElseThrow().getBalance())
+    assertThat(accountBalance(merchantId))
         .isEqualTo(40_000);
   }
 
@@ -98,7 +97,7 @@ class MerchantClosureSettlementServiceTest {
     ClosureSettlementRunResult second = settlementService.run();
 
     assertThat(second.closed()).isZero();
-    assertThat(accountRepository.findByMerchantId(merchantId).orElseThrow().getBalance())
+    assertThat(accountBalance(merchantId))
         .isEqualTo(10_000);
   }
 
@@ -133,11 +132,12 @@ class MerchantClosureSettlementServiceTest {
   }
 
   private Long saveClosingMerchant(LocalDateTime requestedAt) {
+    Long ownerId = nextOwnerId++;
     Long merchantId =
         merchantRepository
-            .save(Merchant.create(nextOwnerId++, "해지 정산 서비스 가맹점", "인천광역시 남동구 1", true))
+            .save(Merchant.create(ownerId, "해지 정산 서비스 가맹점", "인천광역시 남동구 1", true))
             .getId();
-    merchantWalletService.createFor(merchantId);
+    accountRepository.save(Account.createEmpty(ownerId, LocalDateTime.now(clock)));
     merchantRepository.updateStatusIfCurrent(
         merchantId, MerchantStatus.ACTIVE, MerchantStatus.CLOSING);
     closureRepository.save(MerchantClosure.create(merchantId, requestedAt));
@@ -147,6 +147,11 @@ class MerchantClosureSettlementServiceTest {
   private void saveDaily(Long merchantId, LocalDate date, long paymentTotal) {
     dailySettlementRepository.save(
         DailySettlement.create(merchantId, date, paymentTotal, 0, 0, LocalDateTime.now(clock)));
+  }
+
+  private long accountBalance(Long merchantId) {
+    Long ownerId = merchantRepository.findById(merchantId).orElseThrow().getOwnerId();
+    return accountRepository.findByUserId(ownerId).orElseThrow().getBalance();
   }
 
   private MerchantStatus statusOf(Long merchantId) {
