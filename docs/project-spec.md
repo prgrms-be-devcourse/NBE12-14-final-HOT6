@@ -90,7 +90,7 @@
 | SET-02 | 원장 대사 | 운영자 | 11종 대사(7절), 매일 00:50 자동 실행과 수동 실행, 불일치 건수와 대상 ID 표시 | GET /api/admin/settlements/reconciliation, POST /api/admin/settlements/reconciliation/run | P2 |
 | SET-03 | 월 정산·지급 | 시스템·사장님 | 매일 00:30(전월 대상, 대기 건 재시도). 전월 일 정산 확정액의 합을 가맹점 전용 지갑에 입금하고 지급 직후 가맹점 모의계좌로 출금한다. 가맹점·정산월별 중복 생성과 중복 입금 방지. 사장님은 월 정산 내역과 정산 계좌 잔액을 조회한다 | GET /api/merchants/me/settlements/monthly, GET /api/merchants/me/account | P1 |
 | SET-04 | 정산 수동 실행 | 운영자 | 날짜·월을 지정해 일·월 정산을 다시 실행한다. 재실행해도 정산과 지급이 중복되지 않는다 | POST /api/admin/settlements/daily/run, POST /api/admin/settlements/monthly/run | P2 |
-| SET-05 | 해지 정산 | 시스템·운영자 | (구현 예정) 신청 다음 날 이후, 매일 00:40과 운영자 수동 실행(서버가 밤에 꺼져 있어 낮에 운영자 화면에서 실행). 일 정산을 채우고 미지급 확정액을 지급한 뒤, 마이너스 이월을 정산 계좌에서 차감하고 남은 돈을 점주 개인 모의계좌로 이체하며 해지 완료로 바꾼다. 재실행해도 한 번만 처리한다 | POST /api/admin/settlements/closure/run | P2 |
+| SET-05 | 해지 정산 | 시스템·운영자 | 신청 다음 날 이후, 매일 00:40과 운영자 수동 실행(서버가 밤에 꺼져 있어 낮에 운영자 화면에서 실행). 일 정산을 채우고 미지급 확정액에서 마이너스 이월을 차감한 뒤, 남은 금액을 점주 계좌로 바로 지급하고 해지 완료로 바꾼다. 점주 계좌에 이미 있는 돈은 건드리지 않는다. 차감하지 못하면 보류하고, 재실행해도 한 번만 처리한다 | POST /api/admin/settlements/closure/run | P2 |
 
 ## 3. 이번에 추가·변경한 기능
 
@@ -172,7 +172,7 @@
 | 신규 | `cashback_earning` | 결제 1건 = 적립 1건. 상태 PENDING / PAID / CANCELED / RECLAIMED |
 | 신규 | `reconciliation_result` | 대사 결과 (11종) |
 | 신규 | `merchant` | 가맹점(이름, 주소, 소유자 ID, 적립 대상 여부, 위경도와 해지용 상태는 추가 예정) |
-| 신규 | `merchant_closure` | 가맹점 해지(신청·완료 시각, 지급·차감·이체액, 구현 예정) |
+| 신규 | `merchant_closure` | 가맹점 해지(신청 시각, 달별 차감액은 `merchant_closure_deduction`) |
 | 신규 | `qr_code` | 동적 QR(토큰, 가맹점, 금액, 상태, 만료 시각) |
 | 신규 | `daily_settlement` | 일 정산(순매출, 전일 이월, 정산 확정액, 다음 날 이월). `(가맹점, 날짜)` 유니크 |
 | 신규 | `monthly_settlement` | 월 정산·지급(지급액, 대기·지급 완료). `(가맹점, 정산월)` 유니크 |
