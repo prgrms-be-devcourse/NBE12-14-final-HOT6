@@ -6,12 +6,27 @@ import com.back.nbe1214finalhot6.domain.auth.entity.UserStatus;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface UserRepository extends JpaRepository<User, Long> {
+
+  /** 잠근 회원 행에서 읽은 상태와 역할. */
+  interface LockedUser {
+    String getStatus();
+
+    String getRole();
+  }
+
+  /**
+   * 회원 행을 잠그고(FOR UPDATE) 상태와 역할을 읽는다. 점주 탈퇴와 가맹점 등록이 같은 행을 잠가 차례로 처리된다. 회원
+   * 객체가 아니라 값을 읽어서, 같은 트랜잭션에서 먼저 읽어 둔 낡은 객체를 보지 않는다.
+   */
+  @Query(value = "select status, role from users where id = :id for update", nativeQuery = true)
+  Optional<LockedUser> lockById(@Param("id") Long id);
 
   boolean existsByEmail(String email);
 
