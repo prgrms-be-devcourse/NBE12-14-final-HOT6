@@ -79,6 +79,17 @@ public class MerchantService {
   }
 
   /**
+   * 지갑 주인(이용자)이 이 가맹점의 점주 본인인지 확인한다. 이용자·점주 계정은 따로지만 같은 사람은 같은 전화번호를 쓴다고 보고 전화번호로
+   * 비교한다(#301). 본인 가맹점 결제는 캐시백을 적립하지 않으려고 결제와 적립 미리보기가 부른다. 둘 다 지갑 번호를 갖고 있어 지갑으로 받는다.
+   *
+   * <p>다른 전화번호로 만든 계정은 구분하지 못한다(본인인증 값이 없음).
+   */
+  @Transactional(readOnly = true)
+  public boolean isOwnedBySamePerson(Long merchantId, Long walletId) {
+    return merchantRepository.isOwnedBySamePerson(merchantId, walletId);
+  }
+
+  /**
    * 영업 중인 가맹점인지 확인한다. 해지 신청 뒤(CLOSING)와 해지 뒤(CLOSED)에는 결제와 QR 을 막으려고 다른 도메인이 부른다.
    *
    * @throws BusinessException 없으면 MER-001, 해지 진행 중이면 MER-003, 해지됐으면 MER-004

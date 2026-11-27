@@ -50,13 +50,16 @@ public class PaymentTxService {
                                payment.getCashbackUsedAmount(), paymentId);
 
     boolean cashbackEligible = merchantService.isCashbackEligible(payment.getMerchantId());
+    boolean selfPayment = merchantService.isOwnedBySamePerson(payment.getMerchantId(), payment.getWalletId());
+
     CashbackReserveResponse reserve = cashbackService.reserve(
       new CashbackReserveRequest(
               paymentId,
               payment.getWalletId(),
               cashbackEligible,
               payment.getWalletUsedAmount(),
-              payment.getRequestedAt()
+              payment.getRequestedAt(),
+              selfPayment
       )
     );
     payment.complete(

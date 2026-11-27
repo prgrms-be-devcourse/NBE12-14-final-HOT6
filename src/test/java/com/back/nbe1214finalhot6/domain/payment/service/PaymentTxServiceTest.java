@@ -7,7 +7,13 @@ import static org.mockito.Mockito.doThrow;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
+import com.back.nbe1214finalhot6.domain.auth.entity.User;
+import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
+import com.back.nbe1214finalhot6.domain.auth.repository.UserRepository;
+import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackExclusionReason;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackService;
+import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
+import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.payment.PaymentTestFixture;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
@@ -15,9 +21,13 @@ import com.back.nbe1214finalhot6.domain.payment.entity.Payment;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.repository.PaymentRepository;
 import com.back.nbe1214finalhot6.domain.qr.service.QrService;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Wallet;
+import com.back.nbe1214finalhot6.domain.wallet.entity.WalletTransactionType;
 import com.back.nbe1214finalhot6.domain.wallet.repository.WalletRepository;
 import com.back.nbe1214finalhot6.domain.wallet.repository.WalletTransactionRepository;
+import com.back.nbe1214finalhot6.domain.wallet.service.WalletService;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
+import java.time.LocalDateTime;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -41,6 +51,9 @@ class PaymentTxServiceTest {
   @Autowired WalletRepository walletRepository;
   @Autowired WalletTransactionRepository walletTransactionRepository;
   @Autowired PaymentTestFixture fixture;
+  @Autowired UserRepository userRepository;
+  @Autowired MerchantRepository merchantRepository;
+  @Autowired WalletService walletService;
 
   // QR 은 Mock: 대상 조회만 stub 하고, 사용 처리는 아무것도 안 하거나 예외를 던지게 한다
   @MockitoBean QrService qrService;
@@ -127,4 +140,29 @@ class PaymentTxServiceTest {
             .count();
     assertThat(debitRows).isZero();
   }
+
+  @Test
+  @DisplayName("본인 가맹점 결제 => 결제는 COMPLETED, 지갑은 차감되고 적립만 0원·SELF_PAYMENT (#301)")
+  void 본인가맹점_결제는_완료되고_적립만_제외() {
+    // given : 같은 사람이 같은 전화번호로 점주 계정과 이용자 계정을 따로 가진다
+    String phone = String.format("010%08d", Math.floorMod(System.nanoTime(), 100_000_000L)); // 테스트마다 다른 번호
+    String tag = UUID.randomUUID().toString().substring(0, 8);
+    Long ownerId =
+        userRepository.save(User.create("점주", "owner-" + tag + "@devpay.test", phone, "pw", "pin", UserRole.OWNER)).getId();
+    Long userId =
+        userRepository.save(User.create("이용자", "user-" + tag + "@devpay.test", phone, "pw", "pin", UserRole.USER)).getId();
+    Long merchantId = merchantRepository.save(Merchant.create(ownerId, "본인가맹점", "인천", true)).getId();
+    Long walletId = walletRepository.save(Wallet.create(userId, LocalDateTime.now())).getId();
+    walletService.credit(walletId, 10_000L, WalletTransactionType.CHARGE, null);
+    PaymentRequest request = new PaymentRequest(walletId, fixture.stubQr(qrService, merchantId, 10_000L), 0L);
+    Long paymentId = claimPayment(request);
+    // when
+    PaymentResponse response = paymentTxService.tx(paymentId);
+    // then : 결제는 정상 완료, 돈은 빠지고 적립만 제외된다
+    assertThat(response.status()).isEqualTo(PaymentStatus.COMPLETED);
+    assertThat(response.cashbackExclusionReason()).isEqualTo(CashbackExclusionReason.SELF_PAYMENT.name());
+    assertThat(response.cashbackEarnedAmount()).isZero();
+    assertThat(walletRepository.findById(walletId).orElseThrow().getBalance()).isZero();
+  }
+
 }
