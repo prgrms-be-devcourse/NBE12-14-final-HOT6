@@ -2,6 +2,7 @@ package com.back.nbe1214finalhot6.domain.payment.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackService;
+import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
 import com.back.nbe1214finalhot6.domain.payment.entity.Payment;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
@@ -27,6 +28,7 @@ public class PaymentCancelService {
   private final PaymentRepository paymentRepository;
   private final WalletService walletService;
   private final CashbackService cashbackService;
+  private final MerchantService merchantService;
   private final Clock clock;
 
   // 결제 취소 (단일 트랜잭션). 락 순서: 결제 → 지갑 → 예산
@@ -49,12 +51,15 @@ public class PaymentCancelService {
       throw new BusinessException(PAYMENT_NOT_CANCELABLE);
     }
 
+    // 해지 신청 중(CLOSING)과 해지 뒤(CLOSED)에는 취소하지 않는다.
+    // 없으면 MER-001, 해지 진행 중이면 MER-003, 해지됐으면 MER-004. 
+    merchantService.assertActive(merchantId);
+
     walletService.creditPaymentCancel(
         payment.getWalletId(),
         payment.getWalletUsedAmount(),
         payment.getCashbackUsedAmount(),
         paymentId);
-
 
     cashbackService.cancel(paymentId);
 

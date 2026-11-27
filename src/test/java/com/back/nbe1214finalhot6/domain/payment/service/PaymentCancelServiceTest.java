@@ -17,6 +17,8 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.AnnualBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackBudgetService;
 import com.back.nbe1214finalhot6.domain.cashback.service.CashbackService;
+import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
+import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.payment.PaymentTestFixture;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentRequest;
 import com.back.nbe1214finalhot6.domain.payment.dto.PaymentResponse;
@@ -258,6 +260,72 @@ class PaymentCancelServiceTest {
         .isInstanceOf(BusinessException.class);
     // then
     verify(cashbackService, never()).cancel(any());
+  }
+
+  // ---- 해지 진행·완료 가맹점의 취소 거절 (#289) ----
+
+  private void changeMerchantStatus(MerchantStatus status) {
+    jdbc.update("update merchant set status = ? where id = ?", status.name(), merchantId);
+  }
+
+  // 거절된 취소는 결제·지갑·원장·적립 어느 것도 바꾸지 않는다
+  private void assertNothingMoved(Long paymentId) {
+    assertThat(payment(paymentId).getStatus()).isEqualTo(PaymentStatus.COMPLETED);
+    assertThat(payment(paymentId).getCanceledAt()).isNull();
+    assertThat(wallet().getBalance()).isEqualTo(0L); // 결제 뒤 잔액 그대로 (7,000 - 7,000)
+    assertThat(wallet().getCashbackBalance()).isEqualTo(0L); // (3,000 - 3,000)
+    assertThat(walletTransactionRepository.findByTypeAndRefKey(
+            WalletTransactionType.PAYMENT_CANCEL_DEVMONEY, paymentId)).isEmpty();
+    assertThat(walletTransactionRepository.findByTypeAndRefKey(
+            WalletTransactionType.PAYMENT_CANCEL_CASHBACK, paymentId)).isEmpty();
+    verify(cashbackService, never()).cancel(any());
+  }
+
+  @Test
+  @DisplayName("해지 진행 중(CLOSING) 가맹점의 취소 => MER-003, 돈이 움직이지 않는다")
+  void 해지진행중_취소거절() {
+    // given : 결제 완료 뒤 점주가 해지를 신청함
+    Long paymentId = completedPayment();
+    changeMerchantStatus(MerchantStatus.CLOSING);
+    clearInvocations(cashbackService);
+    // when & then
+    assertThatThrownBy(() -> paymentCancelService.cancel(merchantId, paymentId))
+        .isInstanceOf(BusinessException.class)
+        .extracting(PaymentCancelServiceTest::errorCodeOf)
+        .isEqualTo(MerchantErrorCode.MERCHANT_CLOSING);
+    assertNothingMoved(paymentId);
+  }
+
+  @Test
+  @DisplayName("해지 완료(CLOSED) 가맹점의 취소 => MER-004, 돈이 움직이지 않는다")
+  void 해지완료_취소거절() {
+    // given
+    Long paymentId = completedPayment();
+    changeMerchantStatus(MerchantStatus.CLOSED);
+    clearInvocations(cashbackService);
+    // when & then
+    assertThatThrownBy(() -> paymentCancelService.cancel(merchantId, paymentId))
+        .isInstanceOf(BusinessException.class)
+        .extracting(PaymentCancelServiceTest::errorCodeOf)
+        .isEqualTo(MerchantErrorCode.MERCHANT_CLOSED);
+    assertNothingMoved(paymentId);
+  }
+
+  @Test
+  @DisplayName("해지 전에 취소한 결제를 해지 뒤 다시 취소 => 에러 없이 기존 취소 결과 반환")
+  void 해지전_취소건_재요청() {
+    // given : 영업 중에 취소한 뒤 해지 완료
+    Long paymentId = completedPayment();
+    paymentCancelService.cancel(merchantId, paymentId);
+    LocalDateTime canceledAt = payment(paymentId).getCanceledAt(); // DB 에 저장된 값
+    changeMerchantStatus(MerchantStatus.CLOSED);
+    // when
+    PaymentResponse again = paymentCancelService.cancel(merchantId, paymentId);
+    // then : 같은 결과, 환급은 한 번뿐 (결제 전 잔액으로 복구된 그대로)
+    assertThat(again.status()).isEqualTo(PaymentStatus.CANCELED);
+    assertThat(again.canceledAt()).isEqualTo(canceledAt);
+    assertThat(wallet().getBalance()).isEqualTo(7_000L);
+    assertThat(wallet().getCashbackBalance()).isEqualTo(3_000L);
   }
 
   @Test
