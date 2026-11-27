@@ -15,6 +15,7 @@ import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyHistoryRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyRepository;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -46,6 +47,7 @@ public class CashbackPolicyService {
   private final CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   private final CashbackNoticeService noticeService;
   private final CashbackPolicyBasisCollector basisCollector;
+  private final EntityManager entityManager;
   private final CashbackProperties properties;
   private final Clock clock;
 
@@ -75,6 +77,8 @@ public class CashbackPolicyService {
     }
 
     YearMonth month = YearMonth.from(effectiveAt);
+    // 구간을 바꾸기 전의 상황을 근거로 남긴다. 예산 행을 잠그기 전에 읽는다
+    PolicyBasis basis = basisCollector.collect();
     CashbackMonthlyBudget budget =
         monthlyBudgetRepository
             .findWithLockByBudgetYearAndBudgetMonth(month.getYear(), month.getMonthValue())
@@ -82,6 +86,8 @@ public class CashbackPolicyService {
                 () ->
                     new BusinessException(
                         CashbackErrorCode.BUDGET_NOT_FOUND, "적용 시각이 속한 달의 월 예산이 없습니다"));
+    // 근거를 모으며 먼저 읽은 객체가 남아 있을 수 있어, 잠근 뒤의 값으로 다시 읽는다
+    entityManager.refresh(budget);
 
     LocalDateTime monthStart = month.atDay(1).atStartOfDay();
     LocalDateTime nextMonthStart = month.plusMonths(1).atDay(1).atStartOfDay();
@@ -105,9 +111,6 @@ public class CashbackPolicyService {
           "새 요율은 현재 요율(" + currentRate.toPlainString() + ")보다 낮아야 합니다");
     }
 
-    // 구간을 바꾸기 전의 상황을 근거로 남긴다
-    PolicyBasis basis = basisCollector.collect(currentRate);
-
     CashbackPolicy before = null;
     if (covering != null) {
       before = covering.snapshot();
@@ -124,7 +127,8 @@ public class CashbackPolicyService {
       historyRepository.save(CashbackPolicyHistory.updated(before, covering, operatorId, now));
     }
     historyRepository.save(
-        CashbackPolicyHistory.reduced(successor, operatorId, now, request.reason(), basis));
+        CashbackPolicyHistory.reduced(
+            successor, operatorId, now, request.reason(), basis.withPreviousRate(currentRate)));
     // 이용자에게 보이는 정책 변경 예고. 같은 트랜잭션이라 인하가 롤백되면 공지도 롤백된다
     noticeService.registerPolicyChange(successor, request.notice(), now);
     return PolicyResponse.from(successor);
@@ -146,11 +150,13 @@ public class CashbackPolicyService {
             .findStartsAt(policyId)
             .orElseThrow(() -> new BusinessException(CashbackErrorCode.POLICY_NOT_FOUND));
     YearMonth month = YearMonth.from(oldStart);
+    PolicyBasis basis = basisCollector.collect();
     // 인하와 같은 행을 잠가 같은 달의 인하·수정을 하나씩 처리한다
     CashbackMonthlyBudget budget =
         monthlyBudgetRepository
             .findWithLockByBudgetYearAndBudgetMonth(month.getYear(), month.getMonthValue())
             .orElseThrow(() -> new BusinessException(CashbackErrorCode.BUDGET_NOT_FOUND));
+    entityManager.refresh(budget);
     CashbackPolicy target = pending(policyId, now);
 
     LocalDateTime newStart = request.effectiveAt();
@@ -188,7 +194,6 @@ public class CashbackPolicyService {
           CashbackErrorCode.INVALID_POLICY, "새 요율은 다음에 예약한 요율보다 높아야 합니다");
     }
 
-    PolicyBasis basis = basisCollector.collect(previousRate);
     if (preceding != null && !newStart.equals(preceding.getEndsAt())) {
       CashbackPolicy before = preceding.snapshot();
       preceding.moveEnd(newStart);
@@ -197,7 +202,13 @@ public class CashbackPolicyService {
     CashbackPolicy before = target.snapshot();
     target.reschedule(request.rate(), newStart);
     historyRepository.save(
-        CashbackPolicyHistory.revised(before, target, operatorId, now, request.reason(), basis));
+        CashbackPolicyHistory.revised(
+            before,
+            target,
+            operatorId,
+            now,
+            request.reason(),
+            basis.withPreviousRate(previousRate)));
     noticeService.revisePolicyChange(target, request.notice(), now);
     return PolicyResponse.from(target);
   }

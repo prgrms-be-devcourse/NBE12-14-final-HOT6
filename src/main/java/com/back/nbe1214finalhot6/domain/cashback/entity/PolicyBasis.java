@@ -35,4 +35,23 @@ public record PolicyBasis(
     return new PolicyBasis(
         previousRate, null, null, null, null, null, null, null, null, null, null, null, null, null);
   }
+
+  /** 직전 요율을 채운 근거. 예산과 예측은 요율을 정하기 전에 모은다. */
+  public PolicyBasis withPreviousRate(BigDecimal rate) {
+    return new PolicyBasis(
+        rate,
+        year,
+        month,
+        allocatedAmount,
+        paidAmount,
+        reservedAmount,
+        remainingAmount,
+        contingencyAmount,
+        dailyDemand,
+        fastExhaustionDate,
+        midExhaustionDate,
+        slowExhaustionDate,
+        noticeLineDate,
+        modelVersion);
+  }
 }
