@@ -93,7 +93,7 @@ class UserQueryServiceTest {
   }
 
   // 목적: 역할은 토큰이 아니라 DB 의 현재 값이고, 토큰의 역할과 다르면 needsRelogin 이 true 인지 확인한다.
-  // 역할이 바뀐 뒤(가맹점 등록으로 승격 등)에 바로 반영돼야 하고, 토큰이 새 역할을 가지면 다시 false 가 돼야 한다.
+  // 역할이 바뀐 뒤(DB 에서 역할을 바꾼 경우 등)에 바로 반영돼야 하고, 토큰이 새 역할을 가지면 다시 false 가 돼야 한다.
   @Test
   @DisplayName("역할은 DB 의 현재 값이고, 토큰의 역할과 다르면 재로그인이 필요하다")
   void currentRoleFromDb() {

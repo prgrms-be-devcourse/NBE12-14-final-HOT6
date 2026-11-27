@@ -33,21 +33,14 @@ export default function MyPage() {
           <Link href="/my/profile" className="btn btn-outline btn-sm !w-auto">내정보 수정</Link>
         </section>
         {me.data?.needsRelogin && (
-          <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-            {me.data.role === "OWNER" ? (
-              <>점주 계정으로 바뀌었어요. <LogoutLink href="/merchant/login" className="font-bold underline underline-offset-2">가맹점주 로그인</LogoutLink>에서 다시 로그인해 주세요.</>
-            ) : (
-              "회원 정보가 바뀌었어요. 로그아웃 후 다시 로그인하면 적용돼요."
-            )}
-          </p>
+          <p role="status" className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">회원 정보가 바뀌었어요. 로그아웃 후 다시 로그인하면 적용돼요.</p>
         )}
         <section className="grid grid-cols-2 gap-2">
           <div className="card-gray !p-3"><div className="note">지갑 잔액</div><div className="mt-0.5 font-bold text-slate-900">{wallet.data ? won(wallet.data.devMoney) : "…"}</div></div>
           <div className="card-gray !p-3"><div className="note">이번 달 캐시백</div><div className="mt-0.5 font-bold text-emerald-600">{summary.data ? won(summary.data.earnedAmount) : "…"}</div></div>
         </section>
         <ul className="card !p-0">
-          {/* 점주가 되기 전(USER)인 회원에게만 가맹점 등록 입구를 보여 준다 */}
-          {(me.data?.role === "USER" ? [...MENUS, { href: "/merchant/register", label: "가맹점 등록하기" }] : MENUS).map((m, i) => (
+          {MENUS.map((m, i) => (
             <li key={m.label} className={i ? "border-t border-zinc-200" : ""}>
               <Link href={m.href} className="flex items-center justify-between px-4 py-3.5 text-[15px]">
                 {m.label}<span aria-hidden className="text-zinc-400">›</span>

@@ -34,7 +34,6 @@ class AccountRoleUniquenessTest {
   private static final String OWNER_PASSWORD = "Owner123!";
 
   @Autowired AuthService authService;
-  @Autowired UserRoleService userRoleService;
   @Autowired JwtProvider jwtProvider;
   @Autowired PasswordEncoder passwordEncoder;
   @Autowired UserRepository userRepository;
@@ -162,26 +161,6 @@ class AccountRoleUniquenessTest {
         () -> authService.login(new LoginRequest(EMAIL, USER_PASSWORD)),
         AuthErrorCode.WITHDRAWN_USER);
     assertThat(ownerLoginId(USER_PASSWORD)).isEqualTo(owner.getId());
-  }
-
-  @Test
-  @DisplayName("같은 이메일의 점주 계정이 있으면 이용자를 점주로 올리지 않고 AUTH-001 로 거절한다")
-  void promotionBlockedByEmail() {
-    save(EMAIL, "01011112222", UserRole.OWNER, OWNER_PASSWORD);
-    Long userId = authService.signup(request(EMAIL, PHONE)).id();
-
-    assertError(() -> userRoleService.promoteToOwner(userId), AuthErrorCode.DUPLICATE_EMAIL);
-
-    assertThat(userRepository.findById(userId).orElseThrow().getRole()).isEqualTo(UserRole.USER);
-  }
-
-  @Test
-  @DisplayName("같은 전화번호의 점주 계정이 있으면 승격을 AUTH-002 로 거절한다")
-  void promotionBlockedByPhone() {
-    save("owner@devpay.com", PHONE, UserRole.OWNER, OWNER_PASSWORD);
-    Long userId = authService.signup(request(EMAIL, PHONE)).id();
-
-    assertError(() -> userRoleService.promoteToOwner(userId), AuthErrorCode.DUPLICATE_PHONE);
   }
 
   private SignupRequest request(String email, String phone) {

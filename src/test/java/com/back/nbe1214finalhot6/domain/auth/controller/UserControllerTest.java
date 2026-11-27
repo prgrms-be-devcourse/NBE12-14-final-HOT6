@@ -72,10 +72,10 @@ class UserControllerTest {
     verify(userQueryService, never()).getMyInfo(eq(999L), any());
   }
 
-  // 목적: 점주가 된 직후(토큰은 USER, DB는 OWNER)에는 needsRelogin 이 true 로 내려가고, PIN 잠금도 그대로 내려가는지 확인한다.
+  // 목적: DB 의 역할이 바뀐 직후(토큰은 USER, DB는 OWNER)에는 needsRelogin 이 true 로 내려가고, PIN 잠금도 그대로 내려가는지 확인한다.
   @Test
   @DisplayName("토큰은 USER 인데 DB 역할이 OWNER 이면 needsRelogin 이 true 이다")
-  void 승격직후() throws Exception {
+  void 역할변경직후() throws Exception {
     given(userQueryService.getMyInfo(5L, UserRole.USER))
         .willReturn(new MyInfoResponse("김점주", "owner@devpay.com", UserRole.OWNER, true, true));
 

@@ -63,37 +63,29 @@ class MyInfoFlowTest {
         .andExpect(jsonPath("$.data.pinFailCount").doesNotExist());
   }
 
-  // 목적: 가맹점을 등록해 점주가 된 직후, 옛 토큰으로 /me 를 부르면 DB 의 현재 역할(OWNER)과 needsRelogin=true 를 주고,
-  // 다시 로그인해 새 토큰을 받으면 needsRelogin=false 가 되는지 확인한다.
+  // 목적: 토큰을 받은 뒤 DB 의 역할이 바뀌면 /me 가 현재 역할과 needsRelogin=true 를 주고,
+  // 그 역할의 로그인으로 새 토큰을 받으면 needsRelogin=false 가 되는지 확인한다.
   @Test
-  @DisplayName("가맹점 등록 직후 옛 토큰으로는 needsRelogin 이 true, 다시 로그인하면 false 이다")
-  void needsReloginAfterPromotion() throws Exception {
+  @DisplayName("DB 의 역할이 토큰과 다르면 needsRelogin 이 true, 다시 로그인하면 false 이다")
+  void needsReloginAfterRoleChange() throws Exception {
     String oldToken = signupAndLogin("me2@devpay.com", "01066660002");
-    assertThat(jwtProvider.parse(oldToken).role()).isEqualTo(UserRole.USER);
+    long userId = jwtProvider.parse(oldToken).userId();
+    jdbcTemplate.update("update users set role = 'OWNER' where id = ?", userId);
+    // 이 테스트는 전체가 한 트랜잭션이라, SQL 로 바꾼 값을 DB 에서 다시 읽도록 비운다
+    entityManager.flush();
+    entityManager.clear();
 
-    mockMvc
-        .perform(
-            post("/api/merchants")
-                .header("Authorization", "Bearer " + oldToken)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\": \"내정보 가맹점\", \"address\": \"인천광역시 남동구 1\"}"))
-        .andExpect(status().isCreated());
-
-    // 토큰은 그대로(옛 역할 USER)인데, /me 는 DB 의 현재 역할과 재로그인 필요 여부를 알려 준다
-    assertThat(jwtProvider.parse(oldToken).role()).isEqualTo(UserRole.USER);
     mockMvc
         .perform(get("/api/users/me").header("Authorization", "Bearer " + oldToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.role").value("OWNER"))
         .andExpect(jsonPath("$.data.needsRelogin").value(true));
 
-    // 다시 로그인해 새 토큰(OWNER)을 받으면 재로그인은 필요 없다
     String newToken = login("/api/auth/owner/login", "me2@devpay.com");
     assertThat(jwtProvider.parse(newToken).role()).isEqualTo(UserRole.OWNER);
     mockMvc
         .perform(get("/api/users/me").header("Authorization", "Bearer " + newToken))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.role").value("OWNER"))
         .andExpect(jsonPath("$.data.needsRelogin").value(false));
   }
 
