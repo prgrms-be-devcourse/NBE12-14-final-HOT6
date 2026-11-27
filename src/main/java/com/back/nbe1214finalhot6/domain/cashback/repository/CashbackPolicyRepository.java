@@ -4,11 +4,16 @@ import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface CashbackPolicyRepository extends JpaRepository<CashbackPolicy, Long> {
+
+  /** 구간의 시작 시각만 읽는다. 월 예산 행을 잠그기 전에 어느 달인지 알아야 하고, 엔티티는 잠근 뒤에 읽는다. */
+  @Query("select p.startsAt from CashbackPolicy p where p.id = :id")
+  Optional<LocalDateTime> findStartsAt(@Param("id") Long id);
 
   /** 무기한(종료 시각 없음)을 비교할 때 쓰는 먼 미래 시각. PostgreSQL 이 null 파라미터의 타입을 추론하지 못해서 null 대신 쓴다. */
   LocalDateTime FAR_FUTURE = LocalDateTime.of(9999, 12, 31, 0, 0);

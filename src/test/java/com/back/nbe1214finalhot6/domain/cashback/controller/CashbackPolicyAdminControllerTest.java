@@ -8,6 +8,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -18,6 +19,7 @@ import com.back.nbe1214finalhot6.domain.auth.entity.UserRole;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.domain.auth.security.AuthUser;
 import com.back.nbe1214finalhot6.domain.cashback.entity.PolicyBasis;
+import com.back.nbe1214finalhot6.domain.cashback.dto.RateReservationResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyHistoryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.PolicyHistoryAction;
@@ -59,7 +61,8 @@ class CashbackPolicyAdminControllerTest {
 
   private static final String BODY =
       """
-      {"rate": 0.03, "effectiveAt": "2026-11-20T00:00:00", "reason": "수요 급증"}
+      {"rate": 0.03, "effectiveAt": "2026-11-20T00:00:00", "reason": "수요 급증",
+       "notice": {"title": "적립률이 바뀌어요", "content": "본문", "showOnHome": true, "homeUntil": "2026-11-30"}}
       """;
 
   // 목적: 인하 요청이 201 과 공통 응답 형식으로 내려가고 만들어진 구간이 담기는지 확인한다.
@@ -128,13 +131,55 @@ class CashbackPolicyAdminControllerTest {
             List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
   }
 
+  // 목적: 공지가 없거나 제목이 비면 400 인지 확인한다.
+  @Test
+  @DisplayName("공지가 없으면 400")
+  void reduce_withoutNotice() throws Exception {
+    for (String notice : new String[] {"", ", \"notice\": {\"title\": \"\", \"content\": \"본문\"}"}) {
+      mockMvc
+          .perform(
+              post("/api/admin/cashback/policies/reductions")
+                  .with(operator())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(
+                      "{\"rate\": 0.03, \"effectiveAt\": \"2026-11-20T00:00:00\", \"reason\": \"사유\"" + notice + "}"))
+          .andExpect(status().isBadRequest());
+    }
+    verifyNoInteractions(policyService);
+  }
+
+  // 목적: 예약 수정이 운영자를 넘겨 200 을 반환하고, 조회는 지금 값을 담는지 확인한다.
+  @Test
+  @DisplayName("예약한 인하를 조회하고 수정한다")
+  void reservation_getAndRevise() throws Exception {
+    given(policyService.getReservation(1L))
+        .willReturn(
+            new RateReservationResponse(
+                1L, new BigDecimal("0.03"), LocalDateTime.of(2026, 11, 20, 0, 0), "사유", null));
+    given(policyService.reviseReduction(eq(1L), any(), eq(99L))).willReturn(sample());
+
+    mockMvc
+        .perform(get("/api/admin/cashback/policies/1/reduction"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.reason").value("사유"));
+    mockMvc
+        .perform(
+            put("/api/admin/cashback/policies/1/reduction")
+                .with(operator())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(BODY))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.policyId").value(1));
+  }
+
   // 목적: 서비스가 던지는 도메인 예외가 각각 올바른 상태 코드와 에러 코드로 변환되는지 확인한다.
   @ParameterizedTest
   @CsvSource({
     "INVALID_POLICY, 400, CSH-003",
     "BUDGET_NOT_FOUND, 404, CSH-004",
     "POLICY_PERIOD_OVERLAP, 409, CSH-002",
-    "RATE_REDUCTION_LIMIT_EXCEEDED, 409, CSH-009"
+    "RATE_REDUCTION_LIMIT_EXCEEDED, 409, CSH-009",
+    "POLICY_ALREADY_APPLIED, 409, CSH-017"
   })
   @DisplayName("인하 실패는 에러 코드에 맞는 상태로 변환된다")
   void reduce_errors(CashbackErrorCode errorCode, int httpStatus, String code) throws Exception {

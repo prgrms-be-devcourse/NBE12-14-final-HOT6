@@ -39,7 +39,10 @@ public enum CashbackErrorCode implements ErrorCode {
 
   // 공지
   INVALID_NOTICE("CSH-014", HttpStatus.BAD_REQUEST, "공지 내용이 올바르지 않습니다"),
-  NOTICE_NOT_FOUND("CSH-015", HttpStatus.NOT_FOUND, "공지를 찾을 수 없습니다");
+  NOTICE_NOT_FOUND("CSH-015", HttpStatus.NOT_FOUND, "공지를 찾을 수 없습니다"),
+
+  // 예약 인하 수정 (CSH-016 은 적립 내역 조회가 쓴다)
+  POLICY_ALREADY_APPLIED("CSH-017", HttpStatus.CONFLICT, "이미 적용이 시작된 요율은 수정할 수 없습니다");
 
   private final String code;
   private final HttpStatus status;

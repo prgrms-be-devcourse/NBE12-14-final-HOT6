@@ -232,6 +232,20 @@ public class CashbackNotice {
     this.homeUntil = showOnHome ? homeUntil : null;
   }
 
+  /** 등록하면서 운영자가 쓴 문구와 홈 노출로 바꾼다. 수정 시각은 남기지 않는다. */
+  public void compose(String title, String content, boolean showOnHome, LocalDate homeUntil) {
+    this.title = title;
+    this.content = content;
+    this.showOnHome = showOnHome;
+    this.homeUntil = showOnHome ? homeUntil : null;
+  }
+
+  /** 알리던 인하 예약이 바뀌어 적용일과 문구를 함께 고친다. 알리는 값이 달라졌으므로 수정 시각을 남긴다. */
+  public void reschedule(LocalDate effectiveFrom, LocalDateTime now) {
+    this.effectiveFrom = effectiveFrom;
+    this.updatedAt = now;
+  }
+
   /** 알리던 예약이 취소되어 공지를 거둔다. */
   public void withdraw() {
     status = NoticeStatus.WITHDRAWN;

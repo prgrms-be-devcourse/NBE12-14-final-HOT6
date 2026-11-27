@@ -88,6 +88,26 @@ public class CashbackPolicy {
     this.endsAt = newEndsAt;
   }
 
+  /** 아직 적용 전인 구간의 요율과 시작 시각을 바꾼다. 시각의 규칙은 호출한 서비스가 확인한다. */
+  public void reschedule(BigDecimal newRate, LocalDateTime newStartsAt) {
+    validateRate(newRate);
+    if (newStartsAt == null || (endsAt != null && !endsAt.isAfter(newStartsAt))) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_POLICY, "시작 시각은 구간의 종료보다 빨라야 합니다");
+    }
+    this.rate = newRate.setScale(RATE_SCALE);
+    this.startsAt = newStartsAt;
+  }
+
+  /** 뒤 구간의 시작이 바뀌어 이 구간의 종료를 함께 옮긴다. */
+  public void moveEnd(LocalDateTime newEndsAt) {
+    if (newEndsAt == null || !newEndsAt.isAfter(startsAt)) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_POLICY, "적용 시각은 앞 구간의 시작보다 늦어야 합니다");
+    }
+    this.endsAt = newEndsAt;
+  }
+
   /**
    * 요율 형식을 검사한다. 정책 구간과 월 기본 요율이 같은 규칙을 쓴다.
    *
