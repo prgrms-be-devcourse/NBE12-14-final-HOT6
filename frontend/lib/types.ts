@@ -41,7 +41,8 @@ export type ReconciliationType =
   | "REFUND_TRANSFER"
   | "DAILY_NET_SALES"
   | "SETTLEMENT_CARRY"
-  | "MONTHLY_PAYOUT";
+  | "MONTHLY_PAYOUT"
+  | "MERCHANT_CLOSURE";
 export type ReconciliationStatus = "MATCHED" | "MISMATCHED" | "ERROR";
 export type ReconciliationResultResponse = {
   id: number;

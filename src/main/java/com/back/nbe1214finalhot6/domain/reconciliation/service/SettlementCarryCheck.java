@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** 7번 대사. 확정액과 이월이 순매출과 전일 이월로 설명되는지, 전일 이월이 어제 장부와 이어지는지 본다. */
+/** 9번 대사. 확정액과 이월이 순매출과 전일 이월로 설명되는지, 전일 이월이 어제 장부와 이어지는지 본다. */
 @Component
 @RequiredArgsConstructor
 public class SettlementCarryCheck implements ReconciliationCheck {

@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** 6번 대사. 일 정산 장부의 결제·취소·순매출이 결제 원본을 다시 집계한 값과 같은지 본다. */
+/** 8번 대사. 일 정산 장부의 결제·취소·순매출이 결제 원본을 다시 집계한 값과 같은지 본다. */
 @Component
 @RequiredArgsConstructor
 public class DailyNetSalesCheck implements ReconciliationCheck {

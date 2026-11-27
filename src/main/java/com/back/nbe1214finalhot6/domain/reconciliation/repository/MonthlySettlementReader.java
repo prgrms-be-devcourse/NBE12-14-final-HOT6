@@ -2,6 +2,7 @@ package com.back.nbe1214finalhot6.domain.reconciliation.repository;
 
 import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlement;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.repository.Repository;
 
@@ -9,4 +10,6 @@ import org.springframework.data.repository.Repository;
 public interface MonthlySettlementReader extends Repository<MonthlySettlement, Long> {
 
   List<MonthlySettlement> findBySettlementMonth(LocalDate settlementMonth);
+
+  List<MonthlySettlement> findByMerchantIdIn(Collection<Long> merchantIds);
 }
