@@ -100,8 +100,13 @@ export type ForecastAccuracy = {
 };
 export const getForecastAccuracy = () => api<ForecastAccuracy>(`${BASE}/forecast/accuracy`);
 export const REASON_MAX = 200;
-export const reduceRate = (rate: number, effectiveAt: string, reason: string) =>
-  api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt, reason } });
+export type RateReductionBody = { rate: number; effectiveAt: string; reason: string; notice: SettingNotice };
+export const reduceRate = (body: RateReductionBody) => api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body });
+// 아직 적용되지 않은 예약의 지금 값과 수정. 적용이 시작된 구간은 서버가 거절한다
+export type RateReservation = { policyId: number; rate: number; effectiveAt: string; reason: string | null; notice: SettingNotice | null };
+export const getReservation = (policyId: number) => api<RateReservation>(`${BASE}/policies/${policyId}/reduction`);
+export const reviseReduction = (policyId: number, body: RateReductionBody) =>
+  api<unknown>(`${BASE}/policies/${policyId}/reduction`, { method: "PUT", body });
 export const noticeStop = (year: number, month: number) => api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}/notice-stop`, { method: "POST" });
 export const emergencyStop = (year: number, month: number) =>
   api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}/emergency-stop`, { method: "POST", body: { confirm: true } });

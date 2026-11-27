@@ -5,6 +5,7 @@ import com.back.nbe1214finalhot6.common.response.PageResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeAdminResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.NoticeUpdateRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.RateNoticeRequest;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackNotice;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
@@ -59,8 +60,62 @@ public class CashbackNoticeService {
    * @param policy 새로 만든 요율 구간. 저장되어 id 가 있어야 한다
    */
   @Transactional
-  public void registerPolicyChange(CashbackPolicy policy, LocalDateTime now) {
-    noticeRepository.save(CashbackNotice.policyChange(policy, now));
+  public void registerPolicyChange(
+      CashbackPolicy policy, RateNoticeRequest request, LocalDateTime now) {
+    CashbackNotice notice = CashbackNotice.policyChange(policy, now);
+    if (request != null) {
+      compose(notice, request, policy.getStartsAt().toLocalDate());
+    }
+    noticeRepository.save(notice);
+  }
+
+  /**
+   * 예약한 인하를 수정했을 때 그 공지를 고친다. 공지가 없으면 새로 등록한다.
+   *
+   * @param request 새 문구. null 이면 서버가 만드는 기본 문구
+   * @throws BusinessException 제목·본문이나 홈 종료일이 올바르지 않을 때(CSH-014)
+   */
+  @Transactional
+  public void revisePolicyChange(
+      CashbackPolicy policy, RateNoticeRequest request, LocalDateTime now) {
+    CashbackNotice notice =
+        noticeRepository.findByPolicyIdAndType(policy.getId(), NoticeType.POLICY_CHANGE).orElse(null);
+    if (notice == null) {
+      registerPolicyChange(policy, request, now);
+      return;
+    }
+    LocalDate from = policy.getStartsAt().toLocalDate();
+    CashbackNotice defaults = CashbackNotice.policyChange(policy, now);
+    compose(
+        notice,
+        request != null
+            ? request
+            : new RateNoticeRequest(
+                defaults.displayTitle(),
+                defaults.getContent(),
+                defaults.isShowOnHome(),
+                defaults.getHomeUntil()),
+        from);
+    notice.reschedule(from, now);
+  }
+
+  /** 정책을 알린 공지의 지금 문구와 홈 노출. 공지가 없으면 null. */
+  @Transactional(readOnly = true)
+  public RateNoticeRequest findPolicyNotice(Long policyId) {
+    return noticeRepository
+        .findByPolicyIdAndType(policyId, NoticeType.POLICY_CHANGE)
+        .map(
+            n ->
+                new RateNoticeRequest(
+                    n.displayTitle(), n.getContent(), n.isShowOnHome(), n.getHomeUntil()))
+        .orElse(null);
+  }
+
+  private void compose(CashbackNotice notice, RateNoticeRequest request, LocalDate effectiveFrom) {
+    requireText(request.title(), request.content());
+    requireHome(request.showOnHome(), request.homeUntil(), effectiveFrom);
+    notice.compose(
+        request.title(), request.content(), request.showOnHome(), request.homeUntil());
   }
 
   /**

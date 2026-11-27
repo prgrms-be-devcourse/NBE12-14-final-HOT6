@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import BudgetGauge from "@/components/BudgetGauge";
 import { getAnnualBudget, listMonthlyBudgets, putAnnualBudget, putMonthlyBudget, transferBudget, type AnnualBudget, type MonthlyBudget } from "@/lib/adminApi";
 import { pctText } from "@/lib/cashbackApi";
 import { won } from "@/lib/format";
@@ -11,7 +12,7 @@ const digits = (v: string) => Number(v.replace(/\D/g, "")) || 0;
 const pct = (n: number, whole: number) => (whole > 0 ? Math.round((n / whole) * 100) : 0);
 const totalOf = (m: MonthlyBudget) => m.allocatedAmount + m.carriedInAmount - m.carriedOutAmount;
 
-// 위에는 선택한 달의 현황과 이월, 아래에는 연·월 배정
+// 위에서부터 연 예산 현황, 선택한 달의 현황과 이월, 연·월 배정
 type Props = { year: number; thisMonth: number; contingencyRate?: number; onFlash: (message: string) => void; onChanged?: () => void };
 
 export default function BudgetPlanner({ year, thisMonth, contingencyRate, onFlash, onChanged }: Props) {
@@ -83,6 +84,8 @@ function Planner({ year, thisMonth, contingencyRate, savedAnnual, monthly, onFla
   const usedPct = pct(spent, assigned);
   const reservedPct = pct(reserved, assigned);
 
+  const annualTotal = savedAnnual ? savedAnnual.totalAmount + savedAnnual.carriedInAmount - savedAnnual.carriedOutAmount : 0;
+
   const setOne = (i: number, v: number) => setAlloc((a) => a.map((x, idx) => (idx === i ? v : x)));
   const fillEven = () => {
     const editable = alloc.map((_, i) => i).filter((i) => !isLocked(i));
@@ -151,6 +154,13 @@ function Planner({ year, thisMonth, contingencyRate, savedAnnual, monthly, onFla
         </p>
       )}
 
+      {savedAnnual && (
+        <section className="card space-y-3 !p-5" aria-label="연 예산 현황">
+          <h3 className="font-bold">{year}년 연 예산 <span className="tabular-nums">{won(annualTotal)}</span></h3>
+          <BudgetGauge total={annualTotal} paid={savedAnnual.paidAmount} reserved={savedAnnual.reservedAmount} remaining={savedAnnual.remainingAmount} />
+        </section>
+      )}
+
       <section className="card !p-5" aria-label={`${MONTH_LABELS[month - 1]} 예산 분배`}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="font-bold">{MONTH_LABELS[month - 1]} 예산 분배</h3>
@@ -169,12 +179,10 @@ function Planner({ year, thisMonth, contingencyRate, savedAnnual, monthly, onFla
             <div className="sign mx-auto max-w-md !py-3 text-center">
               <div className="text-[13px] font-medium text-white/85">{MONTH_LABELS[month - 1]} 예산</div>
               <div className="text-[28px] font-extrabold tabular-nums tracking-tight">{won(assigned)}</div>
-              <div className="relative mx-auto mt-2 flex h-2.5 w-full overflow-hidden rounded-full bg-white/25" role="img" aria-label={`집행 ${usedPct}%, 확보 ${reservedPct}%, 남음 ${Math.max(0, 100 - usedPct - reservedPct)}%`}>
-                <span className="h-full bg-white" style={{ width: `${Math.min(100, usedPct)}%` }} />
-                <span className="h-full bg-amber-500" style={{ width: `${Math.min(100 - Math.min(100, usedPct), reservedPct)}%` }} />
-                <span className="absolute inset-y-0 w-0.5 bg-white" style={{ left: `${100 - pct(reserve, assigned)}%` }} />
+              <div className="mt-2">
+                <BudgetGauge dark total={assigned} paid={spent} reserved={reserved} remaining={left} contingency={reserve} />
               </div>
-              <div className="mt-1 flex justify-between text-[11px] text-white/80"><span>0</span><span>대비금 {won(reserve)}</span><span>100%</span></div>
+              <div className="mt-1 text-[11px] text-white/80">흰 세로선은 대비금 {won(reserve)}</div>
             </div>
 
             <div className="mx-auto h-5 w-px bg-slate-300" aria-hidden />

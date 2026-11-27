@@ -6,6 +6,7 @@ import com.back.nbe1214finalhot6.common.response.PageResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyHistoryResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.PolicyResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
+import com.back.nbe1214finalhot6.domain.cashback.dto.RateReservationResponse;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackMonthlyBudget;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicy;
 import com.back.nbe1214finalhot6.domain.cashback.entity.CashbackPolicyHistory;
@@ -14,6 +15,7 @@ import com.back.nbe1214finalhot6.domain.cashback.exception.CashbackErrorCode;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackMonthlyBudgetRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyHistoryRepository;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackPolicyRepository;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -45,6 +47,7 @@ public class CashbackPolicyService {
   private final CashbackMonthlyBudgetRepository monthlyBudgetRepository;
   private final CashbackNoticeService noticeService;
   private final CashbackPolicyBasisCollector basisCollector;
+  private final EntityManager entityManager;
   private final CashbackProperties properties;
   private final Clock clock;
 
@@ -74,6 +77,8 @@ public class CashbackPolicyService {
     }
 
     YearMonth month = YearMonth.from(effectiveAt);
+    // 구간을 바꾸기 전의 상황을 근거로 남긴다. 예산 행을 잠그기 전에 읽는다
+    PolicyBasis basis = basisCollector.collect();
     CashbackMonthlyBudget budget =
         monthlyBudgetRepository
             .findWithLockByBudgetYearAndBudgetMonth(month.getYear(), month.getMonthValue())
@@ -81,6 +86,8 @@ public class CashbackPolicyService {
                 () ->
                     new BusinessException(
                         CashbackErrorCode.BUDGET_NOT_FOUND, "적용 시각이 속한 달의 월 예산이 없습니다"));
+    // 근거를 모으며 먼저 읽은 객체가 남아 있을 수 있어, 잠근 뒤의 값으로 다시 읽는다
+    entityManager.refresh(budget);
 
     LocalDateTime monthStart = month.atDay(1).atStartOfDay();
     LocalDateTime nextMonthStart = month.plusMonths(1).atDay(1).atStartOfDay();
@@ -104,9 +111,6 @@ public class CashbackPolicyService {
           "새 요율은 현재 요율(" + currentRate.toPlainString() + ")보다 낮아야 합니다");
     }
 
-    // 구간을 바꾸기 전의 상황을 근거로 남긴다
-    PolicyBasis basis = basisCollector.collect(currentRate);
-
     CashbackPolicy before = null;
     if (covering != null) {
       before = covering.snapshot();
@@ -123,10 +127,143 @@ public class CashbackPolicyService {
       historyRepository.save(CashbackPolicyHistory.updated(before, covering, operatorId, now));
     }
     historyRepository.save(
-        CashbackPolicyHistory.reduced(successor, operatorId, now, request.reason(), basis));
+        CashbackPolicyHistory.reduced(
+            successor, operatorId, now, request.reason(), basis.withPreviousRate(currentRate)));
     // 이용자에게 보이는 정책 변경 예고. 같은 트랜잭션이라 인하가 롤백되면 공지도 롤백된다
-    noticeService.registerPolicyChange(successor, now);
+    noticeService.registerPolicyChange(successor, request.notice(), now);
     return PolicyResponse.from(successor);
+  }
+
+  /**
+   * 아직 적용되지 않은 인하 예약의 요율, 적용 시각, 사유, 공지를 수정한다. 월 인하 횟수는 늘지 않는다.
+   *
+   * <p>적용 시각을 옮기면 이 구간에 맞닿아 끝나던 앞 구간의 종료도 함께 옮긴다. 앞서 남긴 이력은 바꾸지 않고 새 이력을 남긴다.
+   *
+   * @throws BusinessException 없는 구간(CSH-001), 이미 적용이 시작된 구간(CSH-017), 요율·시각이 올바르지 않을 때(CSH-003),
+   *     다른 구간과 겹칠 때(CSH-002), 공지가 올바르지 않을 때(CSH-014)
+   */
+  @Transactional
+  public PolicyResponse reviseReduction(Long policyId, RateReductionRequest request, Long operatorId) {
+    LocalDateTime now = LocalDateTime.now(clock);
+    LocalDateTime oldStart =
+        policyRepository
+            .findStartsAt(policyId)
+            .orElseThrow(() -> new BusinessException(CashbackErrorCode.POLICY_NOT_FOUND));
+    YearMonth month = YearMonth.from(oldStart);
+    PolicyBasis basis = basisCollector.collect();
+    // 인하와 같은 행을 잠가 같은 달의 인하·수정을 하나씩 처리한다
+    CashbackMonthlyBudget budget =
+        monthlyBudgetRepository
+            .findWithLockByBudgetYearAndBudgetMonth(month.getYear(), month.getMonthValue())
+            .orElseThrow(() -> new BusinessException(CashbackErrorCode.BUDGET_NOT_FOUND));
+    entityManager.refresh(budget);
+    CashbackPolicy target = pending(policyId, now);
+
+    LocalDateTime newStart = request.effectiveAt();
+    requireNewStart(newStart, target.getStartsAt(), now, month);
+    CashbackPolicy.validateRate(request.rate());
+
+    List<CashbackPolicy> others =
+        policyRepository.findAllByOrderByStartsAtDesc().stream()
+            .filter(p -> !p.getId().equals(policyId))
+            .toList();
+    // 이 구간이 시작되며 끝나던 앞 구간. 월초에 시작하는 예약은 지난달 구간을 건드리지 않는다
+    CashbackPolicy preceding =
+        target.getStartsAt().equals(month.atDay(1).atStartOfDay())
+            ? null
+            : others.stream()
+                .filter(p -> target.getStartsAt().equals(p.getEndsAt()))
+                .findFirst()
+                .orElse(null);
+    CashbackPolicy following =
+        others.stream()
+            .filter(p -> p.getStartsAt().equals(target.getEndsAt()))
+            .findFirst()
+            .orElse(null);
+    if (others.stream()
+        .anyMatch(p -> p != preceding && overlaps(p, newStart, target.getEndsAt()))) {
+      throw new BusinessException(CashbackErrorCode.POLICY_PERIOD_OVERLAP);
+    }
+    BigDecimal previousRate = preceding != null ? preceding.getRate() : budget.getBaseRate();
+    if (previousRate == null || request.rate().compareTo(previousRate) >= 0) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_POLICY, "새 요율은 그 시각의 이전 요율보다 낮아야 합니다");
+    }
+    if (following != null && request.rate().compareTo(following.getRate()) <= 0) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_POLICY, "새 요율은 다음에 예약한 요율보다 높아야 합니다");
+    }
+
+    if (preceding != null && !newStart.equals(preceding.getEndsAt())) {
+      CashbackPolicy before = preceding.snapshot();
+      preceding.moveEnd(newStart);
+      historyRepository.save(CashbackPolicyHistory.updated(before, preceding, operatorId, now));
+    }
+    CashbackPolicy before = target.snapshot();
+    target.reschedule(request.rate(), newStart);
+    historyRepository.save(
+        CashbackPolicyHistory.revised(
+            before,
+            target,
+            operatorId,
+            now,
+            request.reason(),
+            basis.withPreviousRate(previousRate)));
+    noticeService.revisePolicyChange(target, request.notice(), now);
+    return PolicyResponse.from(target);
+  }
+
+  /**
+   * 아직 적용되지 않은 인하 예약의 지금 값.
+   *
+   * @throws BusinessException 없는 구간(CSH-001), 이미 적용이 시작된 구간(CSH-017)
+   */
+  @Transactional(readOnly = true)
+  public RateReservationResponse getReservation(Long policyId) {
+    CashbackPolicy policy = pending(policyId, LocalDateTime.now(clock));
+    return new RateReservationResponse(
+        policy.getId(),
+        policy.getRate(),
+        policy.getStartsAt(),
+        historyRepository
+            .findFirstByPolicyIdAndReasonIsNotNullOrderByIdDesc(policyId)
+            .map(CashbackPolicyHistory::getReason)
+            .orElse(null),
+        noticeService.findPolicyNotice(policyId));
+  }
+
+  private CashbackPolicy pending(Long policyId, LocalDateTime now) {
+    CashbackPolicy policy =
+        policyRepository
+            .findById(policyId)
+            .orElseThrow(() -> new BusinessException(CashbackErrorCode.POLICY_NOT_FOUND));
+    if (!policy.getStartsAt().isAfter(now)) {
+      throw new BusinessException(CashbackErrorCode.POLICY_ALREADY_APPLIED);
+    }
+    return policy;
+  }
+
+  // 시각을 바꿀 때만 예고 일수를 다시 확인한다. 사유나 공지만 고치는 것은 언제든 할 수 있다
+  private void requireNewStart(
+      LocalDateTime newStart, LocalDateTime oldStart, LocalDateTime now, YearMonth month) {
+    if (newStart == null || !YearMonth.from(newStart).equals(month)) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_POLICY, "적용 시각은 같은 달 안에서만 바꿀 수 있습니다");
+    }
+    if (newStart.equals(oldStart)) {
+      return;
+    }
+    LocalDateTime earliest =
+        now.truncatedTo(ChronoUnit.MINUTES).plusDays(properties.rateChangeNoticeDays());
+    if (newStart.isBefore(earliest) || !newStart.isAfter(now)) {
+      throw new BusinessException(
+          CashbackErrorCode.INVALID_POLICY, "적용 시각은 " + earliest + " 이후여야 합니다");
+    }
+  }
+
+  private static boolean overlaps(CashbackPolicy p, LocalDateTime start, LocalDateTime end) {
+    return (end == null || p.getStartsAt().isBefore(end))
+        && (p.getEndsAt() == null || p.getEndsAt().isAfter(start));
   }
 
   /**

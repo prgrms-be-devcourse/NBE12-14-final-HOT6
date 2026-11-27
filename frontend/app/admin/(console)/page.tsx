@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import BarChart from "@/components/BarChart";
+import BudgetGauge from "@/components/BudgetGauge";
 import ForecastAccuracyTable from "@/components/ForecastAccuracyTable";
 import { ApiError } from "@/lib/api";
 import {
-  getAdminNotices, getForecast, getMonthlyBudget, getPayoutStatus, getPolicies, getSettings, md, moneyUnit, STATUS_TEXT, thisYearMonth,
+  getAdminNotices, getAnnualBudget, getForecast, getMonthlyBudget, getPayoutStatus, getPolicies, getSettings, md, moneyUnit, STATUS_TEXT, thisYearMonth,
 } from "@/lib/adminApi";
 import { LIMIT_NAME, mmdd, pctText } from "@/lib/cashbackApi";
 import { ymd } from "@/lib/dates";
@@ -16,7 +17,7 @@ const NOTICE_SAMPLE = 100;
 // 지금(한국 시간)을 서버 시각 문자열과 비교할 수 있는 "yyyy-MM-ddTHH:mm" 으로 만든다
 const nowKst = () => new Date().toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).replace(" ", "T").slice(0, 16);
 
-// 한눈에 보는 현황판: 이번 달 예산, 소진 예측, 지금 적용 중인 정책, 확인할 일. 바꾸는 일은 각 관리 화면에서 한다
+// 한눈에 보는 현황판: 연 예산과 이번 달 예산, 소진 예측, 지금 적용 중인 정책, 확인할 일. 바꾸는 일은 각 관리 화면에서 한다
 export default function AdminDashboardPage() {
   // 이번 달 월 예산이 아직 없으면(CSH-004) 오류 대신 배정 화면 링크를 보여 준다
   const budget = useLoad(() => {
@@ -26,6 +27,9 @@ export default function AdminDashboardPage() {
       throw e;
     });
   }, []);
+  const { year, month } = thisYearMonth();
+  // 연 예산이 아직 없으면 null
+  const annual = useLoad(() => getAnnualBudget(year), [year]);
   const forecast = useLoad(getForecast, []);
   const policies = useLoad(getPolicies, []);
   const settings = useLoad(getSettings, []);
@@ -49,13 +53,14 @@ export default function AdminDashboardPage() {
   const limitCount = settings.data?.filter((s) => s.scheduled).length;
 
   const total = b ? b.allocatedAmount + b.carriedInAmount - b.carriedOutAmount : 0;
-  const share = (v: number) => (total > 0 ? Math.min(100, Math.max(0, (v / total) * 100)) : 0);
+  const a = annual.data;
+  const annualTotal = a ? a.totalAmount + a.carriedInAmount - a.carriedOutAmount : 0;
   const kpi = b && [
     { k: "남은 예산", v: won(b.remainingAmount), c: "text-emerald-600", tag: "남음", tagCls: "badge-ok" },
     { k: "집행 완료", v: won(b.paidAmount), c: "text-blue-600", tag: "완료", tagCls: "badge-info" },
     { k: "예약 · 확보", v: won(b.reservedAmount), c: "text-amber-800", tag: "확보", tagCls: "badge-warn" },
   ];
-  const errors = [budget.error, policies.error, settings.error].filter(Boolean);
+  const errors = [annual.error, budget.error, policies.error, settings.error].filter(Boolean);
 
   const todos = [
     { k: "지금 지급 가능", v: payouts.data ? `${payouts.data.dueCount.toLocaleString("ko-KR")}건` : "…", sub: payouts.data ? won(payouts.data.dueAmount) : "", href: "/admin/earnings?tab=payouts" },
@@ -75,7 +80,7 @@ export default function AdminDashboardPage() {
       {errors.length > 0 && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{errors[0]}</p>}
       {!budget.loading && !budget.error && !b && (
         <div role="alert" className="rounded-xl border border-amber-500 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          이번 달 예산이 아직 없어요. <Link href="/admin/budget" className="font-bold underline">예산 관리에서 배정하기</Link>
+          {month}월 예산이 아직 없어요. <Link href="/admin/budget" className="font-bold underline">예산 관리에서 배정하기</Link>
         </div>
       )}
       {b && b.warning !== "NONE" && (
@@ -85,16 +90,23 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {kpi && (
-        <section className="card space-y-4 !p-5" aria-label="이번 달 예산">
+      {a && (
+        <section className="card space-y-3 !p-5" aria-label="연 예산">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-lg font-bold">이번 달 예산 <span className="tabular-nums">{won(total)}</span></h2>
+            <h2 className="text-lg font-bold">{a.budgetYear}년 연 예산 <span className="tabular-nums">{won(annualTotal)}</span></h2>
             <Link href="/admin/budget" className="text-[13px] font-medium text-brand-600 underline">예산 관리</Link>
           </div>
-          <div className="flex h-3 w-full overflow-hidden rounded-full bg-emerald-100" role="img" aria-label={`집행 ${Math.round(share(b.paidAmount))}%, 확보 ${Math.round(share(b.reservedAmount))}%`}>
-            <span className="h-full bg-blue-600" style={{ width: `${share(b.paidAmount)}%` }} />
-            <span className="h-full bg-amber-500" style={{ width: `${share(b.reservedAmount)}%` }} />
+          <BudgetGauge total={annualTotal} paid={a.paidAmount} reserved={a.reservedAmount} remaining={a.remainingAmount} />
+        </section>
+      )}
+
+      {b && kpi && (
+        <section className="card space-y-4 !p-5" aria-label={`${b.budgetMonth}월 예산`}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-bold">{b.budgetMonth}월 예산 <span className="tabular-nums">{won(total)}</span></h2>
+            <Link href="/admin/budget" className="text-[13px] font-medium text-brand-600 underline">예산 관리</Link>
           </div>
+          <BudgetGauge total={total} paid={b.paidAmount} reserved={b.reservedAmount} remaining={b.remainingAmount} />
           <div className="grid gap-3 sm:grid-cols-3">
             {kpi.map((x) => <div key={x.k} className="rounded-lg bg-slate-50 px-3 py-2.5"><div className="flex items-center justify-between"><span className="note">{x.k}</span><span className={`badge ${x.tagCls}`}>{x.tag}</span></div><div className={`mt-1 text-2xl font-bold tabular-nums ${x.c}`}>{x.v}</div></div>)}
           </div>

@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 /**
  * 정책(요율 구간) 변경 이력. 구간을 만들거나 값을 바꿀 때마다 변경 전후 값을 한 행으로 남긴다.
  *
- * <p>사유와 근거는 요율을 인하해 새로 만든 구간의 이력에만 있다. 이 기능이 생기기 전의 이력은 변경자, 사유, 근거가 null 이다.
+ * <p>사유와 근거는 요율을 인하해 새로 만든 구간과 예약을 수정한 구간의 이력에만 있다. 이 기능이 생기기 전의 이력은 변경자, 사유, 근거가 null 이다.
  */
 @Entity
 @Table(name = "cashback_policy_history")
@@ -106,6 +106,20 @@ public class CashbackPolicyHistory {
       String reason,
       PolicyBasis basis) {
     CashbackPolicyHistory history = created(policy, changedBy, changedAt);
+    history.reason = reason;
+    history.basis = basis;
+    return history;
+  }
+
+  /** 예약한 인하를 수정한 기록. 앞서 남긴 이력은 그대로 두고 새 사유와 근거를 함께 남긴다. */
+  public static CashbackPolicyHistory revised(
+      CashbackPolicy before,
+      CashbackPolicy after,
+      Long changedBy,
+      LocalDateTime changedAt,
+      String reason,
+      PolicyBasis basis) {
+    CashbackPolicyHistory history = updated(before, after, changedBy, changedAt);
     history.reason = reason;
     history.basis = basis;
     return history;
