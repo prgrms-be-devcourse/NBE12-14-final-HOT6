@@ -10,10 +10,23 @@ import java.time.LocalDateTime;
  * @param cashbackEligible 적립 대상 가맹점인지
  * @param walletUsedAmount 적립 기준 금액. 데브머니로 결제한 금액(원)
  * @param requestedAt 최초 서버 접수 시각(KST). 요율과 월 기준이 된다
+ * @param selfPayment 이용자가 이 가맹점의 점주 본인인지. 본인이면 적립하지 않는다(#301)
  */
 public record CashbackReserveRequest(
     Long paymentId,
     Long walletId,
     boolean cashbackEligible,
     long walletUsedAmount,
-    LocalDateTime requestedAt) {}
+    LocalDateTime requestedAt,
+    boolean selfPayment) {
+
+  /** 본인 가맹점 결제가 아닌 요청. */
+  public CashbackReserveRequest(
+      Long paymentId,
+      Long walletId,
+      boolean cashbackEligible,
+      long walletUsedAmount,
+      LocalDateTime requestedAt) {
+    this(paymentId, walletId, cashbackEligible, walletUsedAmount, requestedAt, false);
+  }
+}

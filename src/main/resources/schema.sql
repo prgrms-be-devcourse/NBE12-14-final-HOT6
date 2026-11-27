@@ -28,3 +28,24 @@ BEGIN
     END LOOP;
 END $$
 ^^
+-- 적립 제외 사유에 SELF_PAYMENT(본인 가맹점 결제, #301)가 늘었다. ddl-auto: update 는 기존 체크 제약을 바꾸지 않아서
+-- 제약을 지우고 새 값 목록으로 다시 만든다. 제약 이름은 DB 마다 달라서 컬럼으로 찾는다. 여러 번 실행해도 같은 결과다
+DO $$
+DECLARE
+    c record;
+BEGIN
+    FOR c IN
+        SELECT con.conname
+        FROM pg_constraint con
+        JOIN pg_attribute att ON att.attrelid = con.conrelid AND att.attnum = ANY (con.conkey)
+        WHERE con.conrelid = 'cashback_earning'::regclass
+          AND con.contype = 'c'
+          AND att.attname = 'exclusion_reason'
+    LOOP
+        EXECUTE format('ALTER TABLE cashback_earning DROP CONSTRAINT %I', c.conname);
+    END LOOP;
+    ALTER TABLE cashback_earning ADD CONSTRAINT cashback_earning_exclusion_reason_check
+        CHECK (exclusion_reason IN ('NONE', 'SELF_PAYMENT', 'NOT_ELIGIBLE', 'NO_WALLET_USAGE',
+                                    'AMOUNT_TOO_SMALL', 'MONTHLY_LIMIT_EXCEEDED', 'BUDGET_EXHAUSTED'));
+END $$
+^^

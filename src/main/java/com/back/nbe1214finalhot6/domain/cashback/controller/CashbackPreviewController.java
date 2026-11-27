@@ -37,9 +37,12 @@ public class CashbackPreviewController {
       @AuthenticationPrincipal AuthUser user,
       @RequestParam Long merchantId,
       @RequestParam @Min(0) long walletUsedAmount) {
+    Long walletId = ownedResources.walletIdOf(user);
     boolean eligible = merchantService.isCashbackEligible(merchantId);
+    // 본인 가맹점 결제는 적립하지 않는다(#301). 결제 때와 같은 기준(지갑 주인과 점주의 전화번호)으로 미리 알려 준다
+    boolean selfPayment = merchantService.isOwnedBySamePerson(merchantId, walletId);
     return ApiResponse.ok(
         cashbackService.preview(
-            new CashbackPreviewRequest(ownedResources.walletIdOf(user), eligible, walletUsedAmount)));
+            new CashbackPreviewRequest(walletId, eligible, walletUsedAmount, selfPayment)));
   }
 }

@@ -10,6 +10,7 @@ import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.CashbackReserveResponse;
 import com.back.nbe1214finalhot6.domain.cashback.dto.MonthlyBudgetRequest;
 import com.back.nbe1214finalhot6.domain.cashback.dto.RateReductionRequest;
+import com.back.nbe1214finalhot6.domain.cashback.entity.EarningStatus;
 import com.back.nbe1214finalhot6.domain.cashback.repository.CashbackEarningRepository;
 import com.back.nbe1214finalhot6.setting.SettingKey;
 import com.back.nbe1214finalhot6.setting.service.OperatorSettingAdminService;
@@ -74,6 +75,48 @@ class CashbackPreviewTest {
     assertThat(preview.appliedRate()).isEqualByComparingTo(reserved.appliedRate());
     assertThat(preview.monthlyLimitRemaining()).isEqualTo(50_000L);
     assertThat(reserved.monthlyLimitRemaining()).isEqualTo(50_000L - 370L);
+  }
+
+  // 목적: 본인 가맹점 결제는 적립 대상 가맹점이고 금액이 충분해도 SELF_PAYMENT 로 제외되는지 확인한다(#301).
+  @Test
+  @DisplayName("본인 가맹점 결제는 다른 조건과 상관없이 SELF_PAYMENT 로 제외된다")
+  void selfPaymentExcluded() {
+    CashbackPreviewResponse self =
+        service.preview(new CashbackPreviewRequest(WALLET, true, 12_345L, true));
+
+    assertThat(self.exclusionReason()).isEqualTo(CashbackExclusionReason.SELF_PAYMENT);
+    assertThat(self.earnable()).isFalse();
+    assertThat(self.expectedAmount()).isZero();
+    assertThat(self.appliedRate()).isEqualByComparingTo("0");
+    // 적립 대상이 아닌 가맹점이어도 본인 결제 사유가 먼저다
+    assertThat(service.preview(new CashbackPreviewRequest(WALLET, false, 12_345L, true)).exclusionReason())
+        .isEqualTo(CashbackExclusionReason.SELF_PAYMENT);
+  }
+
+  // 목적: 본인 가맹점 결제의 reserve 는 예외 없이 0원·SELF_PAYMENT 를 돌려주고, 한도·예산을 쓰지 않으며 제외 건을 남기는지 확인한다(#301).
+  // 미리보기와 같은 사유여야 결제 전 안내와 영수증이 일치한다.
+  @Test
+  @DisplayName("본인 가맹점 결제는 적립 0원·SELF_PAYMENT 로 제외 건만 남기고 한도·예산을 쓰지 않는다")
+  void selfPaymentReserveExcluded() {
+    CashbackReserveResponse reserved =
+        service.reserve(new CashbackReserveRequest(1L, WALLET, true, 12_345L, AT, true));
+
+    assertThat(reserved.exclusionReason()).isEqualTo(CashbackExclusionReason.SELF_PAYMENT);
+    assertThat(reserved.earnedAmount()).isZero();
+    assertThat(reserved.payableAt()).isNull();
+
+    entityManager.flush();
+    entityManager.clear();
+    assertThat(earningRepository.findByPaymentId(1L))
+        .get()
+        .satisfies(
+            e -> {
+              assertThat(e.getStatus()).isEqualTo(EarningStatus.EXCLUDED);
+              assertThat(e.getExclusionReason()).isEqualTo(CashbackExclusionReason.SELF_PAYMENT);
+              assertThat(e.getAmount()).isZero();
+            });
+    assertThat(limitService.usedAmount(WALLET, YearMonth.of(2026, 11))).isZero();
+    assertThat(budgetService.getMonthly(2026, 11).reservedAmount()).isZero();
   }
 
   // 목적: 대상 아님·사용분 0·내림해서 0 이 각각 맞는 사유와 예상 0원으로 나오고, reserve 와 같은 사유인지 확인한다.
