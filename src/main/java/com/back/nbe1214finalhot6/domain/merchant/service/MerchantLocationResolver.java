@@ -55,14 +55,14 @@ public class MerchantLocationResolver {
     String target = (addressGiven ? requestedAddress : current.address()).strip();
     GeocodingResult result = geocodingClient.geocode(target);
     return switch (result.status()) {
-      case FOUND -> LocationChange.set(result.location());
+      case FOUND -> LocationChange.set(result.location(), target);
       case NOT_FOUND -> {
         if (addressChanged) {
           throw new BusinessException(MerchantErrorCode.MERCHANT_ADDRESS_NOT_FOUND);
         }
         yield LocationChange.keep();
       }
-      case UNAVAILABLE -> addressChanged ? LocationChange.clear() : LocationChange.keep();
+      case UNAVAILABLE -> addressChanged ? LocationChange.clear(target) : LocationChange.keep();
     };
   }
 }

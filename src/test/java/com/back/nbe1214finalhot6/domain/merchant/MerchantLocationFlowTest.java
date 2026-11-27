@@ -71,6 +71,19 @@ class MerchantLocationFlowTest {
   }
 
   @Test
+  @DisplayName("이미 가맹점이 있는 점주는 주소를 변환하기 전에 409 MER-002 로 거절한다")
+  void 이미_등록했으면_변환_호출_없음() throws Exception {
+    long userId = ownerId();
+    saveMerchant(userId, "기존", "기존 주소", INCHEON);
+
+    register(token(userId), "{\"name\": \"가게\", \"address\": \"없는 주소\"}")
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("MER-002"));
+
+    verify(geocodingClient, never()).geocode(anyString());
+  }
+
+  @Test
   @DisplayName("요청에 좌표를 보내도 무시하고 서버가 변환한 값만 저장한다")
   void 요청의_좌표는_무시() throws Exception {
     given(geocodingClient.geocode(anyString())).willReturn(GeocodingResult.found(INCHEON));

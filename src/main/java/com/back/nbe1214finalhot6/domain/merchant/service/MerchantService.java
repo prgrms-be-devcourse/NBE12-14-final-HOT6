@@ -37,6 +37,14 @@ public class MerchantService {
    *
    * @param location 주소를 변환한 좌표. 알 수 없으면 null
    */
+  /** 이미 가맹점이 있으면 MER-002 로 거절한다. 외부 호출(주소 변환) 전에 빨리 거르는 용도이고, 동시 요청은 {@link #register} 의 확인과 유니크 제약이 막는다. */
+  @Transactional(readOnly = true)
+  public void assertNotRegistered(Long ownerId) {
+    if (merchantRepository.existsByOwnerId(ownerId)) {
+      throw new BusinessException(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED);
+    }
+  }
+
   @Transactional
   public MerchantRegisterResponse register(
       Long ownerId, MerchantRegisterRequest request, Location location) {
@@ -123,7 +131,8 @@ public class MerchantService {
             .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
 
     merchant.update(request.name(), request.address());
-    if (locationChange.apply()) {
+    // 변환하는 사이에 주소가 바뀌었으면 옛 주소의 좌표를 저장하지 않는다
+    if (locationChange.appliesTo(merchant.getAddress())) {
       merchant.updateLocation(locationChange.location());
     }
 
