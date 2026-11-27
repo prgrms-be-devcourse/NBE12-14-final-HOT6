@@ -82,20 +82,22 @@ public class OperatorSettingAdminService {
   }
 
   /**
-   * 설정 값을 바로 바꾼다. 지금 적용되는 값과 같은 값이면 아무것도 바꾸지 않고(행도 이력도 공지도 만들지 않고) 현재 상태를 돌려준다. 대기 중인 예약은 남는다.
+   * 설정 값을 바로 바꾼다. 지금 적용되는 값과 같은 값이면 아무것도 바꾸지 않고(행도 이력도 공지도 만들지 않고) 현재 상태를 돌려준다. 대기 중인 예약이
+   * 있으면 예약 공지와 어긋나지 않도록 거절한다.
    *
    * <p>같은 키를 동시에 바꿀 때 변경 전 값이 낡은 값으로 이력에 남지 않도록 행을 잠그고 읽는다. 행이 아직 없을 때 두 요청이 동시에 처음 설정하면 한쪽은
    * 유일 제약으로 실패한다. 운영자 단독 작업을 전제로 따로 처리하지 않는다.
    *
    * @param notice 함께 등록할 공지. null 이면 공지하지 않는다
    * @throws com.back.nbe1214finalhot6.common.exception.BusinessException 없는 키이거나 값이 허용 범위를 벗어났을 때
-   *     (SET-001), 공지 내용이 올바르지 않을 때(CSH-014)
+   *     (SET-001), 대기 중인 예약이 있을 때(SET-002), 공지 내용이 올바르지 않을 때(CSH-014)
    */
   @Transactional
   public SettingResponse put(String keyName, long value, SettingNoticeRequest notice) {
     SettingKey key = SettingKey.from(keyName);
     key.validate(value);
     applyDueSchedule(key);
+    requireNoSchedule(key);
     OperatorSetting stored = settingRepository.findWithLockBySettingKey(key).orElse(null);
     long current = stored != null ? stored.getSettingValue() : key.defaultValue();
     if (current == value) {
@@ -122,16 +124,17 @@ public class OperatorSettingAdminService {
   }
 
   /**
-   * 운영자 설정을 지워서 바로 기본값으로 되돌린다. 운영자가 바꾼 적이 없는 키면 아무것도 바꾸지 않는다. 대기 중인 예약은 남는다.
+   * 운영자 설정을 지워서 바로 기본값으로 되돌린다. 운영자가 바꾼 적이 없는 키면 아무것도 바꾸지 않는다. 대기 중인 예약이 있으면 거절한다.
    *
    * @param notice 함께 등록할 공지. null 이면 공지하지 않는다
-   * @throws com.back.nbe1214finalhot6.common.exception.BusinessException 없는 키일 때(SET-001), 공지 내용이 올바르지
-   *     않을 때(CSH-014)
+   * @throws com.back.nbe1214finalhot6.common.exception.BusinessException 없는 키일 때(SET-001), 대기 중인 예약이 있을
+   *     때(SET-002), 공지 내용이 올바르지 않을 때(CSH-014)
    */
   @Transactional
   public SettingResponse reset(String keyName, SettingNoticeRequest notice) {
     SettingKey key = SettingKey.from(keyName);
     applyDueSchedule(key);
+    requireNoSchedule(key);
     OperatorSetting stored = settingRepository.findWithLockBySettingKey(key).orElse(null);
     if (stored == null) {
       return response(key, null);
@@ -199,6 +202,12 @@ public class OperatorSettingAdminService {
       notifier.withdraw(schedule.getNoticeId());
     }
     return response(key, settingRepository.findById(key).orElse(null));
+  }
+
+  private void requireNoSchedule(SettingKey key) {
+    if (scheduleRepository.existsById(key)) {
+      throw new BusinessException(SettingErrorCode.SCHEDULE_ALREADY_EXISTS);
+    }
   }
 
   // 적용일이 지난 예약을 설정 행에 반영하고 지운다. 이력의 시각은 적용일 00:00 이다
