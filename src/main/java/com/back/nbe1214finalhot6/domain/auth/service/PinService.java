@@ -34,7 +34,8 @@ public class PinService {
    * PIN 이 맞는지 확인한다. 맞으면 아무 일도 없고(실패 횟수는 0으로), 아니면 예외를 던진다.
    *
    * <ul>
-   *   <li>없는 회원이거나 탈퇴한 회원: COM-009(404)
+   *   <li>없는 회원: COM-009(404)
+   *   <li>탈퇴한 회원: AUTH-004(401)
    *   <li>이미 잠긴 회원: AUTH-006(409). 맞는 PIN 이어도 거절한다. 잠긴 지 10분이 지나면 자동으로 풀린다(임시 방식, MVP 이후 이메일 인증 해제로 대체)
    *   <li>틀림: AUTH-005(400), 메시지에 남은 횟수. 5번째로 틀려 잠기면 AUTH-006(409)
    * </ul>
@@ -43,8 +44,11 @@ public class PinService {
     User user =
         userRepository
             .findById(userId)
-            .filter(u -> u.getStatus() == UserStatus.ACTIVE)
             .orElseThrow(() -> new BusinessException(CommonErrorCode.RESOURCE_NOT_FOUND));
+    // 인증 필터를 통과한 뒤에 앞 요청의 탈퇴가 끝날 수 있다. 필터와 같은 에러로 알려야 화면이 탈퇴 완료로 안내한다
+    if (user.getStatus() != UserStatus.ACTIVE) {
+      throw new BusinessException(AuthErrorCode.WITHDRAWN_USER);
+    }
     LocalDateTime now = LocalDateTime.now(clock);
     if (user.isPinLocked(now)) {
       throw new BusinessException(AuthErrorCode.PIN_LOCKED);

@@ -1,9 +1,12 @@
 package com.back.nbe1214finalhot6.domain.auth.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -15,15 +18,19 @@ import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.security.OwnedResources;
 import com.back.nbe1214finalhot6.domain.auth.dto.WithdrawalPreviewResponse;
 import com.back.nbe1214finalhot6.domain.auth.dto.WithdrawalResult;
+import com.back.nbe1214finalhot6.domain.auth.dto.WithdrawalSettleRequest;
 import com.back.nbe1214finalhot6.domain.auth.exception.AuthErrorCode;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
+import com.back.nbe1214finalhot6.domain.auth.service.PinService;
 import com.back.nbe1214finalhot6.domain.auth.service.WithdrawalService;
 import com.back.nbe1214finalhot6.support.WithAuthUser;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -36,12 +43,13 @@ import org.springframework.test.web.servlet.MockMvc;
 @WithAuthUser(userId = 7L) // 로그인한 회원으로 호출한다. 내 지갑은 setUp 에서 70번으로 정한다
 class WithdrawalControllerTest {
 
-  private static final String BODY = "{\"expectedRefundAmount\": 50000}";
+  private static final String BODY = "{\"expectedRefundAmount\": 50000, \"pin\": \"123456\"}";
 
   @Autowired private MockMvc mockMvc;
   @MockitoBean private JwtProvider jwtProvider; // 보안 설정이 토큰 검사에 쓴다
   @MockitoBean private WithdrawalService withdrawalService;
   @MockitoBean private OwnedResources ownedResources;
+  @MockitoBean private PinService pinService;
 
   @BeforeEach
   void setUp() {
@@ -84,6 +92,62 @@ class WithdrawalControllerTest {
         .andExpect(jsonPath("$.data.canceledEarningCount").value(2))
         .andExpect(jsonPath("$.data.canceledEarningAmount").value(1_500))
         .andExpect(jsonPath("$.data.withdrawnAt").exists());
+
+    // PIN 확인이 탈퇴 실행보다 먼저다
+    InOrder order = inOrder(pinService, withdrawalService);
+    order.verify(pinService).verify(7L, "123456");
+    order.verify(withdrawalService).settle(7L, 70L, 50_000L, key);
+  }
+
+  // 목적: PIN 이 틀리거나 잠겼으면 그 에러가 그대로 나가고 탈퇴가 시작되지 않는지 확인한다.
+  @Test
+  @DisplayName("PIN 이 틀리면 400(AUTH-005), 잠겼으면 409(AUTH-006)이고 서비스를 부르지 않는다")
+  void wrongPin() throws Exception {
+    for (AuthErrorCode error : List.of(AuthErrorCode.PIN_MISMATCH, AuthErrorCode.PIN_LOCKED)) {
+      willThrow(new BusinessException(error)).given(pinService).verify(7L, "123456");
+
+      mockMvc
+          .perform(
+              post("/api/users/withdraw/settle")
+                  .header("Idempotency-Key", UUID.randomUUID().toString())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(BODY))
+          .andExpect(status().is(error.getStatus().value()))
+          .andExpect(jsonPath("$.code").value(error.getCode()));
+    }
+    verify(withdrawalService, never()).settle(anyLong(), anyLong(), anyLong(), anyString());
+  }
+
+  @Test
+  @DisplayName("PIN 이 없거나 숫자 6자리가 아니면 400 이고 PIN 확인도 탈퇴도 하지 않는다")
+  void invalidPin() throws Exception {
+    String key = UUID.randomUUID().toString();
+    for (String body :
+        new String[] {
+          "{\"expectedRefundAmount\": 0}",
+          "{\"expectedRefundAmount\": 0, \"pin\": \"\"}",
+          "{\"expectedRefundAmount\": 0, \"pin\": \"12345\"}",
+          "{\"expectedRefundAmount\": 0, \"pin\": \"abcdef\"}"
+        }) {
+      mockMvc
+          .perform(
+              post("/api/users/withdraw/settle")
+                  .header("Idempotency-Key", key)
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(body))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("COM-001"));
+    }
+    verify(pinService, never()).verify(anyLong(), anyString());
+    verify(withdrawalService, never()).settle(anyLong(), anyLong(), anyLong(), anyString());
+  }
+
+  @Test
+  @DisplayName("요청을 문자열로 바꿔도 PIN 은 드러나지 않는다")
+  void pinIsMasked() {
+    assertThat(new WithdrawalSettleRequest(0L, "987654").toString())
+        .doesNotContain("987654")
+        .contains("pin=****");
   }
 
   // 목적: 본문에 남의 지갑 번호를 넣어도 무시하고 토큰의 회원 지갑(70)으로만 처리하는지 확인한다.
@@ -99,7 +163,7 @@ class WithdrawalControllerTest {
             post("/api/users/withdraw/settle")
                 .header("Idempotency-Key", key)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"walletId\": 99, \"expectedRefundAmount\": 0}"))
+                .content("{\"walletId\": 99, \"expectedRefundAmount\": 0, \"pin\": \"123456\"}"))
         .andExpect(status().isOk());
 
     verify(withdrawalService).settle(7L, 70L, 0L, key);
@@ -109,7 +173,10 @@ class WithdrawalControllerTest {
   @DisplayName("확인 금액이 없거나 음수이면 400 이고 서비스를 부르지 않는다")
   void invalidAmount() throws Exception {
     String key = UUID.randomUUID().toString();
-    for (String body : new String[] {"{}", "{\"expectedRefundAmount\": -1}"}) {
+    for (String body :
+        new String[] {
+          "{\"pin\": \"123456\"}", "{\"expectedRefundAmount\": -1, \"pin\": \"123456\"}"
+        }) {
       mockMvc
           .perform(
               post("/api/users/withdraw/settle")
