@@ -12,8 +12,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
-import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -24,18 +22,12 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 인증·권한 설정(COM-03).
  *
- * <p>역할은 USER, OWNER, ADMIN 이다. OWNER 는 USER 의 기능을 포함하고(역할 계층), ADMIN 은 운영 전용이라 시민 기능을 쓰지 못한다.
+ * <p>역할은 USER(이용자), OWNER(점주), ADMIN(운영자)이고 서로의 기능을 포함하지 않는다. 둘 이상의 역할이 쓰는 경로는 규칙에 함께 적는다.
  * 규칙에 없는 경로는 로그인만 하면(역할 무관) 접근한다. 새 경로를 열 때는 아래 표에 한 줄씩 추가하고, 위에서부터 먼저 맞는 규칙이 적용되므로 좁은 경로를
  * 넓은 경로보다 위에 둔다.
  */
 @Configuration
 public class SecurityConfig {
-
-  /** OWNER 가 USER 의 기능도 쓸 수 있게 한다. ADMIN 은 이 계층에 넣지 않는다(운영 전용). */
-  @Bean
-  static RoleHierarchy roleHierarchy() {
-    return RoleHierarchyImpl.fromHierarchy("ROLE_OWNER > ROLE_USER");
-  }
 
   @Bean
   public SecurityFilterChain securityFilterChain(
@@ -82,13 +74,16 @@ public class SecurityConfig {
                     // 가맹점주(결제 취소는 /api/payments/** 보다 위에 둔다)
                     .requestMatchers(HttpMethod.POST, "/api/payments/*/cancel")
                     .hasRole("OWNER")
-                    // 가맹점 이름 검색은 시민도 쓴다
+                    // 가맹점 이름 검색은 이용자만
                     .requestMatchers(HttpMethod.GET, "/api/merchants")
                     .hasRole("USER")
                     // 가맹점 등록과 관리(수정, QR 생성)는 점주만
                     .requestMatchers("/api/merchants/**")
                     .hasRole("OWNER")
-                    // 시민 기능(OWNER 도 쓴다, ADMIN 은 못 쓴다)
+                    // 점주 화면도 쓰는 QR 한도·상태 조회(/api/qr/** 보다 위에 둔다)
+                    .requestMatchers(HttpMethod.GET, "/api/qr/limit", "/api/qr/*/status")
+                    .hasAnyRole("USER", "OWNER")
+                    // 이용자 기능
                     .requestMatchers(
                         "/api/cashback/**",
                         "/api/notices/**",
@@ -99,10 +94,10 @@ public class SecurityConfig {
                     // 내 정보 조회는 역할 구분 없이 로그인만 하면 된다(운영자 포함)
                     .requestMatchers(HttpMethod.GET, "/api/users/me")
                     .authenticated()
-                    // PIN 검증은 이용자(OWNER 포함)만 쓴다. 운영자는 못 쓴다
+                    // PIN 검증은 이용자와 점주가 쓴다. 운영자는 못 쓴다
                     .requestMatchers(HttpMethod.POST, "/api/users/pin/verify")
-                    .hasRole("USER")
-                    // 탈퇴는 이용자(OWNER 포함)만 요청할 수 있다. 점주는 서비스가 DB 역할로 한 번 더 거절하고, 운영자는 여기서 막힌다
+                    .hasAnyRole("USER", "OWNER")
+                    // 탈퇴는 이용자만 요청할 수 있다. 점주 탈퇴는 아직 지원하지 않는다
                     .requestMatchers(
                         HttpMethod.POST, "/api/users/withdraw", "/api/users/withdraw/settle")
                     .hasRole("USER")

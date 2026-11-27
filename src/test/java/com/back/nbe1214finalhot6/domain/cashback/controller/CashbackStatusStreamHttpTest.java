@@ -136,11 +136,12 @@ class CashbackStatusStreamHttpTest {
     }
   }
 
-  // 목적: 이용자(점주 포함)만 연결할 수 있는지 확인한다.
+  // 목적: 이용자만 연결할 수 있는지 확인한다.
   @Test
-  @DisplayName("점주는 연결할 수 있고 운영자와 비로그인은 거절한다")
+  @DisplayName("이용자는 연결할 수 있고 점주·운영자와 비로그인은 거절한다")
   void authorization() throws Exception {
-    assertThat(open(UserRole.OWNER).statusCode()).isEqualTo(200);
+    assertThat(open(UserRole.USER).statusCode()).isEqualTo(200);
+    assertThat(open(UserRole.OWNER).statusCode()).isEqualTo(403);
     assertThat(open(UserRole.ADMIN).statusCode()).isEqualTo(403);
     assertThat(open(null).statusCode()).isEqualTo(401);
   }
