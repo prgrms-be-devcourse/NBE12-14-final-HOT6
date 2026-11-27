@@ -2,6 +2,7 @@ package com.back.nbe1214finalhot6.domain.merchant.service;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.common.response.PageResponse;
+import com.back.nbe1214finalhot6.domain.auth.service.UserRoleService;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
@@ -29,14 +30,8 @@ public class MerchantService {
   private static final int MAX_PAGE_SIZE = 50;
 
   private final MerchantRepository merchantRepository;
+  private final UserRoleService userRoleService;
 
-  /**
-   * 점주(ownerId)의 가맹점을 등록한다. 점주 한 명당 하나만 등록할 수 있다.
-   *
-   * <p>미리 확인해서 MER-002 로 거절하고, 동시에 두 번 눌러 둘 다 확인을 통과해도 DB 유일 제약이 막아서 같은 MER-002 로 응답한다.
-   *
-   * @param location 주소를 변환한 좌표. 알 수 없으면 null
-   */
   /** 이미 가맹점이 있으면 MER-002 로 거절한다. 외부 호출(주소 변환) 전에 빨리 거르는 용도이고, 동시 요청은 {@link #register} 의 확인과 유니크 제약이 막는다. */
   @Transactional(readOnly = true)
   public void assertNotRegistered(Long ownerId) {
@@ -45,6 +40,26 @@ public class MerchantService {
     }
   }
 
+  /**
+   * 점주 회원 행을 잠근 채 활동 중인 점주인지 확인한 뒤 가맹점을 등록한다. 탈퇴와 등록이 동시에 와도 한쪽이 끝난 뒤 바뀐 상태로 처리되어, 탈퇴한 점주에게 가맹점이 생기지 않는다.
+   *
+   * <p>잠금은 이 트랜잭션이 끝날 때까지 유지된다. 탈퇴한 회원은 COM-009, 점주가 아니면 COM-008 이다.
+   */
+  @Transactional
+  public MerchantRegisterResponse registerByOwner(
+      Long ownerId, MerchantRegisterRequest request, Location location) {
+    userRoleService.lockActiveOwner(ownerId);
+    return register(ownerId, request, location);
+  }
+
+  /**
+   * 점주(ownerId)의 가맹점을 등록한다. 점주 한 명당 하나만 등록할 수 있다.
+   *
+   * <p>미리 확인해서 MER-002 로 거절하고, 동시에 두 번 눌러 둘 다 확인을 통과해도 DB 유일 제약이 막아서 같은 MER-002 로 응답한다. 점주 계정 확인은 하지 않으므로 화면에서 오는 등록은 {@link
+   * #registerByOwner} 를 쓴다.
+   *
+   * @param location 주소를 변환한 좌표. 알 수 없으면 null
+   */
   @Transactional
   public MerchantRegisterResponse register(
       Long ownerId, MerchantRegisterRequest request, Location location) {
