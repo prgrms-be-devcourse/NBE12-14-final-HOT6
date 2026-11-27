@@ -35,6 +35,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 @IntegrationTest
 class CashbackPolicyReductionLockTest {
 
+  private static final long OPERATOR_ID = 99L;
+
   private static final LocalDateTime NOV_20 = LocalDateTime.of(2026, 11, 20, 0, 0);
 
   @Autowired private CashbackPolicyService policyService;
@@ -78,7 +80,7 @@ class CashbackPolicyReductionLockTest {
                   ready.countDown();
                   go.await();
                   try {
-                    policyService.reduceRate(new RateReductionRequest(rate, NOV_20));
+                    policyService.reduceRate(new RateReductionRequest(rate, NOV_20, "테스트 사유"), OPERATOR_ID);
                     return "OK";
                   } catch (BusinessException e) {
                     return e.getErrorCode().getCode();

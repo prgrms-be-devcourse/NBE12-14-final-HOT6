@@ -10,8 +10,15 @@ export type MonthlyBudget = {
   reservedAmount: number; paidAmount: number; contingencyAmount: number; remainingAmount: number;
   usedRate: number; remainingRate: number; warning: BudgetWarning; baseRate: number | null; status: BudgetStatus;
 };
+// 요율을 인하한 시점의 예산과 예측. 그 달 예산이 없었으면 직전 요율만 있다
+export type PolicyBasis = {
+  previousRate: number; year: number | null; month: number | null; allocatedAmount: number | null; paidAmount: number | null;
+  reservedAmount: number | null; remainingAmount: number | null; contingencyAmount: number | null; dailyDemand: number | null;
+  fastExhaustionDate: string | null; midExhaustionDate: string | null; slowExhaustionDate: string | null; noticeLineDate: string | null; modelVersion: string | null;
+};
 export type PolicyHistory = {
-  historyId: number; policyId: number; action: "CREATE" | "UPDATE"; changedBy: number; changedAt: string;
+  historyId: number; policyId: number; action: "CREATE" | "UPDATE"; changedBy: number | null; changedAt: string;
+  reason: string | null; basis: PolicyBasis | null;
   beforeRate: number | null; beforeStartsAt: string | null; beforeEndsAt: string | null;
   afterRate: number | null; afterStartsAt: string | null; afterEndsAt: string | null;
 };
@@ -92,8 +99,9 @@ export type ForecastAccuracy = {
   days: { date: string; predictedDemand: number; slowDemand: number; fastDemand: number; actualAmount: number; difference: number; withinRange: boolean; modelVersion: string }[];
 };
 export const getForecastAccuracy = () => api<ForecastAccuracy>(`${BASE}/forecast/accuracy`);
-export const reduceRate = (rate: number, effectiveAt: string) =>
-  api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt } });
+export const REASON_MAX = 200;
+export const reduceRate = (rate: number, effectiveAt: string, reason: string) =>
+  api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt, reason } });
 export const noticeStop = (year: number, month: number) => api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}/notice-stop`, { method: "POST" });
 export const emergencyStop = (year: number, month: number) =>
   api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}/emergency-stop`, { method: "POST", body: { confirm: true } });

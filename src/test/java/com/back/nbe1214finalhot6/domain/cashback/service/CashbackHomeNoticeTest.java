@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class CashbackHomeNoticeTest {
 
+  private static final long OPERATOR_ID = 99L;
+
   private static final LocalDate TODAY = LocalDate.of(2026, 11, 18);
 
   @Autowired private CashbackNoticeService noticeService;
@@ -110,7 +112,7 @@ class CashbackHomeNoticeTest {
   @DisplayName("자동 공지는 그 달 말일까지 홈에 보인다")
   void automaticNoticesShowOnHome() {
     policyService.reduceRate(
-        new RateReductionRequest(new BigDecimal("0.02"), LocalDateTime.of(2026, 11, 20, 0, 0)));
+        new RateReductionRequest(new BigDecimal("0.02"), LocalDateTime.of(2026, 11, 20, 0, 0), "테스트 사유"), OPERATOR_ID);
     clock.advance(Duration.ofMinutes(1));
     stateService.emergencyStopManually(2026, 11);
 

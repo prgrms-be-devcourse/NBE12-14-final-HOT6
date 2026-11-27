@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class CashbackNoticeServiceTest {
 
+  private static final long OPERATOR_ID = 99L;
+
   @Autowired private CashbackNoticeService noticeService;
   @Autowired private CashbackPolicyService policyService;
   @Autowired private CashbackBudgetService budgetService;
@@ -41,7 +43,7 @@ class CashbackNoticeServiceTest {
   }
 
   private PolicyResponse reduce(String rate, LocalDateTime effectiveAt) {
-    return policyService.reduceRate(new RateReductionRequest(new BigDecimal(rate), effectiveAt));
+    return policyService.reduceRate(new RateReductionRequest(new BigDecimal(rate), effectiveAt, "테스트 사유"), OPERATOR_ID);
   }
 
   private void insertNotice(String type, String content, LocalDateTime createdAt) {
