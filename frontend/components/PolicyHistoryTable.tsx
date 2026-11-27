@@ -25,7 +25,7 @@ export default function PolicyHistoryTable() {
       ...rates.content.map((h): Row => ({
         id: `rate-${h.historyId}`, kind: "rate", at: h.changedAt, item: "적립률",
         change: `${h.beforeRate != null ? `${pctText(h.beforeRate)} → ` : ""}${pctText(h.afterRate)}`,
-        from: h.afterStartsAt ?? h.beforeStartsAt ?? "", memo: h.action === "CREATE" ? "구간 생성" : "구간 변경",
+        from: h.afterStartsAt ?? h.beforeStartsAt ?? "", memo: h.action === "CREATE" ? "구간 생성" : h.reason ? "예약 수정" : "구간 변경",
         detail: h.reason || h.basis ? h : undefined,
       })),
       ...limits.content.map((h): Row => ({
