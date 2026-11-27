@@ -8,6 +8,7 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
+import com.back.nbe1214finalhot6.domain.merchant.geocoding.LocationChange;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import jakarta.persistence.EntityManager;
@@ -46,7 +47,7 @@ class MerchantServiceTest {
     MerchantRegisterRequest request =
         new MerchantRegisterRequest("테스트 가맹점", "인천광역시 남동구 어딘가 1", null);
 
-    MerchantRegisterResponse response = merchantService.register(OWNER_ID, request);
+    MerchantRegisterResponse response = merchantService.register(OWNER_ID, request, null);
 
     Merchant saved = merchantRepository.findById(response.merchantId()).orElseThrow();
     assertThat(saved.getOwnerId()).isEqualTo(OWNER_ID);
@@ -60,7 +61,7 @@ class MerchantServiceTest {
     MerchantRegisterRequest request =
         new MerchantRegisterRequest("서류 가맹점", "인천광역시 서구 어딘가 2", "revenue.pdf");
 
-    MerchantRegisterResponse response = merchantService.register(OWNER_ID, request);
+    MerchantRegisterResponse response = merchantService.register(OWNER_ID, request, null);
 
     assertThat(response.cashbackEligible()).isTrue();
     assertThat(merchantRepository.findById(response.merchantId()).orElseThrow().isCashbackEligible())
@@ -75,7 +76,7 @@ class MerchantServiceTest {
     MerchantRegisterRequest request =
         new MerchantRegisterRequest("서류없는 가맹점", "인천광역시 부평구 어딘가 3", proof);
 
-    MerchantRegisterResponse response = merchantService.register(OWNER_ID, request);
+    MerchantRegisterResponse response = merchantService.register(OWNER_ID, request, null);
 
     assertThat(response.cashbackEligible()).isFalse();
   }
@@ -87,7 +88,7 @@ class MerchantServiceTest {
     long ownerId = nextOwnerId; // register() 가 이 번호로 등록한다
     Long id = register("원래 이름", "원래 주소", true);
 
-    merchantService.update(id, new MerchantUpdateRequest("새 이름", null));
+    merchantService.update(id, new MerchantUpdateRequest("새 이름", null), LocationChange.keep());
     Merchant updated = reload(id);
 
     assertThat(updated.getName()).isEqualTo("새 이름");
@@ -101,7 +102,7 @@ class MerchantServiceTest {
   void 모든필드수정() {
     Long id = register("원래 이름", "원래 주소", true);
 
-    merchantService.update(id, new MerchantUpdateRequest("새 이름", "새 주소"));
+    merchantService.update(id, new MerchantUpdateRequest("새 이름", "새 주소"), LocationChange.keep());
     Merchant updated = reload(id);
 
     assertThat(updated.getName()).isEqualTo("새 이름");
@@ -135,7 +136,7 @@ class MerchantServiceTest {
   @DisplayName("존재하지 않는 가맹점을 수정하면 예외가 발생한다")
   void 없는가맹점수정시예외() {
     assertThatThrownBy(
-            () -> merchantService.update(Long.MAX_VALUE, new MerchantUpdateRequest("이름", null)))
+            () -> merchantService.update(Long.MAX_VALUE, new MerchantUpdateRequest("이름", null), LocationChange.keep()))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_NOT_FOUND));
@@ -253,12 +254,12 @@ class MerchantServiceTest {
   void 점주당가맹점하나() {
     MerchantRegisterResponse first =
         merchantService.register(
-            OWNER_ID, new MerchantRegisterRequest("첫 가맹점", "인천광역시 남동구 어딘가 1", null));
+            OWNER_ID, new MerchantRegisterRequest("첫 가맹점", "인천광역시 남동구 어딘가 1", null), null);
 
     assertThatThrownBy(
             () ->
                 merchantService.register(
-                    OWNER_ID, new MerchantRegisterRequest("둘째 가맹점", "인천광역시 남동구 어딘가 2", null)))
+                    OWNER_ID, new MerchantRegisterRequest("둘째 가맹점", "인천광역시 남동구 어딘가 2", null), null))
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED));
@@ -270,8 +271,8 @@ class MerchantServiceTest {
   @Test
   @DisplayName("점주가 다르면 각자 가맹점을 등록할 수 있다")
   void 점주가다르면각자등록() {
-    Long a = merchantService.register(OWNER_ID, new MerchantRegisterRequest("가게 A", "인천광역시 서구 1", null)).merchantId();
-    Long b = merchantService.register(OWNER_ID + 1, new MerchantRegisterRequest("가게 B", "인천광역시 서구 2", null)).merchantId();
+    Long a = merchantService.register(OWNER_ID, new MerchantRegisterRequest("가게 A", "인천광역시 서구 1", null), null).merchantId();
+    Long b = merchantService.register(OWNER_ID + 1, new MerchantRegisterRequest("가게 B", "인천광역시 서구 2", null), null).merchantId();
 
     assertThat(merchantRepository.findByOwnerId(OWNER_ID)).hasValueSatisfying(m -> assertThat(m.getId()).isEqualTo(a));
     assertThat(merchantRepository.findByOwnerId(OWNER_ID + 1)).hasValueSatisfying(m -> assertThat(m.getId()).isEqualTo(b));
@@ -279,7 +280,7 @@ class MerchantServiceTest {
 
   private Long register(String name, String address, boolean cashbackEligible) {
     return merchantService
-        .register(nextOwnerId++, new MerchantRegisterRequest(name, address, cashbackEligible ? "revenue.pdf" : null))
+        .register(nextOwnerId++, new MerchantRegisterRequest(name, address, cashbackEligible ? "revenue.pdf" : null), null)
         .merchantId();
   }
 
