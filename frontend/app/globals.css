@@ -159,3 +159,9 @@ input, textarea { caret-color: var(--color-brand-600); }
   .demo-x { display: none; }
   .demo-scan { animation: none; top: 50%; }
 }
+
+/* Tailwind 기본 스타일(img max-width 100%, height auto)이 네이버 지도 타일 이미지 크기를 깨뜨려 지도가 비어 보이므로 지도 안에서는 끈다 */
+.naver-map img {
+  max-width: none;
+  max-height: none;
+}

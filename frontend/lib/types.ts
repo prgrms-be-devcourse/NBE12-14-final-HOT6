@@ -5,7 +5,8 @@ export type MerchantRegisterRequest = {
   address: string;
   revenueProof?: string;
 };
-export type MerchantRegisterResponse = { merchantId: number; name: string; address: string; cashbackEligible: boolean };
+// 위도·경도는 서버가 주소로 변환한 값이다. 변환하지 못했으면 null 이거나 필드가 없다
+export type MerchantRegisterResponse = { merchantId: number; name: string; address: string; cashbackEligible: boolean; latitude?: number | null; longitude?: number | null };
 // 가맹점 상태. 해지를 신청하면 CLOSING(해지 진행 중), 정산이 모두 끝나면 CLOSED(해지 완료)
 export type MerchantStatus = "ACTIVE" | "CLOSING" | "CLOSED";
 export type MerchantResponse = MerchantRegisterResponse & { status: MerchantStatus };

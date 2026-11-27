@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Header from "@/components/Header";
+import NaverMap from "@/components/NaverMap";
 import { ApiError } from "@/lib/api";
 import { searchMerchants } from "@/lib/endpoints";
 import type { MerchantResponse } from "@/lib/types";
@@ -19,11 +20,15 @@ export default function StoresPage() {
   const [state, setState] = useState<State>({ kind: "idle" });
   const [more, setMore] = useState(false);
   const [moreError, setMoreError] = useState("");
+  const [openId, setOpenId] = useState<number | null>(null); // 지도를 펼친 가맹점. 한 번에 하나만 펼친다
 
   // 이름 부분 일치 검색. page 가 0 이면 새로 검색하고, 1 이상이면 기존 결과 뒤에 이어 붙인다
   const search = async (query: string, page: number) => {
     setMoreError("");
-    if (page === 0) setState({ kind: "loading" });
+    if (page === 0) {
+      setOpenId(null);
+      setState({ kind: "loading" });
+    }
     else setMore(true);
     try {
       const res = await searchMerchants(query, page, PAGE_SIZE);
@@ -74,22 +79,39 @@ export default function StoresPage() {
               <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">찾으시는 가맹점이 없어요. 다른 이름으로 찾아보세요.</p>
             ) : (
               <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-                {state.items.map((s) => (
-                  <li key={s.merchantId} className="flex items-center gap-3 px-3.5 py-3">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{s.name}</span>
-                      <span className="block truncate text-xs text-slate-500">{s.address || "주소 정보 없음"}</span>
-                    </span>
-                    <span className={`badge shrink-0 ${s.cashbackEligible ? "badge-ok" : "badge-warn"}`}>{s.cashbackEligible ? "적립 가능" : "적립 제외"}</span>
-                  </li>
-                ))}
+                {state.items.map((s) => {
+                  const open = openId === s.merchantId;
+                  return (
+                    <li key={s.merchantId}>
+                      <button type="button" aria-expanded={open} onClick={() => setOpenId(open ? null : s.merchantId)} className="flex w-full items-center gap-3 px-3.5 py-3 text-left">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{s.name}</span>
+                          <span className="block truncate text-xs text-slate-500">{s.address || "주소 정보 없음"}</span>
+                        </span>
+                        <span className={`badge shrink-0 ${s.cashbackEligible ? "badge-ok" : "badge-warn"}`}>{s.cashbackEligible ? "적립 가능" : "적립 제외"}</span>
+                        <span aria-hidden className="shrink-0 text-xs text-slate-400">{open ? "▴" : "▾"}</span>
+                      </button>
+                      {open && (
+                        <div className="px-3.5 pb-3">
+                          {typeof s.latitude === "number" && typeof s.longitude === "number"
+                            ? (
+                              <div className="space-y-2">
+                                <NaverMap points={[{ lat: s.latitude, lng: s.longitude, title: s.name }]} height={180} />
+                                <a href={`https://map.naver.com/p/search/${encodeURIComponent(s.address)}`} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">네이버 지도에서 보기</a>
+                              </div>
+                            )
+                            : <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">위치 정보가 없어요</p>}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
             {state.page + 1 < state.totalPages && (
               <button type="button" disabled={more} onClick={() => search(state.query, state.page + 1)} className="btn btn-outline disabled:opacity-40">{more ? "불러오는 중…" : "더 보기"}</button>
             )}
             {moreError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">{moreError}</p>}
-            <p className="note text-center">지도와 업종으로 찾는 기능은 준비 중이에요.</p>
           </>
         )}
       </div>

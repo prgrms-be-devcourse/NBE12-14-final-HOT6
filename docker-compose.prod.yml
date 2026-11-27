@@ -13,6 +13,7 @@ services:
       context: ./frontend
       args:
         BACKEND_URL: http://backend:8080
+        NEXT_PUBLIC_NAVER_MAP_CLIENT_ID: ${NAVER_MAP_CLIENT_ID:-}
     container_name: devpay-frontend
     restart: unless-stopped
     depends_on:
