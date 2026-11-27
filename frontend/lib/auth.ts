@@ -12,8 +12,8 @@ type LoginResponse = { accessToken: string; tokenType: string; expiresIn: number
 
 const KEY = "devpay.session";
 
-// 앱(화면 묶음)마다 들어올 수 있는 역할. 시민 기능은 가맹점주도 쓴다.
-const ALLOWED: Record<Audience, Role[]> = { user: ["USER", "OWNER"], merchant: ["OWNER"], admin: ["ADMIN"] };
+// 앱(화면 묶음)마다 들어올 수 있는 역할. 서버처럼 역할마다 자기 앱만 쓴다.
+const ALLOWED: Record<Audience, Role[]> = { user: ["USER"], merchant: ["OWNER"], admin: ["ADMIN"] };
 
 export const LOGIN_PATH: Record<Audience, string> = { user: "/login", merchant: "/merchant/login", admin: "/admin/login" };
 
