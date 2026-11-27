@@ -9,7 +9,10 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
+import com.back.nbe1214finalhot6.domain.merchant.geocoding.Location;
+import com.back.nbe1214finalhot6.domain.merchant.geocoding.LocationChange;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -31,9 +34,12 @@ public class MerchantService {
    * 점주(ownerId)의 가맹점을 등록한다. 점주 한 명당 하나만 등록할 수 있다.
    *
    * <p>미리 확인해서 MER-002 로 거절하고, 동시에 두 번 눌러 둘 다 확인을 통과해도 DB 유일 제약이 막아서 같은 MER-002 로 응답한다.
+   *
+   * @param location 주소를 변환한 좌표. 알 수 없으면 null
    */
   @Transactional
-  public MerchantRegisterResponse register(Long ownerId, MerchantRegisterRequest request) {
+  public MerchantRegisterResponse register(
+      Long ownerId, MerchantRegisterRequest request, Location location) {
     if (merchantRepository.existsByOwnerId(ownerId)) {
       throw new BusinessException(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED);
     }
@@ -47,7 +53,8 @@ public class MerchantService {
                   ownerId,
                   request.name(),
                   request.address(),
-                  request.resolveCashbackEligible()));
+                  request.resolveCashbackEligible(),
+                  location));
     } catch (DataIntegrityViolationException e) {
       if (isOwnerUniqueViolation(e)) {
         throw new BusinessException(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED);
@@ -92,6 +99,12 @@ public class MerchantService {
     MerchantStatusGuard.assertActive(status);
   }
 
+  /** 점주의 가맹점 상태. 가맹점이 없으면 비어 있다. 점주 탈퇴 가능 여부를 정하는 쪽(회원)이 쓴다. */
+  @Transactional(readOnly = true)
+  public Optional<MerchantStatus> findStatusByOwner(Long ownerId) {
+    return merchantRepository.findStatusByOwnerId(ownerId);
+  }
+
   @Transactional(readOnly = true)
   public MerchantResponse get(Long merchantId) {
     return merchantRepository
@@ -100,14 +113,19 @@ public class MerchantService {
         .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
   }
 
+  /** 이름·주소와 좌표를 고친다. 좌표는 {@code locationChange} 가 정한다(유지, 새 값, 비우기). */
   @Transactional
-  public MerchantResponse update(Long merchantId, MerchantUpdateRequest request) {
+  public MerchantResponse update(
+      Long merchantId, MerchantUpdateRequest request, LocationChange locationChange) {
     Merchant merchant =
         merchantRepository
             .findById(merchantId)
             .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
 
     merchant.update(request.name(), request.address());
+    if (locationChange.apply()) {
+      merchant.updateLocation(locationChange.location());
+    }
 
     return MerchantResponse.from(merchant);
   }

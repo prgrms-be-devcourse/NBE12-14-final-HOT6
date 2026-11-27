@@ -1,5 +1,6 @@
 package com.back.nbe1214finalhot6.domain.merchant.entity;
 
+import com.back.nbe1214finalhot6.domain.merchant.geocoding.Location;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -43,6 +44,11 @@ public class Merchant {
   @Column(name = "cashback_eligible", nullable = false)
   private boolean cashbackEligible;
 
+  // 주소를 좌표로 바꾼 값. 변환하지 못했거나 기존 가맹점이면 둘 다 null 이고, 지도에는 찍히지 않는다
+  @Column private Double latitude;
+
+  @Column private Double longitude;
+
   // 상태는 조건부 UPDATE 로만 바꾼다(MerchantRepository.updateStatusIfCurrent). 기존 행은 ACTIVE 로 채운다
   @Enumerated(EnumType.STRING)
   @ColumnDefault("'ACTIVE'")
@@ -56,11 +62,15 @@ public class Merchant {
       Long ownerId,
       String name,
       String address,
-      boolean cashbackEligible) {
+      boolean cashbackEligible,
+      Double latitude,
+      Double longitude) {
     this.ownerId = ownerId;
     this.name = name;
     this.address = address;
     this.cashbackEligible = cashbackEligible;
+    this.latitude = latitude;
+    this.longitude = longitude;
     this.createdAt = LocalDateTime.now();
   }
 
@@ -69,7 +79,22 @@ public class Merchant {
       String name,
       String address,
       boolean cashbackEligible) {
-    return new Merchant(ownerId, name, address, cashbackEligible);
+    return new Merchant(ownerId, name, address, cashbackEligible, null, null);
+  }
+
+  public static Merchant create(
+      Long ownerId,
+      String name,
+      String address,
+      boolean cashbackEligible,
+      Location location) {
+    return new Merchant(
+        ownerId,
+        name,
+        address,
+        cashbackEligible,
+        location == null ? null : location.latitude(),
+        location == null ? null : location.longitude());
   }
 
   public void update(String name, String address) {
@@ -79,5 +104,11 @@ public class Merchant {
     if (address != null) {
       this.address = address;
     }
+  }
+
+  /** 좌표를 바꾼다. 위치가 null 이면 비운다(주소는 바뀌었는데 새 좌표를 알 수 없을 때). */
+  public void updateLocation(Location location) {
+    this.latitude = location == null ? null : location.latitude();
+    this.longitude = location == null ? null : location.longitude();
   }
 }

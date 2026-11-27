@@ -15,6 +15,12 @@ spring:
 jwt:
   secret: test-only-jwt-secret-key-0123456789-abcdef
 
+# 테스트에서는 실제 네이버를 호출하지 않는다. 개발 PC 의 .env 에 키가 있어도 비워서, 주소 변환이 건너뛰어지고(위치 없이 저장) 외부 호출이 나가지 않게 한다.
+naver:
+  map:
+    client-id: ""
+    client-secret: ""
+
 # 테스트에서는 스케줄러를 끄고 배치 메서드를 직접 호출한다.
 cashback:
   scheduler:
