@@ -13,8 +13,8 @@ import com.back.nbe1214finalhot6.domain.settlement.entity.DailySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlementStatus;
 import com.back.nbe1214finalhot6.domain.settlement.repository.DailySettlementRepository;
 import com.back.nbe1214finalhot6.domain.settlement.repository.MonthlySettlementRepository;
-import com.back.nbe1214finalhot6.domain.wallet.entity.MerchantAccount;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Account;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -39,7 +39,7 @@ public class MerchantClosureService {
   private final MerchantClosureRepository closureRepository;
   private final DailySettlementRepository dailySettlementRepository;
   private final MonthlySettlementRepository monthlySettlementRepository;
-  private final MerchantAccountRepository accountRepository;
+  private final AccountRepository accountRepository;
   private final Clock clock;
 
   /** 해지 신청 전에 정산 현황과 신청 가능 여부를 보여 준다. 상태는 바꾸지 않는다. */
@@ -109,8 +109,11 @@ public class MerchantClosureService {
                 merchantId, MonthlySettlementStatus.PENDING)
             + unsettledAmount;
 
+    // 점주의 모의계좌가 정산 계좌다. 점주가 없는 가맹점은 계좌가 없어 0원으로 본다
     long accountBalance =
-        accountRepository.findByMerchantId(merchantId).map(MerchantAccount::getBalance).orElse(0L);
+        merchant.getOwnerId() == null
+            ? 0L
+            : accountRepository.findByUserId(merchant.getOwnerId()).map(Account::getBalance).orElse(0L);
 
     // 해지 정산은 월 정산 건이 아직 없는 정산금에서만 부족분을 차감한다. 이미 만들어진 지급 대기 건은 고치지 않고,
     // 계좌 잔액은 점주의 돈이라 쓰지 않는다

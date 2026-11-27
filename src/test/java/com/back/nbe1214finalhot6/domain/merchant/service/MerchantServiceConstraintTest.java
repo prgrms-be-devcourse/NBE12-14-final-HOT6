@@ -4,15 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
-import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
 import java.sql.SQLException;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +28,6 @@ class MerchantServiceConstraintTest {
       new MerchantRegisterRequest("테스트 가맹점", "인천광역시 남동구 1", null);
 
   @Mock MerchantRepository merchantRepository;
-  @Mock MerchantWalletService merchantWalletService;
   @InjectMocks MerchantService merchantService;
 
   private DataIntegrityViolationException violationOf(String constraintName, String message) {
@@ -52,7 +48,6 @@ class MerchantServiceConstraintTest {
         .isInstanceOfSatisfying(
             BusinessException.class,
             e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED));
-    verify(merchantWalletService, never()).createFor(any());
   }
 
   // 목적: 다른 제약 위반을 점주 중복으로 잘못 포장하면 진짜 원인이 가려지므로, 그대로 던지는지 확인한다.
@@ -66,6 +61,5 @@ class MerchantServiceConstraintTest {
     given(merchantRepository.saveAndFlush(any(Merchant.class))).willThrow(other);
 
     assertThatThrownBy(() -> merchantService.register(1L, REQUEST)).isSameAs(other);
-    verify(merchantWalletService, never()).createFor(any());
   }
 }

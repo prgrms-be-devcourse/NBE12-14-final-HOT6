@@ -10,7 +10,6 @@ import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
-import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -27,7 +26,6 @@ public class MerchantService {
   private static final int MAX_PAGE_SIZE = 50;
 
   private final MerchantRepository merchantRepository;
-  private final MerchantWalletService merchantWalletService;
 
   /**
    * 점주(ownerId)의 가맹점을 등록한다. 점주 한 명당 하나만 등록할 수 있다.
@@ -56,7 +54,6 @@ public class MerchantService {
       }
       throw e;
     }
-    merchantWalletService.createFor(merchant.getId());
 
     return MerchantRegisterResponse.from(merchant);
   }

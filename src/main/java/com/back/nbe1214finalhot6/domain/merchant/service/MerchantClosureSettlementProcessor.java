@@ -1,7 +1,5 @@
 package com.back.nbe1214finalhot6.domain.merchant.service;
 
-import com.back.nbe1214finalhot6.common.exception.BusinessException;
-import com.back.nbe1214finalhot6.common.response.CommonErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantClosureDeduction;
 import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantClosureDeductionRepository;
@@ -11,7 +9,7 @@ import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlement;
 import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlementStatus;
 import com.back.nbe1214finalhot6.domain.settlement.repository.DailySettlementRepository;
 import com.back.nbe1214finalhot6.domain.settlement.repository.MonthlySettlementRepository;
-import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
+import com.back.nbe1214finalhot6.domain.settlement.service.MonthlySettlementProcessor;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -25,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 가맹점 한 곳의 해지 정산을 한 트랜잭션으로 처리한다. 호출하는 쪽은 트랜잭션을 열지 않는다.
  *
- * <p>월 정산에 묶이지 않은 달의 일 정산 확정액으로 월 정산 건을 만들고, 마지막 일 정산에 남은 부족분을 가장 최근 달부터 차감한 뒤 지갑을 거쳐 계좌로
+ * <p>월 정산에 묶이지 않은 달의 일 정산 확정액으로 월 정산 건을 만들고, 마지막 일 정산에 남은 부족분을 가장 최근 달부터 차감한 뒤 점주의 모의계좌로
  * 지급하고 해지 완료로 바꾼다. 달별로 차감한 금액은 따로 남겨 월 지급 대사가 지급액을 설명할 수 있게 한다. 부족분이 정산금보다 많으면 아무것도 바꾸지 않고
  * 보류한다. 점주의 계좌와 이미 지급한 정산금은 건드리지 않는다.
  */
@@ -48,7 +46,7 @@ public class MerchantClosureSettlementProcessor {
   private final MerchantClosureDeductionRepository deductionRepository;
   private final DailySettlementRepository dailySettlementRepository;
   private final MonthlySettlementRepository monthlySettlementRepository;
-  private final MerchantWalletService walletService;
+  private final MonthlySettlementProcessor monthlySettlementProcessor;
   private final Clock clock;
 
   /**
@@ -89,7 +87,7 @@ public class MerchantClosureSettlementProcessor {
             MonthlySettlement.create(merchantId, payout.month(), payout.amount(), now));
       }
     }
-    payPending(merchantId, now);
+    payPending(merchantId);
     return Outcome.CLOSED;
   }
 
@@ -139,21 +137,12 @@ public class MerchantClosureSettlementProcessor {
     return deductions;
   }
 
-  // 지급이 끝나지 않은 건을 지갑에 입금하고 계좌로 출금한다. 같은 건을 다시 처리해도 중복 반영되지 않는다
-  private void payPending(Long merchantId, LocalDateTime now) {
+  // 지급이 끝나지 않은 건을 점주의 모의계좌로 지급한다. 같은 건을 다시 처리해도 중복 반영되지 않는다
+  private void payPending(Long merchantId) {
     for (MonthlySettlement pending :
         monthlySettlementRepository.findByMerchantIdAndStatusOrderByIdAsc(
             merchantId, MonthlySettlementStatus.PENDING)) {
-      MonthlySettlement locked =
-          monthlySettlementRepository
-              .findWithLockById(pending.getId())
-              .orElseThrow(() -> new BusinessException(CommonErrorCode.INVALID_REQUEST));
-      if (locked.isPaid()) {
-        continue;
-      }
-      walletService.deposit(merchantId, locked.getPayoutAmount(), locked.getId());
-      walletService.withdrawToAccount(merchantId, locked.getPayoutAmount(), locked.getId());
-      locked.markPaid(now);
+      monthlySettlementProcessor.payAndComplete(pending.getId());
     }
   }
 }

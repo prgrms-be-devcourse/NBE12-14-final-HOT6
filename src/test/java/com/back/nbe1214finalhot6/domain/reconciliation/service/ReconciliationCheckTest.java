@@ -2,8 +2,10 @@ package com.back.nbe1214finalhot6.domain.reconciliation.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantClosureDeduction;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantClosureDeductionRepository;
+import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.domain.payment.entity.Payment;
 import com.back.nbe1214finalhot6.domain.payment.entity.PaymentStatus;
 import com.back.nbe1214finalhot6.domain.payment.repository.PaymentRepository;
@@ -17,10 +19,8 @@ import com.back.nbe1214finalhot6.domain.settlement.repository.DailySettlementRep
 import com.back.nbe1214finalhot6.domain.settlement.repository.MonthlySettlementRepository;
 import com.back.nbe1214finalhot6.domain.settlement.service.DailySettlementService;
 import com.back.nbe1214finalhot6.domain.settlement.service.MonthlySettlementService;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantAccountRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantWalletRepository;
-import com.back.nbe1214finalhot6.domain.wallet.repository.MerchantWalletTransactionRepository;
-import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
+import com.back.nbe1214finalhot6.domain.wallet.entity.Account;
+import com.back.nbe1214finalhot6.domain.wallet.repository.AccountRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,12 +31,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 // 테스트 시계는 2026-11-18 09:00 KST 에서 시작하므로 대사 기준일은 11/17 이다. 월 지급 대사는 그 전월인 10월을 본다.
 @IntegrationTest
 class ReconciliationCheckTest {
 
   private static final Long MERCHANT = 1L;
+  // 월 정산금을 실제로 지급하는 테스트에서 쓰는 점주. 지급하려면 점주가 있는 가맹점과 점주 계좌가 필요하다
+  private static final Long OWNER = 8_401L;
   private static final LocalDate D16 = LocalDate.of(2026, 11, 16);
   private static final LocalDate D17 = LocalDate.of(2026, 11, 17);
   private static final LocalDate OCTOBER_FIRST = LocalDate.of(2026, 10, 1);
@@ -55,21 +58,22 @@ class ReconciliationCheckTest {
   @Autowired MonthlySettlementRepository monthlyRepository;
   @Autowired MerchantClosureDeductionRepository deductionRepository;
   @Autowired PaymentRepository paymentRepository;
-  @Autowired MerchantWalletService walletService;
-  @Autowired MerchantWalletRepository walletRepository;
-  @Autowired MerchantAccountRepository accountRepository;
-  @Autowired MerchantWalletTransactionRepository transactionRepository;
+  @Autowired MerchantRepository merchantRepository;
+  @Autowired AccountRepository accountRepository;
+  @Autowired JdbcTemplate jdbcTemplate;
 
   @AfterEach
   void cleanUp() {
     resultRepository.deleteAll();
     deductionRepository.deleteAll();
-    transactionRepository.deleteAll();
+    jdbcTemplate.update(
+        "delete from account_transaction where account_id in (select id from account where user_id = ?)",
+        OWNER);
+    jdbcTemplate.update("delete from account where user_id = ?", OWNER);
     monthlyRepository.deleteAll();
     dailyRepository.deleteAll();
     paymentRepository.deleteAll();
-    walletRepository.deleteAll();
-    accountRepository.deleteAll();
+    merchantRepository.findByOwnerId(OWNER).ifPresent(merchantRepository::delete);
   }
 
   @Test
@@ -135,10 +139,12 @@ class ReconciliationCheckTest {
   }
 
   @Test
-  @DisplayName("월 지급액과 일 정산 합, 지갑 원장이 모두 맞으면 월 지급 대사가 일치한다")
+  @DisplayName("월 지급액과 일 정산 합, 점주 계좌 원장이 모두 맞으면 월 지급 대사가 일치한다")
   void 월지급_일치() {
-    walletService.createFor(MERCHANT);
-    saveDaily(MERCHANT, LocalDate.of(2026, 10, 5), 15_000L);
+    Long merchantId =
+        merchantRepository.save(Merchant.create(OWNER, "대사 가맹점", "인천광역시 남동구 1", true)).getId();
+    accountRepository.save(Account.createEmpty(OWNER, NOW));
+    saveDaily(merchantId, LocalDate.of(2026, 10, 5), 15_000L);
     monthlyService.settle(YearMonth.of(2026, 10));
 
     ReconciliationResult result = resultOf(ReconciliationType.MONTHLY_PAYOUT);
@@ -171,7 +177,7 @@ class ReconciliationCheckTest {
   }
 
   @Test
-  @DisplayName("지급 완료인데 지갑 원장에 입금·출금이 없으면 월 지급 대사에서 불일치로 잡힌다")
+  @DisplayName("지급 완료인데 점주 계좌 원장에 정산 입금이 없으면 월 지급 대사에서 불일치로 잡힌다")
   void 지급완료_원장없음() {
     saveDaily(MERCHANT, LocalDate.of(2026, 10, 5), 15_000L);
     MonthlySettlement settlement = MonthlySettlement.create(MERCHANT, OCTOBER_FIRST, 15_000L, NOW);
@@ -198,7 +204,6 @@ class ReconciliationCheckTest {
   @Test
   @DisplayName("해지 정산이 부족분을 차감한 달은 확정액의 합에서 차감액을 뺀 값과 지급액이 같으면 일치한다")
   void 해지_차감한_달_일치() {
-    walletService.createFor(MERCHANT);
     saveDaily(MERCHANT, LocalDate.of(2026, 10, 5), 30_000L);
     deductionRepository.save(
         MerchantClosureDeduction.create(MERCHANT, OCTOBER_FIRST, 10_000L, NOW));

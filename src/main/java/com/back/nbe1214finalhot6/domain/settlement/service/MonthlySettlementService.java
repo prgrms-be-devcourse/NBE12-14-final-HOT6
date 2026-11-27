@@ -8,7 +8,6 @@ import com.back.nbe1214finalhot6.domain.settlement.entity.MonthlySettlementStatu
 import com.back.nbe1214finalhot6.domain.settlement.exception.SettlementErrorCode;
 import com.back.nbe1214finalhot6.domain.settlement.repository.DailySettlementRepository;
 import com.back.nbe1214finalhot6.domain.settlement.repository.MonthlySettlementRepository;
-import com.back.nbe1214finalhot6.domain.wallet.service.MerchantWalletService;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -18,8 +17,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 /**
- * 한 달치 일 정산 확정액을 가맹점별로 합산해 지급한다. 가맹점 한 곳의 실패가 다른 곳에 영향을 주지 않도록 트랜잭션은 열지 않고, 입금과 출금도 각각 따로
- * 커밋한다. 출금이 실패해도 입금은 지갑 잔액으로 남고, 다음 실행에서 출금만 다시 시도한다.
+ * 한 달치 일 정산 확정액을 가맹점별로 합산해 점주의 모의계좌로 지급한다. 가맹점 한 곳의 실패가 다른 곳에 영향을 주지 않도록 트랜잭션은 열지 않고, 건마다
+ * 지급을 따로 커밋한다. 지급이 실패하면 건은 대기로 남고 다음 실행에서 다시 지급한다.
  */
 @Slf4j
 @Service
@@ -29,7 +28,6 @@ public class MonthlySettlementService {
   private final DailySettlementRepository dailySettlementRepository;
   private final MonthlySettlementRepository monthlySettlementRepository;
   private final MonthlySettlementProcessor processor;
-  private final MerchantWalletService walletService;
   private final Clock clock;
 
   public MonthlySettlementRunResult settle(YearMonth month) {
@@ -95,8 +93,6 @@ public class MonthlySettlementService {
   }
 
   private void pay(MonthlySettlement settlement) {
-    walletService.deposit(
-        settlement.getMerchantId(), settlement.getPayoutAmount(), settlement.getId());
-    processor.withdrawAndComplete(settlement.getId());
+    processor.payAndComplete(settlement.getId());
   }
 }

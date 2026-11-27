@@ -19,6 +19,6 @@ public enum ReconciliationType {
   DAILY_NET_SALES,
   // 7번: 정산 확정액 + 다음 날 이월 = 순매출 + 전일 이월
   SETTLEMENT_CARRY,
-  // 월 지급액 = 일 정산 확정액 합 = 지갑 원장 입금·출금
+  // 월 지급액 = 일 정산 확정액 합(해지 차감액 제외) = 점주 계좌 원장의 정산 입금
   MONTHLY_PAYOUT
 }
