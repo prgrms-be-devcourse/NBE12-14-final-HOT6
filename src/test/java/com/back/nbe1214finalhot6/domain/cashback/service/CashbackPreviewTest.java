@@ -33,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class CashbackPreviewTest {
 
+  private static final long OPERATOR_ID = 99L;
+
   private static final long WALLET = 7L;
   private static final LocalDateTime AT = LocalDateTime.of(2026, 11, 18, 9, 0);
 
@@ -188,7 +190,7 @@ class CashbackPreviewTest {
   @DisplayName("달 중 인하 구간이 시작되면 그 요율로 계산한다")
   void rateReduction() {
     policyService.reduceRate(
-        new RateReductionRequest(new BigDecimal("0.02"), LocalDateTime.of(2026, 11, 18, 12, 0)));
+        new RateReductionRequest(new BigDecimal("0.02"), LocalDateTime.of(2026, 11, 18, 12, 0), "테스트 사유"), OPERATOR_ID);
     assertThat(preview(true, 10_000L).expectedAmount()).isEqualTo(300L);
 
     ((MutableClock) clock).advance(Duration.ofHours(4)); // 13:00

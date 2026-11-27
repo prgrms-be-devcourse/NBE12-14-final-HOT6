@@ -37,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
     })
 class CashbackPolicyReductionLimitTest {
 
+  private static final long OPERATOR_ID = 99L;
+
   private static final LocalDateTime NOV_20 = LocalDateTime.of(2026, 11, 20, 0, 0);
   private static final LocalDateTime NOV_25 = LocalDateTime.of(2026, 11, 25, 0, 0);
   private static final LocalDateTime NOV_28 = LocalDateTime.of(2026, 11, 28, 0, 0);
@@ -55,7 +57,7 @@ class CashbackPolicyReductionLimitTest {
   }
 
   private PolicyResponse reduce(String rate, LocalDateTime effectiveAt) {
-    return policyService.reduceRate(new RateReductionRequest(new BigDecimal(rate), effectiveAt));
+    return policyService.reduceRate(new RateReductionRequest(new BigDecimal(rate), effectiveAt, "테스트 사유"), OPERATOR_ID);
   }
 
   private void assertReduceError(String rate, LocalDateTime effectiveAt, CashbackErrorCode code) {
