@@ -562,7 +562,7 @@ ACTIVE ──(해지 신청)──▶ CLOSING ──(해지 정산 완료)──
 | 해지 기록 | 엔티티 `MerchantClosure`, 테이블 `merchant_closure`(가맹점 ID 유니크, 신청 시각). 차감액은 `MerchantClosureDeduction`, 테이블 `merchant_closure_deduction` |
 | API | `GET /api/merchants/me/closure/preview`, `POST /api/merchants/me/closure`(OWNER), `POST /api/admin/merchants/closures/run`(ADMIN, 전체 `CLOSING` 가맹점 실행) |
 | 서비스 | `MerchantClosureService`(`preview`, `request`), `MerchantClosureSettlementService`(`run`), `MerchantClosureSettlementProcessor`(`settleOne`, 가맹점별 트랜잭션), `MerchantClosureScheduler`(00:40), `MerchantClosureAdminController`, `MerchantStatusGuard`(상태별 거절 사유), `MerchantService.assertActive(merchantId)`(해지 예정이면 `MER-003`, 해지됐으면 `MER-004`. D의 QR과 A의 결제 취소 서비스가 호출한다) |
-| 대사 | 11번 `MERCHANT_CLOSURE`, 클래스 `MerchantClosureCheck`(#283), 읽기 저장소 `ClosedMerchantReader`. 원인 코드는 `REQUEST`, `PENDING`, `DEDUCTION`, `PAYOUT` |
+| 대사 | 11번 `MERCHANT_CLOSURE`, 클래스 `MerchantClosureCheck`(#283), 읽기 저장소 `ClosedMerchantReader`. 원인 코드는 `REQUEST`(신청 기록 없음), `PENDING`(대기 건 남음), `AFTER`(신청일 뒤 결제·취소), `DEDUCTION`(차감액 ≠ 신청일 이월), `PAYOUT`(확정액 − 차감액 ≠ 지급액). 해지 완료 가맹점은 일 정산이 부족분을 더 넘기지 않고, 9번 대사도 그 가맹점의 다음 날 장부 누락을 보지 않는다(#283) |
 | 에러 코드 | `MER-003 MERCHANT_CLOSING`(해지 예정 가맹점, 409), `MER-004 MERCHANT_CLOSED`(해지된 가맹점, 409), `MER-005 MERCHANT_CLOSURE_SHORTFALL`(정산금으로 마이너스 이월을 갚을 수 없음, 409). 이미 신청한 경우는 `MER-003`으로 응답하고, `STL-006`은 두지 않았다(해지 정산은 `CLOSING` 가맹점만 모아서 처리한다) |
 | 증빙 제출 | `PUT /api/merchants/me/revenue-proof`(OWNER), `Merchant.approveCashback()`, `MerchantService.submitRevenueProof` |
 | 운영자 화면 | 기존 정산 실행 화면에 "해지 정산 실행" 버튼 |

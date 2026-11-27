@@ -2,12 +2,14 @@ package com.back.nbe1214finalhot6.domain.reconciliation.service;
 
 import com.back.nbe1214finalhot6.domain.reconciliation.dto.ReconciliationOutcome;
 import com.back.nbe1214finalhot6.domain.reconciliation.entity.ReconciliationType;
+import com.back.nbe1214finalhot6.domain.reconciliation.repository.ClosedMerchantReader;
 import com.back.nbe1214finalhot6.domain.reconciliation.repository.DailySettlementReader;
 import com.back.nbe1214finalhot6.domain.settlement.entity.DailySettlement;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Component;
 public class SettlementCarryCheck implements ReconciliationCheck {
 
   private final DailySettlementReader settlementReader;
+  private final ClosedMerchantReader closedMerchantReader;
 
   @Override
   public ReconciliationType type() {
@@ -48,10 +51,14 @@ public class SettlementCarryCheck implements ReconciliationCheck {
         mismatches.add("merchantId=" + row.getMerchantId());
       }
     }
-    // 어제 부족분을 넘긴 가맹점은 매출이 없어도 오늘 장부가 있어야 한다
+    // 어제 부족분을 넘긴 가맹점은 매출이 없어도 오늘 장부가 있어야 한다.
+    // 해지가 끝난 가맹점은 해지 정산이 부족분을 청산해 이월을 더 넘기지 않으므로 뺀다
+    Set<Long> closed = Set.copyOf(closedMerchantReader.findClosedMerchantIds());
     int missingCount = 0;
     for (DailySettlement row : yesterday) {
-      if (row.getCarryOut() < 0 && !current.containsKey(row.getMerchantId())) {
+      if (row.getCarryOut() < 0
+          && !current.containsKey(row.getMerchantId())
+          && !closed.contains(row.getMerchantId())) {
         missingCount++;
         mismatches.add("merchantId=" + row.getMerchantId());
       }

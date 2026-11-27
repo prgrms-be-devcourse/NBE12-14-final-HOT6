@@ -80,6 +80,33 @@ class MerchantClosureCheckTest {
   }
 
   @Test
+  @DisplayName("해지 신청일 뒤에 취소가 일 정산에 반영됐으면 청산되지 않은 돈이 있어 AFTER 다")
+  void 신청일_뒤_취소() {
+    Long merchantId = saveClosedMerchant();
+    saveDaily(merchantId, DAY, 30_000, 0, 0);
+    savePaid(merchantId, 30_000);
+    // 신청 뒤에 취소 5,000원이 들어왔다
+    saveDaily(merchantId, DAY.plusDays(2), 0, 5_000, 0);
+
+    assertThat(check.check(CHECK_DATE).mismatches()).contains(ref(merchantId) + ":AFTER");
+  }
+
+  @Test
+  @DisplayName("신청일 뒤에 부족분만 넘긴 행은 결제·취소가 없으므로 AFTER 가 아니다")
+  void 신청일_뒤_이월만() {
+    Long merchantId = saveClosingMerchant();
+    saveDaily(merchantId, DAY.minusDays(2), 30_000, 0, 0);
+    saveDaily(merchantId, DAY.minusDays(1), 0, 10_000, 0);
+    saveDaily(merchantId, DAY, 0, 0, -10_000);
+    // 해지 정산 전날까지 부족분이 이월된 행
+    saveDaily(merchantId, DAY.plusDays(1), 0, 0, -10_000);
+    processor.settleOne(merchantId, DAY);
+
+    assertThat(check.check(CHECK_DATE).mismatches())
+        .noneMatch(ref -> ref.startsWith(ref(merchantId) + ":"));
+  }
+
+  @Test
   @DisplayName("차감액의 합이 신청일의 부족분과 다르면 DEDUCTION 이다")
   void 차감액_불일치() {
     Long merchantId = saveClosedMerchant();

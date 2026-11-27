@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>{@code REQUEST}: 해지 신청 기록이 없다
  *   <li>{@code PENDING}: 지급이 끝나지 않은 월 정산 건이 남아 있다
+ *   <li>{@code AFTER}: 해지 신청일 뒤에 결제나 취소가 일 정산에 반영됐다. 해지 정산은 신청일까지만 청산하므로 그 뒤의 돈은 청산되지 않았다
  *   <li>{@code DEDUCTION}: 해지 차감액의 합이 신청일 마지막 일 정산의 부족분(이월)과 다르다
  *   <li>{@code PAYOUT}: (일 정산 확정액 합 - 차감액 합)이 월 정산 지급액 합과 다르다
  * </ul>
@@ -102,6 +103,16 @@ public class MerchantClosureCheck implements ReconciliationCheck {
     if (monthlies.stream().anyMatch(monthly -> !monthly.isPaid())) {
       return "PENDING";
     }
+    // 신청 뒤에는 결제가 막히고 취소도 막혀야 한다. 이월만 넘긴 행은 결제·취소가 0원이라 걸리지 않는다
+    boolean activityAfterClosure =
+        dailies.stream()
+            .anyMatch(
+                daily ->
+                    daily.getSettlementDate().isAfter(closureDate)
+                        && (daily.getPaymentTotal() > 0 || daily.getCancelTotal() > 0));
+    if (activityAfterClosure) {
+      return "AFTER";
+    }
 
     Map<LocalDate, DailySettlement> byDate =
         dailies.stream()
@@ -112,7 +123,6 @@ public class MerchantClosureCheck implements ReconciliationCheck {
       return "DEDUCTION";
     }
 
-    // 신청 뒤의 확정액도 합에 넣는다. 신청 뒤에 확정액이 생겼다면 지급되지 않은 돈이므로 불일치로 잡혀야 한다
     long confirmedSum = dailies.stream().mapToLong(DailySettlement::getConfirmedAmount).sum();
     long payoutSum = monthlies.stream().mapToLong(MonthlySettlement::getPayoutAmount).sum();
     if (confirmedSum - deductionSum != payoutSum) {
