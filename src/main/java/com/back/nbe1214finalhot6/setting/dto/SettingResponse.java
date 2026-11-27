@@ -2,6 +2,8 @@ package com.back.nbe1214finalhot6.setting.dto;
 
 import com.back.nbe1214finalhot6.setting.SettingKey;
 import com.back.nbe1214finalhot6.setting.entity.OperatorSetting;
+import com.back.nbe1214finalhot6.setting.entity.OperatorSettingSchedule;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -22,10 +24,41 @@ public record SettingResponse(
     long minValue,
     Long hardMax,
     LocalDateTime updatedAt,
-    Long updatedBy) {
+    Long updatedBy,
+    ScheduledChange scheduled) {
+
+  /**
+   * 아직 적용되지 않은 예약.
+   *
+   * @param value 적용일부터 쓸 값(기본값으로 되돌리는 예약이면 기본값)
+   * @param reset 기본값으로 되돌리는 예약인지
+   * @param effectiveDate 적용일
+   * @param noticeId 예약을 알린 공지 ID
+   */
+  public record ScheduledChange(long value, boolean reset, LocalDate effectiveDate, Long noticeId) {}
+
+  /** 예약이 없는 응답. */
+  public SettingResponse(
+      SettingKey key,
+      String description,
+      long value,
+      SettingSource source,
+      long defaultValue,
+      long minValue,
+      Long hardMax,
+      LocalDateTime updatedAt,
+      Long updatedBy) {
+    this(key, description, value, source, defaultValue, minValue, hardMax, updatedAt, updatedBy, null);
+  }
 
   /** 키와 저장된 행(없으면 null)으로 응답을 만든다. */
   public static SettingResponse of(SettingKey key, OperatorSetting stored) {
+    return of(key, stored, null);
+  }
+
+  /** 키, 저장된 행(없으면 null), 대기 중인 예약(없으면 null)으로 응답을 만든다. */
+  public static SettingResponse of(
+      SettingKey key, OperatorSetting stored, OperatorSettingSchedule schedule) {
     boolean overridden = stored != null;
     return new SettingResponse(
         key,
@@ -36,6 +69,13 @@ public record SettingResponse(
         key.minValue(),
         key.hasHardMax() ? key.hardMax() : null,
         overridden ? stored.getUpdatedAt() : null,
-        overridden ? stored.getUpdatedBy() : null);
+        overridden ? stored.getUpdatedBy() : null,
+        schedule == null
+            ? null
+            : new ScheduledChange(
+                schedule.appliedValue(),
+                schedule.getSettingValue() == null,
+                schedule.getEffectiveDate(),
+                schedule.getNoticeId()));
   }
 }

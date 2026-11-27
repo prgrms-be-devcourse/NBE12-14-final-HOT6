@@ -12,6 +12,8 @@
  *   <li>키마다 기본값, 최솟값, 하드 상한이 {@link com.back.nbe1214finalhot6.setting.SettingKey} 에 코드로 정의된다.
  *       하드 상한은 법적 한도 같은 값이라 운영자가 바꿀 수 없다.
  *   <li>값은 운영자 API({@code OperatorSettingAdminController})로만 바꾼다. 값이 실제로 바뀔 때마다 변경 이력을 남긴다.
+ *   <li>날짜를 정해 예약할 수 있다. 배치 없이, 값을 읽을 때 적용일이 지난 예약이 있으면 예약 값을 쓴다.
+ *   <li>변경 공지는 {@code SettingChangeNotifier} 로 요청하고, 이 패키지는 공지를 가진 도메인에 의존하지 않는다.
  * </ul>
  */
 package com.back.nbe1214finalhot6.setting;

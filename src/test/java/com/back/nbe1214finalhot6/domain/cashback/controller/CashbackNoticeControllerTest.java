@@ -43,12 +43,17 @@ class CashbackNoticeControllerTest {
         new NoticeResponse(
             3L,
             NoticeType.POLICY_CHANGE,
+            "적립률 변경 안내",
             "12월 1일부터 적립률이 5%로 바뀌어요.",
             LocalDate.of(2026, 12, 1),
             null,
             LocalDateTime.of(2026, 11, 18, 9, 0),
             new BigDecimal("0.05"),
-            new BigDecimal("0.10"));
+            new BigDecimal("0.10"),
+            null,
+            null,
+            null,
+            null);
     given(noticeService.list(NoticeType.POLICY_CHANGE, 1, 5))
         .willReturn(new PageResponse<>(List.of(notice), 1, 5, 6L, 2));
 
@@ -87,5 +92,34 @@ class CashbackNoticeControllerTest {
     mockMvc.perform(get("/api/notices").param("type", "NOPE")).andExpect(status().isBadRequest());
     mockMvc.perform(get("/api/notices").param("page", "-1")).andExpect(status().isBadRequest());
     mockMvc.perform(get("/api/notices").param("size", "0")).andExpect(status().isBadRequest());
+  }
+
+  // 목적: 홈 공지가 공통 응답 형식으로 내려가는지 확인한다.
+  @Test
+  @DisplayName("홈 공지를 조회한다")
+  void home_ok() throws Exception {
+    given(noticeService.listForHome())
+        .willReturn(
+            List.of(
+                new NoticeResponse(
+                    7L,
+                    NoticeType.LIMIT_CHANGE,
+                    "한도 변경 안내",
+                    "본문",
+                    LocalDate.of(2026, 12, 1),
+                    null,
+                    LocalDateTime.of(2026, 11, 18, 9, 0),
+                    null,
+                    null,
+                    "CASHBACK_USER_MONTHLY_LIMIT",
+                    50_000L,
+                    40_000L,
+                    null)));
+
+    mockMvc
+        .perform(get("/api/notices/home"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].title").value("한도 변경 안내"))
+        .andExpect(jsonPath("$.data[0].newValue").value(40_000));
   }
 }

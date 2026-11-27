@@ -1,10 +1,13 @@
 package com.back.nbe1214finalhot6.setting.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -13,10 +16,13 @@ import com.back.nbe1214finalhot6.common.config.SecurityConfig;
 import com.back.nbe1214finalhot6.common.exception.BusinessException;
 import com.back.nbe1214finalhot6.domain.auth.jwt.JwtProvider;
 import com.back.nbe1214finalhot6.setting.SettingKey;
+import com.back.nbe1214finalhot6.setting.dto.SettingNoticeRequest;
 import com.back.nbe1214finalhot6.setting.dto.SettingResponse;
+import com.back.nbe1214finalhot6.setting.dto.SettingScheduleRequest;
 import com.back.nbe1214finalhot6.setting.dto.SettingSource;
 import com.back.nbe1214finalhot6.setting.exception.SettingErrorCode;
 import com.back.nbe1214finalhot6.setting.service.OperatorSettingAdminService;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -76,22 +82,55 @@ class OperatorSettingAdminControllerTest {
         .andExpect(jsonPath("$.data[1].hardMax").value(1_000_000));
   }
 
-  // 목적: 값 변경이 200 과 변경된 설정을 반환하는지 확인한다.
+  private static final String NOTICE_JSON =
+      """
+      {"title": "제목", "content": "본문", "showOnHome": true, "homeUntil": "2026-11-30"}
+      """;
+  private static final SettingNoticeRequest NOTICE =
+      new SettingNoticeRequest("제목", "본문", true, LocalDate.of(2026, 11, 30));
+
+  private static String updateBody(long value) {
+    return "{\"value\": " + value + ", \"notice\": " + NOTICE_JSON + "}";
+  }
+
+  private static String resetBody() {
+    return "{\"notice\": " + NOTICE_JSON + "}";
+  }
+
+  // 목적: 값 변경이 공지를 서비스에 넘기고 200 과 변경된 설정을 반환하는지 확인한다.
   @Test
   @DisplayName("값 변경은 200 과 변경 결과를 반환한다")
   void put_ok() throws Exception {
-    given(settingService.put(eq(KEY), eq(700_000L))).willReturn(operatorValue(700_000L));
+    given(settingService.put(KEY, 700_000L, NOTICE)).willReturn(operatorValue(700_000L));
 
     mockMvc
         .perform(
             put("/api/admin/settings/" + KEY)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"value": 700000}
-                    """))
+                .content(updateBody(700_000L)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.value").value(700_000))
         .andExpect(jsonPath("$.data.key").value(KEY));
+  }
+
+  // 목적: 공지 없이는 바꾸거나 되돌릴 수 없는지 확인한다.
+  @Test
+  @DisplayName("공지가 없으면 변경과 되돌리기는 400")
+  void withoutNotice() throws Exception {
+    mockMvc
+        .perform(
+            put("/api/admin/settings/" + KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"value\": 700000}"))
+        .andExpect(status().isBadRequest());
+    mockMvc
+        .perform(
+            delete("/api/admin/settings/" + KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+        .andExpect(status().isBadRequest());
+    mockMvc.perform(delete("/api/admin/settings/" + KEY)).andExpect(status().isBadRequest());
+    verifyNoInteractions(settingService);
   }
 
   // 목적: 값이 빠지면 400 으로 걸러지는지 확인한다.
@@ -111,16 +150,14 @@ class OperatorSettingAdminControllerTest {
   @Test
   @DisplayName("범위 밖 값이나 없는 키는 400 과 SET-001")
   void put_invalidSetting() throws Exception {
-    given(settingService.put(eq("NO_SUCH_KEY"), anyLong()))
+    given(settingService.put(eq("NO_SUCH_KEY"), anyLong(), any()))
         .willThrow(new BusinessException(SettingErrorCode.INVALID_SETTING));
 
     mockMvc
         .perform(
             put("/api/admin/settings/NO_SUCH_KEY")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"value": 1000}
-                    """))
+                .content(updateBody(1000L)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SET-001"));
   }
@@ -129,20 +166,96 @@ class OperatorSettingAdminControllerTest {
   @Test
   @DisplayName("되돌리기는 200, 없는 키는 400 과 SET-001")
   void reset_okAndInvalid() throws Exception {
-    given(settingService.reset(KEY))
+    given(settingService.reset(KEY, NOTICE))
         .willReturn(SettingResponse.of(SettingKey.WALLET_MONTHLY_CHARGE_LIMIT, null));
-    given(settingService.reset("NO_SUCH_KEY"))
+    given(settingService.reset("NO_SUCH_KEY", NOTICE))
         .willThrow(new BusinessException(SettingErrorCode.INVALID_SETTING));
 
     mockMvc
-        .perform(delete("/api/admin/settings/" + KEY))
+        .perform(
+            delete("/api/admin/settings/" + KEY)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(resetBody()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.source").value("DEFAULT"))
         .andExpect(jsonPath("$.data.value").value(1_000_000));
 
     mockMvc
-        .perform(delete("/api/admin/settings/NO_SUCH_KEY"))
+        .perform(
+            delete("/api/admin/settings/NO_SUCH_KEY")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(resetBody()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("SET-001"));
+  }
+
+  // 목적: 예약이 201 과 예약 정보를 반환하고, 공지가 없으면 400 인지 확인한다.
+  @Test
+  @DisplayName("예약은 201 이고 공지가 없으면 400")
+  void schedule() throws Exception {
+    LocalDate date = LocalDate.of(2026, 12, 1);
+    SettingScheduleRequest request =
+        new SettingScheduleRequest(800_000L, date, new SettingNoticeRequest("제목", "본문", false, null));
+    given(settingService.schedule(KEY, request))
+        .willReturn(
+            new SettingResponse(
+                SettingKey.WALLET_MONTHLY_CHARGE_LIMIT,
+                "지갑 월 충전 한도(원)",
+                1_000_000L,
+                SettingSource.DEFAULT,
+                1_000_000L,
+                1L,
+                1_000_000L,
+                null,
+                null,
+                new SettingResponse.ScheduledChange(800_000L, false, date, 5L)));
+
+    mockMvc
+        .perform(
+            post("/api/admin/settings/" + KEY + "/schedule")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"value": 800000, "effectiveDate": "2026-12-01",
+                     "notice": {"title": "제목", "content": "본문", "showOnHome": false}}
+                    """))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.data.scheduled.value").value(800_000))
+        .andExpect(jsonPath("$.data.scheduled.effectiveDate").value("2026-12-01"))
+        .andExpect(jsonPath("$.data.scheduled.noticeId").value(5));
+
+    mockMvc
+        .perform(
+            post("/api/admin/settings/" + KEY + "/schedule")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"value": 800000, "effectiveDate": "2026-12-01"}
+                    """))
+        .andExpect(status().isBadRequest());
+  }
+
+  // 목적: 예약 취소가 서비스에 전달되고, 없으면 404(SET-003)인지 확인한다.
+  @Test
+  @DisplayName("예약 취소는 200, 예약이 없으면 404")
+  void cancelSchedule() throws Exception {
+    given(settingService.cancelSchedule(KEY))
+        .willReturn(SettingResponse.of(SettingKey.WALLET_MONTHLY_CHARGE_LIMIT, null))
+        .willThrow(new BusinessException(SettingErrorCode.SCHEDULE_NOT_FOUND));
+
+    mockMvc.perform(delete("/api/admin/settings/" + KEY + "/schedule")).andExpect(status().isOk());
+    mockMvc
+        .perform(delete("/api/admin/settings/" + KEY + "/schedule"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("SET-003"));
+  }
+
+  // 목적: 이용자는 예약할 수 없는지 확인한다.
+  @Test
+  @WithMockUser(roles = "USER")
+  @DisplayName("이용자는 예약과 취소를 할 수 없다")
+  void schedule_forbiddenForUser() throws Exception {
+    mockMvc
+        .perform(delete("/api/admin/settings/" + KEY + "/schedule"))
+        .andExpect(status().isForbidden());
   }
 }
