@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 3번 대사(적립 건). 기준일에 지급·취소·회수된 적립 건과 기준일에 생긴 적립·회수 원장이 가리키는 적립 건을 대상으로 상태에 맞는 원장 기록이 있는지 본다.
+ * 4번 대사(캐시백 적립 건). 기준일에 지급·취소·회수된 적립 건과 기준일에 생긴 적립·회수 원장이 가리키는 적립 건을 대상으로 상태에 맞는 원장 기록이 있는지 본다.
  * 지급 완료는 적립 입금만, 회수는 적립 입금과 회수 차감이 있어야 하고, 그 밖의 상태는 기록이 없어야 한다.
  */
 @Component

@@ -2,6 +2,7 @@ package com.back.nbe1214finalhot6.domain.reconciliation.repository;
 
 import com.back.nbe1214finalhot6.domain.settlement.entity.DailySettlement;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.repository.Repository;
 
@@ -11,4 +12,6 @@ public interface DailySettlementReader extends Repository<DailySettlement, Long>
   List<DailySettlement> findBySettlementDate(LocalDate date);
 
   List<DailySettlement> findBySettlementDateBetween(LocalDate from, LocalDate to);
+
+  List<DailySettlement> findByMerchantIdIn(Collection<Long> merchantIds);
 }

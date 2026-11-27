@@ -73,7 +73,7 @@ public class DailySettlementService {
     targets.addAll(payments.keySet());
     targets.addAll(cancels.keySet());
     settlementRepository
-        .findBySettlementDateAndCarryOutLessThan(date.minusDays(1), 0L)
+        .findCarryTargets(date.minusDays(1))
         .forEach(previous -> targets.add(previous.getMerchantId()));
 
     int created = 0;

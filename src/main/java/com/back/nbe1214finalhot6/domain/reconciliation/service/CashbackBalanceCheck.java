@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 3번 대사(잔액). 모든 지갑의 캐시백 잔액이 캐시백 거래 원장 합과 같은지 본다. 회수로 잔액이 음수가 되어도 원장에 남으므로 그대로 비교한다. 예산은 보지
+ * 3번 대사(캐시백 잔액). 모든 지갑의 캐시백 잔액이 캐시백 거래 원장 합과 같은지 본다. 회수로 잔액이 음수가 되어도 원장에 남으므로 그대로 비교한다. 예산은 보지
  * 않는다.
  */
 @Component

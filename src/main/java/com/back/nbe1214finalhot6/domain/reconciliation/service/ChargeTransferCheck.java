@@ -20,7 +20,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** 4번 대사. 기준일의 충전마다 계좌 원장 차감액과 같은 지갑의 원장 입금액이 충전액과 같은지 본다. */
+/** 6번 대사. 기준일의 충전마다 계좌 원장 차감액과 같은 지갑의 원장 입금액이 충전액과 같은지 본다. */
 @Component
 @RequiredArgsConstructor
 public class ChargeTransferCheck implements ReconciliationCheck {

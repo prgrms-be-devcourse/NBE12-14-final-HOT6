@@ -24,8 +24,13 @@ public interface DailySettlementRepository extends JpaRepository<DailySettlement
       Long merchantId, LocalDate settlementDate);
 
   // 그날 다음 날로 부족분을 넘긴 가맹점. 다음 날 매출이 없어도 정산 대상에 넣는다.
-  List<DailySettlement> findBySettlementDateAndCarryOutLessThan(
-      LocalDate settlementDate, long carryOut);
+  // 해지가 끝난(CLOSED) 가맹점은 해지 정산이 부족분을 차감액으로 청산했으므로 더 넘기지 않는다
+  @Query(
+      "select s from DailySettlement s "
+          + "where s.settlementDate = :settlementDate and s.carryOut < 0 "
+          + "and s.merchantId not in (select m.id from Merchant m "
+          + "where m.status = com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus.CLOSED)")
+  List<DailySettlement> findCarryTargets(@Param("settlementDate") LocalDate settlementDate);
 
   List<DailySettlement> findByMerchantIdAndSettlementDateBetweenOrderBySettlementDateAsc(
       Long merchantId, LocalDate from, LocalDate to);
