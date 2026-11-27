@@ -7,6 +7,7 @@ import com.back.nbe1214finalhot6.domain.auth.dto.WithdrawalPreviewResponse;
 import com.back.nbe1214finalhot6.domain.auth.dto.WithdrawalResult;
 import com.back.nbe1214finalhot6.domain.auth.dto.WithdrawalSettleRequest;
 import com.back.nbe1214finalhot6.domain.auth.security.AuthUser;
+import com.back.nbe1214finalhot6.domain.auth.service.PinService;
 import com.back.nbe1214finalhot6.domain.auth.service.WithdrawalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 회원 탈퇴 API. 지갑은 요청으로 받지 않고 로그인한 회원(토큰)으로 찾는다.
  *
- * <p>2단계다. 먼저 미리보기로 환불 금액을 확인하고, 그 금액을 담아 실행한다.
+ * <p>2단계다. 먼저 미리보기로 환불 금액을 확인하고, 그 금액과 PIN 을 담아 실행한다.
  */
 @Tag(name = "탈퇴", description = "회원 탈퇴 미리보기와 실행 API")
 @RestController
@@ -32,6 +33,7 @@ public class WithdrawalController {
 
   private final WithdrawalService withdrawalService;
   private final OwnedResources ownedResources;
+  private final PinService pinService;
 
   @Operation(
       summary = "탈퇴 미리보기",
@@ -47,8 +49,9 @@ public class WithdrawalController {
       summary = "탈퇴 실행",
       description =
           "남은 데브머니를 모의계좌로 환불하고, 적립 예정 캐시백을 소멸시키고, 탈퇴 처리한다(한 트랜잭션). "
-              + "`Idempotency-Key`(UUID) 헤더와 미리보기에서 확인한 환불 예정액이 필요하고, 그 사이 금액이 달라졌으면 "
-              + "409(AUTH-008)로 거절하니 금액을 다시 확인해 다시 요청한다. 음수 캐시백은 정산하지 않고 감수한다. "
+              + "`Idempotency-Key`(UUID) 헤더와 미리보기에서 확인한 환불 예정액, PIN(숫자 6자리)이 필요하다. "
+              + "PIN 이 틀리면 400(AUTH-005, 남은 횟수), 5회 틀려 잠겼으면 409(AUTH-006)이며 이때는 아무것도 바뀌지 않는다. "
+              + "그 사이 금액이 달라졌으면 409(AUTH-008)로 거절하니 금액을 다시 확인해 다시 요청한다. 음수 캐시백은 정산하지 않고 감수한다. "
               + "점주·운영자는 409(AUTH-007), 이미 탈퇴했으면 409(WAL-002)")
   @PostMapping("/settle")
   public ApiResponse<WithdrawalResult> settle(
@@ -56,6 +59,8 @@ public class WithdrawalController {
       @RequestBody @Valid WithdrawalSettleRequest request,
       @AuthenticationPrincipal AuthUser user) {
     String key = IdempotencyKeys.validate(keyHeader);
+    // PIN 이 틀리면 여기서 끝난다. 환불도 상태 변경도 일어나지 않는다. 탈퇴 트랜잭션 밖에서 확인해야 실패 횟수가 남는다
+    pinService.verify(user.userId(), request.pin());
     return ApiResponse.ok(
         withdrawalService.settle(
             user.userId(), ownedResources.walletIdOf(user), request.expectedRefundAmount(), key));
