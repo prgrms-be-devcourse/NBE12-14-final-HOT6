@@ -9,7 +9,7 @@ const ITEMS = [
   { href: "/admin/budget", label: "예산 관리", icon: ICONS.gauge },
   { href: "/admin/policy", label: "정책 관리", icon: ICONS.sliders },
   { href: "/admin/notices", label: "공지 관리", icon: ICONS.bell },
-  { href: "/admin/payouts", label: "지급 배치", icon: ICONS.payout },
+  { href: "/admin/earnings", label: "적립 관리", icon: ICONS.payout },
   { href: "/admin/settle", label: "정산 · 원장 대사", icon: ICONS.scale },
 ];
 

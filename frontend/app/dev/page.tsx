@@ -18,7 +18,7 @@ const LANES: { title: string; note?: string; items: Item[] }[] = [
     { href: "/merchant/qr", label: "③ QR 생성", star: true }, { href: "/merchant/paid", label: "④ QR 결제 완료 확인", star: true },
     { href: "/merchant/payments", label: "⑤ 결제 내역" }, { href: "/merchant/daily", label: "⑥ 일 정산" }, { href: "/merchant/monthly", label: "⑦ 월 정산" } ] },
   { title: "운영팀", items: [
-    { href: "/admin", label: "① 대시보드" }, { href: "/admin/budget", label: "② 예산 관리" }, { href: "/admin/policy", label: "② 정책 관리", star: true }, { href: "/admin/notices", label: "공지 관리" }, { href: "/admin/settle", label: "③ 정산 · 원장 대사" } ] },
+    { href: "/admin", label: "① 대시보드" }, { href: "/admin/budget", label: "② 예산 관리" }, { href: "/admin/policy", label: "② 정책 관리", star: true }, { href: "/admin/notices", label: "공지 관리" }, { href: "/admin/earnings", label: "적립 관리" }, { href: "/admin/settle", label: "③ 정산 · 원장 대사" } ] },
 ];
 
 export default function DevMenuPage() {

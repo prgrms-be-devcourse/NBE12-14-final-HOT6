@@ -57,7 +57,7 @@ export default function AdminDashboardPage() {
   const errors = [budget.error, policies.error, settings.error].filter(Boolean);
 
   const todos = [
-    { k: "지금 지급 가능", v: payouts.data ? `${payouts.data.dueCount.toLocaleString("ko-KR")}건` : "…", sub: payouts.data ? won(payouts.data.dueAmount) : "", href: "/admin/payouts" },
+    { k: "지금 지급 가능", v: payouts.data ? `${payouts.data.dueCount.toLocaleString("ko-KR")}건` : "…", sub: payouts.data ? won(payouts.data.dueAmount) : "", href: "/admin/earnings?tab=payouts" },
     {
       k: "예약된 변경", v: limitCount != null && policies.data ? `${rateCount + limitCount}건` : "…",
       sub: limitCount != null && policies.data ? `적립률 ${rateCount} · 한도 ${limitCount}` : "",

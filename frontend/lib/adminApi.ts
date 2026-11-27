@@ -1,5 +1,5 @@
 import { api, ApiError } from "@/lib/api";
-import type { Notice } from "@/lib/cashbackApi";
+import type { EarningStatus, ExclusionCode, Notice } from "@/lib/cashbackApi";
 import type { PageResponse } from "@/lib/types";
 
 // 운영자용 캐시백 API (/api/admin/cashback/**)
@@ -24,6 +24,19 @@ export type Forecast = {
 };
 
 const BASE = "/admin/cashback";
+
+// 모든 이용자의 적립 내역. 이용자는 지갑 번호로만 구분한다
+export type AdminEarning = {
+  earningId: number; paymentId: number; walletId: number; status: EarningStatus; walletUsedAmount: number; amount: number; appliedRate: number | null;
+  requestedAt: string; payableAt: string | null; paidAt: string | null; canceledAt: string | null; exclusionReason: ExclusionCode | null;
+};
+// 빈 문자열은 조건 없음
+export type EarningFilter = { status: EarningStatus | ""; walletId: string; from: string; to: string };
+export const getAdminEarnings = (filter: EarningFilter, page = 0, size = 20) => {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  for (const [key, value] of Object.entries(filter)) if (value) params.set(key, value);
+  return api<PageResponse<AdminEarning>>(`${BASE}/earnings?${params}`);
+};
 
 // 서버 설정값(운영 화면의 안내 문구가 쓴다)
 export type CashbackRules = { contingencyRate: number; emergencyRatio: number; noticeDays: number; payoutDelayDays: number };
