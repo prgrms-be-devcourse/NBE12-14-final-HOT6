@@ -12,7 +12,7 @@ import { useLoad } from "@/lib/useLoad";
 const PAGE_SIZE = 20;
 
 // 운영자의 적립 지급 배치: 지급 대기 현황, 수동 실행, 실행 목록과 상세
-export default function AdminPayoutsPage() {
+export default function PayoutBatch({ onRan }: { onRan: () => void }) {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [result, setResult] = useState<PayoutRunResult | null>(null);
@@ -35,15 +35,14 @@ export default function AdminPayoutsPage() {
       setResult(await runPayouts());
       setPage(0);
       reload();
+      onRan();
     } finally {
       running.current = false;
     }
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <h1 className="text-2xl font-extrabold">적립 지급 배치</h1>
-
+    <div className="space-y-5">
       <section className="card space-y-3 !p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold">지급 대기 현황</h2>

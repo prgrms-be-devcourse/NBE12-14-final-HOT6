@@ -8,6 +8,7 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
+import com.back.nbe1214finalhot6.domain.merchant.geocoding.Location;
 import com.back.nbe1214finalhot6.domain.merchant.geocoding.LocationChange;
 import com.back.nbe1214finalhot6.domain.merchant.repository.MerchantRepository;
 import com.back.nbe1214finalhot6.support.IntegrationTest;
@@ -95,6 +96,31 @@ class MerchantServiceTest {
     assertThat(updated.getAddress()).isEqualTo("원래 주소");
     assertThat(updated.isCashbackEligible()).isTrue();
     assertThat(updated.getOwnerId()).isEqualTo(ownerId);
+  }
+
+  @Test
+  @DisplayName("좌표를 만든 주소와 저장된 주소가 같으면 좌표를 반영한다")
+  void 같은_주소_기준이면_좌표_반영() {
+    Long id = register("이름", "옛 주소", true);
+
+    merchantService.update(
+        id, new MerchantUpdateRequest(null, "새 주소"), LocationChange.set(new Location(37.5, 127.0), "새 주소"));
+
+    assertThat(reload(id).getLatitude()).isEqualTo(37.5);
+  }
+
+  @Test
+  @DisplayName("변환하는 사이 주소가 바뀌었으면 옛 주소의 좌표는 저장하지 않는다")
+  void 주소가_바뀐_사이의_좌표는_버림() {
+    Long id = register("이름", "바뀐 주소", true);
+
+    // 옛 주소를 기준으로 만든 좌표를 가진 이름만 수정하는 요청이 늦게 도착한 경우
+    merchantService.update(
+        id, new MerchantUpdateRequest("새 이름", null), LocationChange.set(new Location(37.5, 127.0), "옛 주소"));
+
+    Merchant saved = reload(id);
+    assertThat(saved.getName()).isEqualTo("새 이름");
+    assertThat(saved.getLatitude()).isNull();
   }
 
   @Test

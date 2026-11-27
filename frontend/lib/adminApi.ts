@@ -1,5 +1,5 @@
 import { api, ApiError } from "@/lib/api";
-import type { Notice } from "@/lib/cashbackApi";
+import type { EarningStatus, ExclusionCode, Notice } from "@/lib/cashbackApi";
 import type { PageResponse } from "@/lib/types";
 
 // 운영자용 캐시백 API (/api/admin/cashback/**)
@@ -10,8 +10,15 @@ export type MonthlyBudget = {
   reservedAmount: number; paidAmount: number; contingencyAmount: number; remainingAmount: number;
   usedRate: number; remainingRate: number; warning: BudgetWarning; baseRate: number | null; status: BudgetStatus;
 };
+// 요율을 인하한 시점의 예산과 예측. 그 달 예산이 없었으면 직전 요율만 있다
+export type PolicyBasis = {
+  previousRate: number; year: number | null; month: number | null; allocatedAmount: number | null; paidAmount: number | null;
+  reservedAmount: number | null; remainingAmount: number | null; contingencyAmount: number | null; dailyDemand: number | null;
+  fastExhaustionDate: string | null; midExhaustionDate: string | null; slowExhaustionDate: string | null; noticeLineDate: string | null; modelVersion: string | null;
+};
 export type PolicyHistory = {
-  historyId: number; policyId: number; action: "CREATE" | "UPDATE"; changedBy: number; changedAt: string;
+  historyId: number; policyId: number; action: "CREATE" | "UPDATE"; changedBy: number | null; changedAt: string;
+  reason: string | null; basis: PolicyBasis | null;
   beforeRate: number | null; beforeStartsAt: string | null; beforeEndsAt: string | null;
   afterRate: number | null; afterStartsAt: string | null; afterEndsAt: string | null;
 };
@@ -24,6 +31,19 @@ export type Forecast = {
 };
 
 const BASE = "/admin/cashback";
+
+// 모든 이용자의 적립 내역. 이용자는 지갑 번호로만 구분한다
+export type AdminEarning = {
+  earningId: number; paymentId: number; walletId: number; status: EarningStatus; walletUsedAmount: number; amount: number; appliedRate: number | null;
+  requestedAt: string; payableAt: string | null; paidAt: string | null; canceledAt: string | null; exclusionReason: ExclusionCode | null;
+};
+// 빈 문자열은 조건 없음
+export type EarningFilter = { status: EarningStatus | ""; walletId: string; from: string; to: string };
+export const getAdminEarnings = (filter: EarningFilter, page = 0, size = 20) => {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  for (const [key, value] of Object.entries(filter)) if (value) params.set(key, value);
+  return api<PageResponse<AdminEarning>>(`${BASE}/earnings?${params}`);
+};
 
 // 서버 설정값(운영 화면의 안내 문구가 쓴다)
 export type CashbackRules = { contingencyRate: number; emergencyRatio: number; noticeDays: number; payoutDelayDays: number };
@@ -73,8 +93,9 @@ export const updateNotice = (noticeId: number, body: SettingNotice) => api<Admin
 export type Policy = { policyId: number; rate: number; startsAt: string; endsAt: string | null };
 export const getPolicies = () => api<Policy[]>(`${BASE}/policies`);
 export const getForecast = () => api<Forecast>(`${BASE}/forecast`);
-export const reduceRate = (rate: number, effectiveAt: string) =>
-  api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt } });
+export const REASON_MAX = 200;
+export const reduceRate = (rate: number, effectiveAt: string, reason: string) =>
+  api<unknown>(`${BASE}/policies/reductions`, { method: "POST", body: { rate, effectiveAt, reason } });
 export const noticeStop = (year: number, month: number) => api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}/notice-stop`, { method: "POST" });
 export const emergencyStop = (year: number, month: number) =>
   api<MonthlyBudget>(`${BASE}/budget/monthly/${year}/${month}/emergency-stop`, { method: "POST", body: { confirm: true } });

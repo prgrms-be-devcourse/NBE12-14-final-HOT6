@@ -23,6 +23,7 @@ public class MerchantRegistrationFacade {
 
   public MerchantRegisterResponse register(AuthUser user, MerchantRegisterRequest request) {
     userRoleService.requireOwner(user.userId()); // 점주가 아니면 가맹점을 만들기 전에 거절한다
+    merchantService.assertNotRegistered(user.userId()); // 이미 있으면 외부 호출 없이 MER-002
     Location location = locationResolver.resolveForRegister(request.address()); // 주소를 못 찾으면 MER-006
     return merchantService.register(user.userId(), request, location);
   }

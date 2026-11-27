@@ -37,6 +37,14 @@ public class MerchantService {
    *
    * @param location 주소를 변환한 좌표. 알 수 없으면 null
    */
+  /** 이미 가맹점이 있으면 MER-002 로 거절한다. 외부 호출(주소 변환) 전에 빨리 거르는 용도이고, 동시 요청은 {@link #register} 의 확인과 유니크 제약이 막는다. */
+  @Transactional(readOnly = true)
+  public void assertNotRegistered(Long ownerId) {
+    if (merchantRepository.existsByOwnerId(ownerId)) {
+      throw new BusinessException(MerchantErrorCode.MERCHANT_ALREADY_REGISTERED);
+    }
+  }
+
   @Transactional
   public MerchantRegisterResponse register(
       Long ownerId, MerchantRegisterRequest request, Location location) {
@@ -86,6 +94,17 @@ public class MerchantService {
   }
 
   /**
+   * 지갑 주인(이용자)이 이 가맹점의 점주 본인인지 확인한다. 이용자·점주 계정은 따로지만 같은 사람은 같은 전화번호를 쓴다고 보고 전화번호로
+   * 비교한다(#301). 본인 가맹점 결제는 캐시백을 적립하지 않으려고 결제와 적립 미리보기가 부른다. 둘 다 지갑 번호를 갖고 있어 지갑으로 받는다.
+   *
+   * <p>다른 전화번호로 만든 계정은 구분하지 못한다(본인인증 값이 없음).
+   */
+  @Transactional(readOnly = true)
+  public boolean isOwnedBySamePerson(Long merchantId, Long walletId) {
+    return merchantRepository.isOwnedBySamePerson(merchantId, walletId);
+  }
+
+  /**
    * 영업 중인 가맹점인지 확인한다. 해지 신청 뒤(CLOSING)와 해지 뒤(CLOSED)에는 결제와 QR 을 막으려고 다른 도메인이 부른다.
    *
    * @throws BusinessException 없으면 MER-001, 해지 진행 중이면 MER-003, 해지됐으면 MER-004
@@ -123,7 +142,8 @@ public class MerchantService {
             .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
 
     merchant.update(request.name(), request.address());
-    if (locationChange.apply()) {
+    // 변환하는 사이에 주소가 바뀌었으면 옛 주소의 좌표를 저장하지 않는다
+    if (locationChange.appliesTo(merchant.getAddress())) {
       merchant.updateLocation(locationChange.location());
     }
 

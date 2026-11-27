@@ -26,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class CashbackPolicyHistoryQueryTest {
 
+  private static final long OPERATOR_ID = 99L;
+
   private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 18, 9, 0);
 
   @Autowired private CashbackPolicyService policyService;
@@ -49,7 +51,7 @@ class CashbackPolicyHistoryQueryTest {
     budgetService.putMonthly(2026, 11, new MonthlyBudgetRequest(1_000_000L, new BigDecimal("0.03")));
     PolicyResponse reduced =
         policyService.reduceRate(
-            new RateReductionRequest(new BigDecimal("0.02"), LocalDateTime.of(2026, 11, 18, 12, 0)));
+            new RateReductionRequest(new BigDecimal("0.02"), LocalDateTime.of(2026, 11, 18, 12, 0), "테스트 사유"), OPERATOR_ID);
 
     PageResponse<PolicyHistoryResponse> result = policyService.findHistory(null, 0, 20);
 
@@ -58,7 +60,8 @@ class CashbackPolicyHistoryQueryTest {
     assertThat(history.policyId()).isEqualTo(reduced.policyId());
     assertThat(history.action()).isEqualTo(PolicyHistoryAction.CREATE);
     assertThat(history.changedAt()).isEqualTo(NOW);
-    assertThat(history.changedBy()).isNull();
+    assertThat(history.changedBy()).isEqualTo(OPERATOR_ID);
+    assertThat(history.reason()).isEqualTo("테스트 사유");
     assertThat(history.beforeRate()).isNull();
     assertThat(history.beforeStartsAt()).isNull();
     assertThat(history.beforeEndsAt()).isNull();

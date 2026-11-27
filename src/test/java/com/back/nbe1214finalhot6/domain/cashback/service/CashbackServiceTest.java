@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class CashbackServiceTest {
 
+  private static final long OPERATOR_ID = 99L;
+
   private static final long WALLET = 7L;
   private static final YearMonth NOV = YearMonth.of(2026, 11);
   private static final LocalDateTime AT = LocalDateTime.of(2026, 11, 18, 9, 0);
@@ -251,7 +253,7 @@ class CashbackServiceTest {
   void reserve_usesRateAtRequestTime() {
     var reduced =
         policyService.reduceRate(
-            new RateReductionRequest(new BigDecimal("0.02"), LocalDateTime.of(2026, 11, 18, 12, 0)));
+            new RateReductionRequest(new BigDecimal("0.02"), LocalDateTime.of(2026, 11, 18, 12, 0), "테스트 사유"), OPERATOR_ID);
 
     CashbackReserveResponse before =
         service.reserve(request(1L, true, 10_000L, LocalDateTime.of(2026, 11, 18, 10, 0)));

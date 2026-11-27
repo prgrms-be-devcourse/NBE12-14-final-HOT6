@@ -35,6 +35,14 @@ const POLL_DELAYS_MS = [2000, 4000, 8000, 16000];
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const fmt = (iso?: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "-");
 
+// 요율대로 계산한 적립액. 서버와 같이 데브머니 사용분 × 요율을 원 단위로 내린다.
+// 0.29 × 100 = 28.999… 처럼 소수 계산 오차로 1원 적게 나오지 않도록 아주 작은 값을 더한 뒤 내린다
+const fullCashback = (r: PaymentResponse) => Math.floor(r.walletUsedAmount * (r.appliedRate ?? 0) + 1e-6);
+
+// 월 적립 한도가 모자라 남은 한도만큼만 적립된 결제(#241). 결제 응답에 표시가 없어 요율대로의 금액과 비교한다
+const isLimitReduced = (r: PaymentResponse) =>
+  r.appliedRate != null && (r.cashbackEarnedAmount ?? 0) > 0 && (r.cashbackEarnedAmount ?? 0) < fullCashback(r);
+
 function ReceiptBody() {
   const router = useRouter();
   const [state, setState] = useState<State>({ kind: "loading" });
@@ -180,6 +188,7 @@ function ReceiptBody() {
   ];
   const reason = r.cashbackExclusionReason as ExclusionCode | null;
   const excluded = !!reason && reason !== "NONE";
+  const limitReduced = !excluded && isLimitReduced(r);
 
   return (
     <div className="flex flex-1 flex-col px-5 pt-10">
@@ -200,6 +209,7 @@ function ReceiptBody() {
           ]}
         />
         <dl className="mt-1">{rows.map(([k, v]) => <div key={k} className="flex justify-between border-t border-zinc-100 py-2 text-sm"><dt className="text-zinc-500">{k}</dt><dd className="font-medium tabular-nums">{v}</dd></div>)}</dl>
+        {limitReduced && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">이번 달 적립 한도까지만 적립됐어요</p>}
         {excluded && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">적립 제외 · {reason === "BUDGET_EXHAUSTED" && paused ? "적립이 중단되어 이번 결제는 적립되지 않았어요" : (REASON_TEXT[reason as ExclusionCode] ?? reason)}</p>}
         <p className="note mt-2">소수점 이하는 버림 · 접수 시각 기준 요율로 확정</p>
       </section>

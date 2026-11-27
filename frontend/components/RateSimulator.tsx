@@ -185,11 +185,11 @@ export default function RateSimulator({ rate, onRate, budget, points, today, day
 
       <dl className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-lg bg-slate-50 px-3 py-2.5">
-          <dt className="note">하루 예상 지급액</dt>
+          <dt className="note">하루 예상 지급액 (이번 달 평균 기준)</dt>
           <dd className="mt-0.5 text-lg font-bold tabular-nums">{won(Math.round(dailyPayout(r)))}</dd>
         </div>
         <div className={`rounded-lg px-3 py-2.5 ${danger ? "bg-red-50" : reachReserve ? "bg-amber-50" : "bg-emerald-50"}`}>
-          <dt className="note">대비금 도달 예상</dt>
+          <dt className="note">대비금 도달 예상 (이번 달 평균 기준)</dt>
           <dd className={`mt-0.5 text-lg font-bold ${danger ? "text-red-700" : reachReserve ? "text-amber-800" : "text-emerald-700"}`}>
             {reachReserve ? dayLabel(reachReserve) : "이번 달 안 닿음"}
           </dd>
