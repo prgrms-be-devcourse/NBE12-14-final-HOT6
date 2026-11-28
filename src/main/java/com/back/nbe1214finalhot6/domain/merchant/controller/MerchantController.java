@@ -7,6 +7,7 @@ import com.back.nbe1214finalhot6.domain.auth.security.AuthUser;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
+import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRevenueProofRequest;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantRegistrationFacade;
 import com.back.nbe1214finalhot6.domain.merchant.service.MerchantService;
@@ -23,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -70,6 +72,17 @@ public class MerchantController {
   public ApiResponse<MerchantResponse> update(
       @AuthenticationPrincipal AuthUser user, @Valid @RequestBody MerchantUpdateRequest request) {
     return ApiResponse.ok(updateFacade.update(ownedResources.merchantIdOf(user), request));
+  }
+
+  @Operation(
+      summary = "증빙 제출",
+      description =
+          "연매출 30억 미만 증빙 서류(revenueProof)를 제출해 적립 제외 가맹점을 적립 대상으로 바꾼다. 이미 적립 대상이면 같은 결과를 돌려준다. "
+              + "제출한 뒤의 결제부터 적용되고 이미 끝난 결제는 바뀌지 않는다. 해지 신청 또는 완료된 가맹점은 409(MER-003, MER-004)이다")
+  @PutMapping("/me/revenue-proof")
+  public ApiResponse<MerchantResponse> submitRevenueProof(
+      @AuthenticationPrincipal AuthUser user, @Valid @RequestBody MerchantRevenueProofRequest request) {
+    return ApiResponse.ok(merchantService.submitRevenueProof(ownedResources.merchantIdOf(user)));
   }
 
   @Operation(

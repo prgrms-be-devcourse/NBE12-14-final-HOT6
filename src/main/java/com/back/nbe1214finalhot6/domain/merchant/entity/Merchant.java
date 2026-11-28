@@ -97,6 +97,11 @@ public class Merchant {
         location == null ? null : location.longitude());
   }
 
+  /** 증빙을 제출해 적립 대상이 된다. 이미 적립 대상이면 그대로다. */
+  public void approveCashback() {
+    this.cashbackEligible = true;
+  }
+
   public void update(String name, String address) {
     if (name != null) {
       this.name = name;

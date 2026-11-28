@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import LogoutLink from "@/components/LogoutLink";
+import RevenueProofCard from "@/components/RevenueProofCard";
 import MapPicker, { type LatLng } from "@/components/MapPicker";
 import { ApiError } from "@/lib/api";
 import { loadCtx, saveCtx } from "@/lib/devContext";
@@ -71,6 +72,7 @@ export default function MerchantEditPage() {
           <div className="font-semibold">{f.name}</div>
           <span className={`badge mt-1 ${eligible ? "badge-ok" : "badge-warn"}`}>{eligible ? "적립 가능 가맹점" : "적립 제외 가맹점"}</span>
         </div>
+        {loaded && !eligible && <RevenueProofCard onApproved={() => { setEligible(true); setMsg({ ok: true, text: "증빙이 제출되어 적립 가능 가맹점이 되었어요" }); }} />}
         {input("name", "가맹점명")}
         {input("address", "주소")}
         <div>
