@@ -2,13 +2,15 @@
 
 import { Suspense, useState } from "react";
 import EarningList from "@/components/EarningList";
+import EarningStats from "@/components/EarningStats";
 import PayoutBatch from "@/components/PayoutBatch";
 import Tabs, { useTab, type TabItem } from "@/components/Tabs";
 
-type TabId = "list" | "payouts";
+type TabId = "list" | "payouts" | "stats";
 const TABS: TabItem<TabId>[] = [
   { id: "payouts", label: "지급 배치" },
   { id: "list", label: "적립 내역" },
+  { id: "stats", label: "적립 통계" },
 ];
 
 function EarningsBody() {
@@ -21,6 +23,8 @@ function EarningsBody() {
       {/* 조회 조건과 실행 결과가 탭을 오가도 남도록 숨기기만 한다 */}
       <div hidden={tab !== "list"}><EarningList refresh={ran} /></div>
       <div hidden={tab !== "payouts"}><PayoutBatch onRan={() => setRan((n) => n + 1)} /></div>
+      {/* 통계는 바뀐 값을 보이도록 열 때마다 새로 읽는다 */}
+      {tab === "stats" && <EarningStats />}
     </div>
   );
 }
