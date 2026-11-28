@@ -75,4 +75,23 @@ public interface CashbackMonthlyLimitRepository extends JpaRepository<CashbackMo
       @Param("walletId") Long walletId,
       @Param("month") LocalDate month,
       @Param("amount") long amount);
+
+  /**
+   * 그 달에 사용량이 있는 이용자를 한도 사용률 구간별로 센다. 구간의 아래 경계는 포함하고 위 경계는 포함하지 않으며, 한도 이상은 도달이다. 읽기만 한다.
+   */
+  @Query(
+      """
+      select
+        coalesce(sum(case when l.usedAmount * 4 < :limit then 1 else 0 end), 0L) as below25,
+        coalesce(sum(case when l.usedAmount * 4 >= :limit and l.usedAmount * 2 < :limit
+            then 1 else 0 end), 0L) as below50,
+        coalesce(sum(case when l.usedAmount * 2 >= :limit and l.usedAmount * 4 < :limit * 3
+            then 1 else 0 end), 0L) as below75,
+        coalesce(sum(case when l.usedAmount * 4 >= :limit * 3 and l.usedAmount < :limit
+            then 1 else 0 end), 0L) as below100,
+        coalesce(sum(case when l.usedAmount >= :limit then 1 else 0 end), 0L) as reached
+      from CashbackMonthlyLimit l
+      where l.limitMonth = :month and l.usedAmount > 0
+      """)
+  LimitUsageCount countByUsage(@Param("month") LocalDate month, @Param("limit") long limit);
 }

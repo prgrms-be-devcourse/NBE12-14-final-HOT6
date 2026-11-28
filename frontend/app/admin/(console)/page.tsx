@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import BarChart from "@/components/BarChart";
 import ForecastAccuracyTable from "@/components/ForecastAccuracyTable";
+import ForecastChart from "@/components/ForecastChart";
 import { ApiError } from "@/lib/api";
 import {
-  getAdminNotices, getForecast, getMonthlyBudget, getPayoutStatus, getPolicies, getSettings, md, moneyUnit, STATUS_TEXT, thisYearMonth,
+  getAdminNotices, getForecast, getMonthlyBudget, getPayoutStatus, getPolicies, getSettings, STATUS_TEXT, thisYearMonth,
 } from "@/lib/adminApi";
 import { LIMIT_NAME, mmdd, pctText } from "@/lib/cashbackApi";
 import { ymd } from "@/lib/dates";
@@ -34,10 +34,6 @@ export default function AdminDashboardPage() {
 
   const b = budget.data;
   const f = forecast.data;
-  const pts = f?.points.slice(0, 7) ?? [];
-  // 작은 예산도 보이도록 가장 큰 값에 맞춰 원·만원 단위를 고른다
-  const unit = moneyUnit(Math.max(f?.contingencyAmount ?? 0, ...pts.flatMap((p) => [p.fastRemaining, p.midRemaining, p.slowRemaining])));
-
   const now = nowKst();
   const current = policies.data?.find((p) => p.startsAt.slice(0, 16) <= now && (!p.endsAt || now < p.endsAt.slice(0, 16)));
   const upcoming = policies.data?.filter((p) => p.startsAt.slice(0, 16) > now).sort((a, c) => a.startsAt.localeCompare(c.startsAt))[0];
@@ -104,29 +100,7 @@ export default function AdminDashboardPage() {
       <section className="card !p-5">
         <h2 className="mb-3 text-lg font-bold">소진 예측 <span className="note">(최근 7일 수요 기반{f ? ` · 모델 ${f.assumptions.modelVersion}` : ""})</span></h2>
         {forecast.error && <p className="note">{forecast.error}</p>}
-        {f && pts.length > 0 && (
-          <BarChart
-            label="소진 예측"
-            labels={pts.map((p) => md(p.date))}
-            reserveLine={f.contingencyAmount / unit.div}
-            series={[
-              { name: `빠름(${unit.label})`, color: "var(--color-blue-300)", values: pts.map((p) => p.fastRemaining / unit.div) },
-              { name: `중앙(${unit.label})`, color: "var(--color-blue-600)", values: pts.map((p) => p.midRemaining / unit.div) },
-              { name: `느림(${unit.label})`, color: "var(--color-blue-900)", values: pts.map((p) => p.slowRemaining / unit.div) },
-            ]}
-          />
-        )}
-        {f && (
-          <dl className="mt-4 grid gap-3 sm:grid-cols-3">
-            {([
-              ["예상 소진일 (빠름 / 중앙 / 느림)", `${md(f.fast.exhaustionDate)} / ${md(f.mid.exhaustionDate)} / ${md(f.slow.exhaustionDate)}`],
-              ["대비금 도달일 (중앙)", md(f.mid.noticeLineDate)],
-              ["최소 보장 인원", `${f.guaranteedUsers.toLocaleString("ko-KR")}명`],
-            ] as const).map(([k, v]) => (
-              <div key={k} className="rounded-lg bg-slate-50 px-3 py-2"><dt className="note">{k}</dt><dd className="mt-0.5 font-bold tabular-nums">{v}</dd></div>
-            ))}
-          </dl>
-        )}
+        {f && <ForecastChart forecast={f} />}
         <ForecastAccuracyTable />
       </section>
 

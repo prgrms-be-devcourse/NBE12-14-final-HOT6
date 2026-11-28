@@ -93,6 +93,11 @@ export const updateNotice = (noticeId: number, body: SettingNotice) => api<Admin
 export type Policy = { policyId: number; rate: number; startsAt: string; endsAt: string | null };
 export const getPolicies = () => api<Policy[]>(`${BASE}/policies`);
 export const getForecast = () => api<Forecast>(`${BASE}/forecast`);
+// 적립 통계: 이번 달 월 한도 사용 분포와 최근 일별 적립액
+export type MonthlyLimitUsage = { year: number; month: number; limit: number; userCount: number; below25: number; below50: number; below75: number; below100: number; reached: number };
+export const getMonthlyLimitUsage = () => api<MonthlyLimitUsage>(`${BASE}/statistics/monthly-limit`);
+export type DailyEarningTrend = { days: { date: string; amount: number; previousAverage: number; rate: number | null }[] };
+export const getDailyEarnings = () => api<DailyEarningTrend>(`${BASE}/statistics/daily-earnings`);
 // 하루 한 번 저장한 예측의 하루 예상 수요와 그날 실제 확보액의 비교. 최근 날짜부터
 export type ForecastAccuracy = {
   averageError: number | null; withinRangeDays: number;
@@ -111,8 +116,6 @@ export const thisYearMonth = () => {
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 };
 export const STATUS_TEXT: Record<BudgetStatus, string> = { ACTIVE: "정상 적립", NOTICED: "중단 공지 중", STOPPED: "적립 중단", CLOSED: "마감" };
-// 그래프 금액 단위. 1만 원에 못 미치는 작은 예산도 보이도록, 가장 큰 값이 1만 원 미만이면 원 단위로 쓴다
-export const moneyUnit = (max: number) => (max >= 10_000 ? { label: "만원", div: 10_000 } : { label: "원", div: 1 });
 export const md = (iso: string | null) => (iso ? `${iso.slice(5, 7)}.${iso.slice(8, 10)}` : "-");
 
 // 연·월 예산 (/api/admin/cashback/budget/**)
