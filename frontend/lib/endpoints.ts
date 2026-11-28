@@ -15,6 +15,10 @@ export const getMyMerchant = () => api<MerchantResponse>("/merchants/me");
 
 export const updateMerchant = (body: MerchantUpdateRequest) => api<MerchantResponse>("/merchants/me", { method: "PATCH", body });
 
+// 증빙 서류를 제출해 적립 제외 가맹점을 적립 대상으로 바꾼다(이미 적립 대상이면 같은 결과)
+export const submitRevenueProof = (revenueProof: string) =>
+  api<MerchantResponse>("/merchants/me/revenue-proof", { method: "PUT", body: { revenueProof } });
+
 export const searchMerchants = (name: string, page = 0, size = 20) =>
   api<PageResponse<MerchantResponse>>(`/merchants?name=${encodeURIComponent(name)}&page=${page}&size=${size}`);
 

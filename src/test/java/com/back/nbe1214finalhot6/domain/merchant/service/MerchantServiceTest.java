@@ -7,6 +7,7 @@ import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantRegisterResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantResponse;
 import com.back.nbe1214finalhot6.domain.merchant.dto.MerchantUpdateRequest;
 import com.back.nbe1214finalhot6.domain.merchant.entity.Merchant;
+import com.back.nbe1214finalhot6.domain.merchant.entity.MerchantStatus;
 import com.back.nbe1214finalhot6.domain.merchant.exception.MerchantErrorCode;
 import com.back.nbe1214finalhot6.domain.merchant.geocoding.Location;
 import com.back.nbe1214finalhot6.domain.merchant.geocoding.LocationChange;
@@ -121,6 +122,65 @@ class MerchantServiceTest {
     Merchant saved = reload(id);
     assertThat(saved.getName()).isEqualTo("새 이름");
     assertThat(saved.getLatitude()).isNull();
+  }
+
+  @Test
+  @DisplayName("증빙을 제출하면 적립 제외 가맹점이 적립 대상이 된다")
+  void 증빙제출시_적립대상으로_전환() {
+    Long id = register("증빙 제출 가게", "주소", false);
+    assertThat(reload(id).isCashbackEligible()).isFalse();
+
+    MerchantResponse response = merchantService.submitRevenueProof(id);
+
+    assertThat(response.cashbackEligible()).isTrue();
+    assertThat(reload(id).isCashbackEligible()).isTrue();
+  }
+
+  @Test
+  @DisplayName("이미 적립 대상이면 다시 제출해도 같은 결과다")
+  void 이미_적립대상이면_같은_결과() {
+    Long id = register("이미 적립 가게", "주소", true);
+
+    MerchantResponse first = merchantService.submitRevenueProof(id);
+    MerchantResponse second = merchantService.submitRevenueProof(id);
+
+    assertThat(first.cashbackEligible()).isTrue();
+    assertThat(second).isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("해지 신청한 가맹점은 증빙을 제출할 수 없고 MER-003 이다")
+  void 해지신청_가맹점은_거절() {
+    Long id = register("해지 신청 가게", "주소", false);
+    merchantRepository.updateStatusIfCurrent(id, MerchantStatus.ACTIVE, MerchantStatus.CLOSING);
+
+    assertThatThrownBy(() -> merchantService.submitRevenueProof(id))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_CLOSING));
+    assertThat(reload(id).isCashbackEligible()).isFalse();
+  }
+
+  @Test
+  @DisplayName("해지된 가맹점은 증빙을 제출할 수 없고 MER-004 이다")
+  void 해지완료_가맹점은_거절() {
+    Long id = register("해지 완료 가게", "주소", false);
+    merchantRepository.updateStatusIfCurrent(id, MerchantStatus.ACTIVE, MerchantStatus.CLOSING);
+    merchantRepository.updateStatusIfCurrent(id, MerchantStatus.CLOSING, MerchantStatus.CLOSED);
+
+    assertThatThrownBy(() -> merchantService.submitRevenueProof(id))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_CLOSED));
+  }
+
+  @Test
+  @DisplayName("없는 가맹점은 MER-001 이다")
+  void 없는_가맹점은_거절() {
+    assertThatThrownBy(() -> merchantService.submitRevenueProof(Long.MAX_VALUE))
+        .isInstanceOfSatisfying(
+            BusinessException.class,
+            e -> assertThat(e.getErrorCode()).isEqualTo(MerchantErrorCode.MERCHANT_NOT_FOUND));
   }
 
   @Test

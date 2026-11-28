@@ -133,6 +133,22 @@ public class MerchantService {
   }
 
   /** 이름·주소와 좌표를 고친다. 좌표는 {@code locationChange} 가 정한다(유지, 새 값, 비우기). */
+  /**
+   * 증빙을 제출해 적립 대상으로 바꾼다. 이미 적립 대상이면 같은 결과를 돌려준다. 해지 신청·완료 가맹점은 MER-003, MER-004 로 거절한다.
+   *
+   * <p>제출한 뒤의 결제부터 적용된다. 결제가 끝날 때 가맹점의 현재 값을 읽으므로 이미 끝난 결제는 바뀌지 않는다.
+   */
+  @Transactional
+  public MerchantResponse submitRevenueProof(Long merchantId) {
+    Merchant merchant =
+        merchantRepository
+            .findById(merchantId)
+            .orElseThrow(() -> new BusinessException(MerchantErrorCode.MERCHANT_NOT_FOUND));
+    MerchantStatusGuard.assertActive(merchant.getStatus());
+    merchant.approveCashback();
+    return MerchantResponse.from(merchant);
+  }
+
   @Transactional
   public MerchantResponse update(
       Long merchantId, MerchantUpdateRequest request, LocationChange locationChange) {

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -82,6 +83,35 @@ class MerchantControllerTest {
         .andExpect(jsonPath("$.success").value(true))
         .andExpect(jsonPath("$.data.merchantId").value(1))
         .andExpect(jsonPath("$.data.cashbackEligible").value(true));
+  }
+
+  @Test
+  @DisplayName("증빙 제출은 로그인한 점주의 가맹점으로 서비스를 부르고 200 을 반환한다")
+  void 증빙제출성공() throws Exception {
+    given(merchantService.submitRevenueProof(1L))
+        .willReturn(new MerchantResponse(1L, "가게", "주소", true, MerchantStatus.ACTIVE, null, null));
+
+    mockMvc
+        .perform(
+            put("/api/merchants/me/revenue-proof")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"revenueProof": "revenue.pdf"}
+                    """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.cashbackEligible").value(true));
+
+    verify(merchantService).submitRevenueProof(1L);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"{}", "{\"revenueProof\": \"\"}", "{\"revenueProof\": \"   \"}"})
+  @DisplayName("증빙 값이 비어 있으면 400 이다")
+  void 증빙제출_빈값은_400(String body) throws Exception {
+    mockMvc
+        .perform(put("/api/merchants/me/revenue-proof").contentType(MediaType.APPLICATION_JSON).content(body))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
